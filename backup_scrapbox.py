@@ -3,6 +3,7 @@
 import argparse
 import logging
 from typing import Optional
+from dotenv import dotenv_values
 
 
 def backup_scrapbox(
@@ -14,6 +15,13 @@ def backup_scrapbox(
 
 def argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
+    # env
+    parser.add_argument(
+            '--env',
+            dest='env',
+            default='.env',
+            metavar='DOTENV',
+            help='env file (default .env)')
     # verbose
     parser.add_argument(
             '-v', '--verbose',
@@ -36,5 +44,8 @@ if __name__ == '__main__':
     if option.verbose:
         logger.setLevel(logging.DEBUG)
     logger.debug('option: %s', option)
+    # .env
+    config = dotenv_values(option.env)
+    logger.debug('config: %s', config)
     # main
     backup_scrapbox(logger=logger)
