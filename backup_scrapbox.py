@@ -1,10 +1,16 @@
 #!/usr/bin/env python
 
 import argparse
+import json
 import logging
 import sys
-from typing import Optional, TypedDict, cast
+import time
+from typing import Any, Final, Optional, TypedDict, cast
 from dotenv import dotenv_values
+import requests
+
+
+REQUEST_INTERVAL: Final[float] = 3.0
 
 
 class Config(TypedDict):
@@ -15,9 +21,38 @@ class Config(TypedDict):
 def backup_scrapbox(
         config: Config,
         *,
-        logger: Optional[logging.Logger] = None) -> None:
+        logger: Optional[logging.Logger] = None,
+        request_interval: float = REQUEST_INTERVAL) -> None:
     logger = logger or logging.getLogger(__name__)
     logger.info('backup-scrapbox')
+    # backup
+    backup(config, logger, request_interval)
+
+
+def backup(
+        config: Config,
+        logger: logging.Logger,
+        request_interval: float) -> None:
+    url_base = f'https://scrapbox.io/api/project-backup/{config["project"]}'
+    # list
+    backup_list = request_json(
+            f'{url_base}/list',
+            config['session_id'],
+            logger)
+    print(json.dumps(backup_list, ensure_ascii=False, indent=2))
+    time.sleep(request_interval)
+
+
+def request_json(
+        url: str,
+        session_id: str,
+        logger: logging.Logger) -> Optional[Any]:
+    cookie = {'connect.sid': session_id}
+    logger.info('request: %s', url)
+    response = requests.get(url, cookies=cookie)
+    if not response.ok:
+        return None
+    return json.loads(response.text)
 
 
 def argument_parser() -> argparse.ArgumentParser:
@@ -35,6 +70,14 @@ def argument_parser() -> argparse.ArgumentParser:
             dest='verbose',
             action='store_true',
             help='set log level to debug')
+    # request interval
+    parser.add_argument(
+            '--request-interval',
+            dest='request_interval',
+            type=float,
+            default=REQUEST_INTERVAL,
+            metavar='SECONDS',
+            help=f'request interval seconds (default {REQUEST_INTERVAL})')
     return parser
 
 
@@ -77,4 +120,5 @@ if __name__ == '__main__':
     # main
     backup_scrapbox(
             cast(Config, config),
-            logger=logger)
+            logger=logger,
+            request_interval=option.request_interval)
