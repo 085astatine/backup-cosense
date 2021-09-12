@@ -1,11 +1,27 @@
 # -*- coding: utf-8 -*-
 
-from typing import Optional, TypedDict
+import logging
+from typing import Optional, TypedDict, cast
+import dotenv
 
 
 class Config(TypedDict):
     project: str
     session_id: str
+
+
+def load_config(
+        envfile: str,
+        *,
+        logger: Optional[logging.Logger] = None) -> Config:
+    logger = logger or logging.getLogger(__name__)
+    # load
+    logger.info('load config from "%s"', envfile)
+    config = dotenv.dotenv_values(envfile)
+    logger.debug('config: %s', config)
+    # validate
+    validate_config(config)
+    return cast(Config, config)
 
 
 def validate_config(config: dict[str, Optional[str]]) -> None:

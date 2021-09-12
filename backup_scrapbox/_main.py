@@ -3,9 +3,8 @@
 import argparse
 import logging
 import sys
-from typing import Final, Optional, cast
-import dotenv
-from ._config import Config, validate_config
+from typing import Final, Optional
+from ._config import Config, load_config
 from ._download import download
 
 
@@ -37,10 +36,8 @@ def main() -> None:
         logger.setLevel(logging.DEBUG)
     logger.debug('option: %s', option)
     # .env
-    config = dotenv.dotenv_values(option.env)
-    logger.debug('config: %s', config)
     try:
-        validate_config(config)
+        config = load_config(option.env, logger=logger)
     except Exception as error:
         sys.stderr.write(f'invalid env file: {option.env}\n')
         sys.stderr.write('{0}\n'.format('\n'.join(
@@ -50,7 +47,7 @@ def main() -> None:
         sys.exit(1)
     # main
     backup_scrapbox(
-            cast(Config, config),
+            config,
             logger=logger,
             request_interval=option.request_interval)
 
