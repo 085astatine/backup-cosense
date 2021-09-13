@@ -48,6 +48,63 @@ def jsonschema_backup_list():
     return schema
 
 
+class BackupPageJSON(TypedDict):
+    title: str
+    created: int
+    updated: int
+    id: str
+    lines: list[str]
+    linksLc: list[str]
+
+
+def jsonschema_backup_page():
+    schema = {
+      'type': 'object',
+      'required': ['title', 'created', 'updated', 'id', 'lines', 'linksLc'],
+      'additionalProperties': False,
+      'properties': {
+        'title': {'type': 'string'},
+        'created': {'type': 'integer'},
+        'updated': {'type': 'integer'},
+        'id': {'type': 'string'},
+        'lines': {
+          'type': 'array',
+          'items': {'type': 'string'},
+        },
+        'linksLc': {
+          'type': 'array',
+          'items': {'type': 'string'},
+        },
+      },
+    }
+    return schema
+
+
+class BackupJSON(TypedDict):
+    name: str
+    displayName: str
+    exported: int
+    pages: list[BackupPageJSON]
+
+
+def jsonschema_backup():
+    schema = {
+      'type': 'object',
+      'required': ['name', 'displayName', 'exported', 'pages'],
+      'additionalProperties': False,
+      'properties': {
+        'name': {'type': 'string'},
+        'displayName': {'type': 'string'},
+        'exported': {'type': 'integer'},
+        'pages': {
+          'type': 'array',
+          'items': jsonschema_backup_page(),
+        },
+      },
+    }
+    return schema
+
+
 def load_json(
         path: pathlib.Path) -> Optional[Any]:
     if not path.exists():
