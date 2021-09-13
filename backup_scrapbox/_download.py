@@ -2,12 +2,15 @@
 
 import json
 import logging
+import pathlib
 import time
 from typing import Any, Optional
 import jsonschema
 import requests
 from ._env import Env
-from ._json import BackupListJSON, jsonschema_backup_list
+from ._json import (
+    BackupJSON, BackupInfoJSON, BackupListJSON, jsonschema_backup,
+    jsonschema_backup_list, save_json)
 
 
 def download(
@@ -27,6 +30,39 @@ def download(
             'response:\n%s',
             json.dumps(backup_list, ensure_ascii=False, indent=2))
     time.sleep(request_interval)
+    # TODO: get the timestamp of latest backup
+    # backup
+    for info in backup_list['backups']:
+        # TODO: check whether or not it is a target
+        _download_backup(env, info, logger, request_interval)
+
+
+def _download_backup(
+        env: Env,
+        info: BackupInfoJSON,
+        logger: logging.Logger,
+        request_interval: float) -> None:
+    url = (f'https://scrapbox.io/api/project-backup'
+           f'/{env["project"]}/{info["id"]}.json')
+    backup: Optional[BackupJSON] = _request_json(
+            url,
+            env['session_id'],
+            logger,
+            schema=jsonschema_backup())
+    time.sleep(request_interval)
+    if backup is None:
+        return
+    # save
+    timestamp = info['backuped']
+    save_directory = pathlib.Path(env['save_directory'])
+    # save backup
+    backup_path = save_directory.joinpath(f'{timestamp}.json')
+    logger.info('save %s', backup_path)
+    save_json(backup_path, backup)
+    # save backup info
+    info_path = save_directory.joinpath(f'{timestamp}.info.json')
+    logger.info('save %s', info_path)
+    save_json(info_path, info)
 
 
 def _request_json(

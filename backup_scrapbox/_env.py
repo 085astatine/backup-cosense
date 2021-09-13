@@ -8,6 +8,7 @@ import dotenv
 class Env(TypedDict):
     project: str
     session_id: str
+    save_directory: str
 
 
 def load_env(
@@ -26,7 +27,7 @@ def load_env(
 
 def validate_env(env: dict[str, Optional[str]]) -> None:
     messages: list[str] = []
-    keys = ['project', 'session_id']
+    keys = ['project', 'session_id', 'save_directory']
     messages.extend(
         f'"{key}" is not defined\n'
         for key in keys
