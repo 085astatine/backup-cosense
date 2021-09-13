@@ -5,18 +5,18 @@ import logging
 import time
 from typing import Any, Optional
 import requests
-from ._config import Config
+from ._env import Env
 
 
 def download(
-        config: Config,
+        env: Env,
         logger: logging.Logger,
         request_interval: float) -> None:
-    url_base = f'https://scrapbox.io/api/project-backup/{config["project"]}'
+    url_base = f'https://scrapbox.io/api/project-backup/{env["project"]}'
     # list
     backup_list = _request_json(
             f'{url_base}/list',
-            config['session_id'],
+            env['session_id'],
             logger)
     print(json.dumps(backup_list, ensure_ascii=False, indent=2))
     time.sleep(request_interval)

@@ -4,7 +4,7 @@ import argparse
 import logging
 import sys
 from typing import Final, Optional
-from ._config import Config, load_config
+from ._env import Env, load_env
 from ._download import download
 
 
@@ -12,14 +12,14 @@ _REQUEST_INTERVAL: Final[float] = 3.0
 
 
 def backup_scrapbox(
-        config: Config,
+        env: Env,
         *,
         logger: Optional[logging.Logger] = None,
         request_interval: float = _REQUEST_INTERVAL) -> None:
     logger = logger or logging.getLogger(__name__)
     logger.info('backup-scrapbox')
     # download backup
-    download(config, logger, request_interval)
+    download(env, logger, request_interval)
 
 
 def main() -> None:
@@ -37,7 +37,7 @@ def main() -> None:
     logger.debug('option: %s', option)
     # .env
     try:
-        config = load_config(option.env, logger=logger)
+        env = load_env(option.env, logger=logger)
     except Exception as error:
         sys.stderr.write(f'invalid env file: {option.env}\n')
         sys.stderr.write('{0}\n'.format('\n'.join(
@@ -47,7 +47,7 @@ def main() -> None:
         sys.exit(1)
     # main
     backup_scrapbox(
-            config,
+            env,
             logger=logger,
             request_interval=option.request_interval)
 
