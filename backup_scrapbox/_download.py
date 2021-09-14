@@ -49,6 +49,13 @@ def _download_backup(
             'download the backup created at %s (%d)',
             datetime.datetime.fromtimestamp(timestamp),
             timestamp)
+    # path
+    save_directory = pathlib.Path(env['save_directory'])
+    backup_path = save_directory.joinpath(f'{timestamp}.json')
+    info_path = save_directory.joinpath(f'{timestamp}.info.json')
+    if backup_path.exists() and info_path.exists():
+        logger.info('skip download because backup already exists')
+        return
     # request
     url = (f'https://scrapbox.io/api/project-backup'
            f'/{env["project"]}/{info["id"]}.json')
@@ -60,14 +67,10 @@ def _download_backup(
     time.sleep(request_interval)
     if backup is None:
         return
-    # save
-    save_directory = pathlib.Path(env['save_directory'])
     # save backup
-    backup_path = save_directory.joinpath(f'{timestamp}.json')
     logger.info('save %s', backup_path)
     save_json(backup_path, backup)
     # save backup info
-    info_path = save_directory.joinpath(f'{timestamp}.info.json')
     logger.info('save %s', info_path)
     save_json(info_path, info)
 
