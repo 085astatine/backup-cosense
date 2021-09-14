@@ -4,12 +4,12 @@ import datetime
 import json
 import logging
 import pathlib
-import subprocess
 import time
 from typing import Any, Optional
 import jsonschema
 import requests
 from ._env import Env
+from ._git import git_show_latest_timestamp
 from ._json import (
     BackupJSON, BackupInfoJSON, BackupListJSON, jsonschema_backup,
     jsonschema_backup_list, save_json)
@@ -32,7 +32,9 @@ def download(
             json.dumps(backup_list, ensure_ascii=False, indent=2))
     time.sleep(request_interval)
     # get the latest backup timestamp from the git repository
-    latest_timestamp = _latest_timestamp(env, logger)
+    latest_timestamp = git_show_latest_timestamp(
+            env['git_repository'],
+            logger=logger)
     logger.info(
             'latest backup: %s (%s)',
             datetime.datetime.fromtimestamp(latest_timestamp)
@@ -54,28 +56,6 @@ def download(
 
 def _base_url(env: Env) -> str:
     return f'https://scrapbox.io/api/project-backup/{env["project"]}'
-
-
-def _latest_timestamp(
-        env: Env,
-        logger: logging.Logger) -> Optional[int]:
-    command = ['git', 'show', '-s', '--format=%ct']
-    process = subprocess.run(
-            command,
-            cwd=env['git_repository'],
-            encoding='utf-8',
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-    logger.debug('command: %s', process.args)
-    logger.debug('return code: %d', process.returncode)
-    if process.returncode != 0:
-        logger.error('stderr:\n%s', process.stderr.rstrip('\n'))
-        return None
-    logger.debug('stdout: %s', process.stdout.rstrip('\n'))
-    timestamp = process.stdout.rstrip('\n')
-    if timestamp.isdigit():
-        return int(timestamp)
-    return None
 
 
 def _download_backup(
