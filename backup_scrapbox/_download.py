@@ -18,10 +18,9 @@ def download(
         env: Env,
         logger: logging.Logger,
         request_interval: float) -> None:
-    url_base = f'https://scrapbox.io/api/project-backup/{env["project"]}'
     # list
     backup_list: Optional[BackupListJSON] = _request_json(
-            f'{url_base}/list',
+            f'{_base_url(env)}/list',
             env['session_id'],
             logger,
             schema=jsonschema_backup_list())
@@ -36,6 +35,10 @@ def download(
     for info in sorted(backup_list['backups'], key=lambda x: x['backuped']):
         # TODO: check whether or not it is a target
         _download_backup(env, info, logger, request_interval)
+
+
+def _base_url(env: Env) -> str:
+    return f'https://scrapbox.io/api/project-backup/{env["project"]}'
 
 
 def _download_backup(
@@ -57,8 +60,7 @@ def _download_backup(
         logger.info('skip download because backup already exists')
         return
     # request
-    url = (f'https://scrapbox.io/api/project-backup'
-           f'/{env["project"]}/{info["id"]}.json')
+    url = f'{_base_url(env)}/{info["id"]}.json'
     backup: Optional[BackupJSON] = _request_json(
             url,
             env['session_id'],
