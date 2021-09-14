@@ -3,6 +3,7 @@
 import argparse
 import logging
 import sys
+import textwrap
 from typing import Final, Optional
 from ._env import Env, load_env
 from ._download import download
@@ -40,10 +41,8 @@ def main() -> None:
         env = load_env(option.env, logger=logger)
     except Exception as error:
         sys.stderr.write(f'invalid env file: {option.env}\n')
-        sys.stderr.write('{0}\n'.format('\n'.join(
-                ' ' * 4 + message
-                for message in str(error).split('\n')
-                if message)))
+        sys.stderr.write('{0}'.format(
+                textwrap.indent(str(error), ' ' * 4)))
         sys.exit(1)
     # main
     backup_scrapbox(
