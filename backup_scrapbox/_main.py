@@ -60,7 +60,7 @@ def _argument_parser() -> argparse.ArgumentParser:
             dest='env',
             default='.env',
             metavar='DOTENV',
-            help='env file (default .env)')
+            help='env file (default %(default)s)')
     # verbose
     parser.add_argument(
             '-v', '--verbose',
@@ -74,5 +74,5 @@ def _argument_parser() -> argparse.ArgumentParser:
             type=float,
             default=_REQUEST_INTERVAL,
             metavar='SECONDS',
-            help=f'request interval seconds (default {_REQUEST_INTERVAL})')
+            help='request interval seconds (default %(default)s)')
     return parser
