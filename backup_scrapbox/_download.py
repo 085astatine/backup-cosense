@@ -4,6 +4,7 @@ import datetime
 import json
 import logging
 import pathlib
+import subprocess
 import time
 from typing import Any, Optional
 import jsonschema
@@ -30,15 +31,51 @@ def download(
             'response:\n%s',
             json.dumps(backup_list, ensure_ascii=False, indent=2))
     time.sleep(request_interval)
-    # TODO: get the timestamp of latest backup
+    # get the latest backup timestamp from the git repository
+    latest_timestamp = _latest_timestamp(env, logger)
+    logger.info(
+            'latest backup: %s (%s)',
+            datetime.datetime.fromtimestamp(latest_timestamp)
+            if latest_timestamp is not None else None,
+            latest_timestamp)
     # backup
     for info in sorted(backup_list['backups'], key=lambda x: x['backuped']):
-        # TODO: check whether or not it is a target
+        # check whether or not it is a target
+        if (latest_timestamp is not None
+                and info['backuped'] <= latest_timestamp):
+            logger.info(
+                    'skip backup created at %s (%d)',
+                    datetime.datetime.fromtimestamp(info['backuped']),
+                    info['backuped'])
+            continue
+        # download
         _download_backup(env, info, logger, request_interval)
 
 
 def _base_url(env: Env) -> str:
     return f'https://scrapbox.io/api/project-backup/{env["project"]}'
+
+
+def _latest_timestamp(
+        env: Env,
+        logger: logging.Logger) -> Optional[int]:
+    command = ['git', 'show', '-s', '--format=%ct']
+    process = subprocess.run(
+            command,
+            cwd=env['git_repository'],
+            encoding='utf-8',
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+    logger.debug('command: %s', process.args)
+    logger.debug('return code: %d', process.returncode)
+    if process.returncode != 0:
+        logger.error('stderr:\n%s', process.stderr.rstrip('\n'))
+        return None
+    logger.debug('stdout: %s', process.stdout.rstrip('\n'))
+    timestamp = process.stdout.rstrip('\n')
+    if timestamp.isdigit():
+        return int(timestamp)
+    return None
 
 
 def _download_backup(
