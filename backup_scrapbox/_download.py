@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import datetime
 import json
 import logging
 import pathlib
@@ -42,6 +43,13 @@ def _download_backup(
         info: BackupInfoJSON,
         logger: logging.Logger,
         request_interval: float) -> None:
+    # timestamp
+    timestamp = info['backuped']
+    logger.info(
+            'download the backup created at %s (%d)',
+            datetime.datetime.fromtimestamp(timestamp),
+            timestamp)
+    # request
     url = (f'https://scrapbox.io/api/project-backup'
            f'/{env["project"]}/{info["id"]}.json')
     backup: Optional[BackupJSON] = _request_json(
@@ -53,7 +61,6 @@ def _download_backup(
     if backup is None:
         return
     # save
-    timestamp = info['backuped']
     save_directory = pathlib.Path(env['save_directory'])
     # save backup
     backup_path = save_directory.joinpath(f'{timestamp}.json')
