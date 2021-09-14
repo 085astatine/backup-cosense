@@ -4,9 +4,12 @@ import argparse
 import logging
 import sys
 import textwrap
-from typing import Final, Optional
+from typing import Final, Literal, Optional
 from ._env import Env, load_env
 from ._download import download
+
+
+Target = Literal['all', 'download', 'commit']
 
 
 _REQUEST_INTERVAL: Final[float] = 3.0
@@ -15,12 +18,14 @@ _REQUEST_INTERVAL: Final[float] = 3.0
 def backup_scrapbox(
         env: Env,
         *,
+        target: Target = 'all',
         logger: Optional[logging.Logger] = None,
         request_interval: float = _REQUEST_INTERVAL) -> None:
     logger = logger or logging.getLogger(__name__)
     logger.info('backup-scrapbox')
     # download backup
-    download(env, logger, request_interval)
+    if target in ('all', 'download'):
+        download(env, logger, request_interval)
 
 
 def main() -> None:
@@ -47,12 +52,19 @@ def main() -> None:
     # main
     backup_scrapbox(
             env,
+            target=option.target,
             logger=logger,
             request_interval=option.request_interval)
 
 
 def _argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
+    # target
+    parser.add_argument(
+            '--target',
+            default='all',
+            choices=['all', 'download', 'commit'],
+            help='execution target (default %(default)s)')
     # env
     parser.add_argument(
             '--env',
