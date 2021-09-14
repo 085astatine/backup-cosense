@@ -33,7 +33,7 @@ def download(
     time.sleep(request_interval)
     # TODO: get the timestamp of latest backup
     # backup
-    for info in backup_list['backups']:
+    for info in sorted(backup_list['backups'], key=lambda x: x['backuped']):
         # TODO: check whether or not it is a target
         _download_backup(env, info, logger, request_interval)
 
