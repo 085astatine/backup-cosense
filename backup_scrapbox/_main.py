@@ -7,6 +7,7 @@ import textwrap
 from typing import Final, Literal, Optional
 from ._env import Env, load_env
 from ._download import download
+from ._commit import commit
 
 
 Target = Literal['all', 'download', 'commit']
@@ -25,7 +26,12 @@ def backup_scrapbox(
     logger.info('backup-scrapbox')
     # download backup
     if target in ('all', 'download'):
+        logger.info('target: download')
         download(env, logger, request_interval)
+    # commit
+    if target in ('all', 'commit'):
+        logger.info('target: commit')
+        commit(env, logger)
 
 
 def main() -> None:
