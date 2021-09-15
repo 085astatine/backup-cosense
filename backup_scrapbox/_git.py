@@ -22,18 +22,24 @@ def git_show_latest_timestamp(
         return None
     # git show -s --format=%ct
     command = ['git', 'show', '-s', '--format=%ct']
-    process = subprocess.run(
-            command,
-            cwd=repository,
-            encoding='utf-8',
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-    logger.debug('command: %s', process.args)
-    logger.debug('return code: %d', process.returncode)
-    if process.returncode != 0:
-        logger.error('stderr:\n%s', process.stderr.rstrip('\n'))
-        return None
-    logger.debug('stdout: %s', process.stdout.rstrip('\n'))
+    logger.debug('command: %s', command)
+    try:
+        process = subprocess.run(
+                command,
+                check=True,
+                cwd=repository,
+                encoding='utf-8',
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError as error:
+        error_info = {
+                'return_code': error.returncode,
+                'command': error.cmd,
+                'stdout': error.stdout,
+                'stderr': error.stderr}
+        logger.error('%s: %s', error.__class__.__name__, error_info)
+        raise error
+    logger.debug('stdout: %s', repr(process.stdout))
     timestamp = process.stdout.rstrip('\n')
     if timestamp.isdigit():
         return int(timestamp)
