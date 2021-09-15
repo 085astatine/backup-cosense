@@ -6,7 +6,7 @@ import pathlib
 import re
 from typing import Optional, TypedDict
 from ._env import Env
-from ._git import git_show_latest_timestamp
+from ._git import git_show_latest_timestamp, is_git_repository
 
 
 def commit(
@@ -15,7 +15,7 @@ def commit(
     git_repository = pathlib.Path(env['git_repository'])
     backup_directory = pathlib.Path(env['save_directory'])
     # check if the git repository exists
-    if not git_repository.exists():
+    if not is_git_repository(git_repository):
         logger.error('git repository "%s" does not exist', git_repository)
         return None
     # backup targets
