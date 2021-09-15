@@ -15,7 +15,7 @@ class BackupInfoJSON(TypedDict):
 def jsonschema_backup_info():
     schema = {
       'type': 'object',
-      'required': ['id', 'backuped', 'totalPages', 'totalLinks'],
+      'required': ['id', 'backuped'],
       'additionalProperties': False,
       'properties': {
         'id': {'type': 'string'},
@@ -60,7 +60,7 @@ class BackupPageJSON(TypedDict):
 def jsonschema_backup_page():
     schema = {
       'type': 'object',
-      'required': ['title', 'created', 'updated', 'id', 'lines', 'linksLc'],
+      'required': ['title', 'created', 'updated', 'lines'],
       'additionalProperties': False,
       'properties': {
         'title': {'type': 'string'},
