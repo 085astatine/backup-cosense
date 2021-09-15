@@ -1,15 +1,21 @@
 # -*- coding: utf-8 -*-
 
 import logging
+import pathlib
 import subprocess
 from typing import Optional
 
 
 def git_show_latest_timestamp(
-        repository: str,
+        repository: pathlib.Path,
         *,
         logger: Optional[logging.Logger] = None) -> Optional[int]:
     logger = logger or logging.getLogger(__name__)
+    # check if the repository exists
+    if not repository.exists():
+        logger.warning('git repository "%s" does not exist', repository)
+        return None
+    # git show -s --format=%ct
     command = ['git', 'show', '-s', '--format=%ct']
     process = subprocess.run(
             command,

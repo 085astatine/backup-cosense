@@ -38,7 +38,7 @@ def _backup_targets(
         logger: logging.Logger) -> list[_Backup]:
     # get latest backup timestamp
     latest_timestamp = git_show_latest_timestamp(
-            git_repository.as_posix(),
+            git_repository,
             logger=logger)
     logger.info(
             'latest backup: %s (%s)',

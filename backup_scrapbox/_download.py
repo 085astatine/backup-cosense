@@ -33,7 +33,7 @@ def download(
     time.sleep(request_interval)
     # get the latest backup timestamp from the git repository
     latest_timestamp = git_show_latest_timestamp(
-            env['git_repository'],
+            pathlib.Path(env['git_repository']),
             logger=logger)
     logger.info(
             'latest backup: %s (%s)',
