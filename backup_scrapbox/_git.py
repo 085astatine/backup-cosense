@@ -19,10 +19,10 @@ def git_ls_files(
         logger: Optional[logging.Logger] = None) -> list[pathlib.Path]:
     logger = logger or logging.getLogger(__name__)
     # ls-files
-    command = ['git', 'ls-files']
+    command = ['git', 'ls-files', '-z']
     process = git_command(command, repository, logger=logger)
     return [repository.joinpath(path)
-            for path in process.stdout.split('\n')
+            for path in process.stdout.split('\0')
             if path]
 
 
