@@ -4,9 +4,12 @@ import datetime
 import logging
 import pathlib
 import re
-from typing import Optional, TypedDict
+from typing import Optional, TypedDict, Union
 from ._env import Env
-from ._git import git_show_latest_timestamp, is_git_repository
+from ._json import BackupJSON, BackupInfoJSON, load_json, save_json
+from ._git import (
+        git_command, git_commit, git_ls_files, git_show_latest_timestamp,
+        is_git_repository)
 
 
 def commit(
@@ -17,13 +20,35 @@ def commit(
     # check if the git repository exists
     if not is_git_repository(git_repository):
         logger.error('git repository "%s" does not exist', git_repository)
-        return None
+        return
     # backup targets
-    targets = _backup_targets(
+    backup_targets = _backup_targets(
             backup_directory,
             git_repository,
             logger)
-    print(targets)
+    # commit
+    for info in backup_targets:
+        logger.info(
+                'commit %s (%d)',
+                datetime.datetime.fromtimestamp(info['timestamp']),
+                info['timestamp'])
+        # clear
+        _clear_repository(
+                env['project'],
+                git_repository,
+                logger)
+        # copy
+        commit_targets = _copy_backup(
+                env['project'],
+                git_repository,
+                info['backup_path'],
+                logger)
+        # commit
+        _commit(env['project'],
+                git_repository,
+                info,
+                commit_targets,
+                logger)
 
 
 class _Backup(TypedDict):
@@ -71,3 +96,113 @@ def _backup_targets(
     # sort by oldest timestamp
     targets.sort(key=lambda x: x['timestamp'])
     return targets
+
+
+def _clear_repository(
+        project: str,
+        git_repository: pathlib.Path,
+        logger: logging.Logger) -> None:
+    targets: list[pathlib.Path] = []
+    # load previous backup
+    previous_backup_path = git_repository.joinpath(
+            f'{_escape_filename(project)}.json')
+    logger.debug('load previous backup "%s"', previous_backup_path)
+    previous_backup: Optional[BackupJSON] = load_json(previous_backup_path)
+    if previous_backup is None:
+        logger.debug('previous backup dose not exist')
+        return
+    targets.append(previous_backup_path)
+    # pages/
+    page_directory = git_repository.joinpath('pages')
+    targets.extend(
+            page_directory.joinpath(f'{_escape_filename(page["title"])}.json')
+            for page in previous_backup['pages'])
+    # git ls-files
+    staged = git_ls_files(git_repository, logger=logger)
+    # rm / git rm
+    for target in targets:
+        if target.exists():
+            if target in staged:
+                git_command(
+                        ['git', 'rm', target.as_posix()],
+                        git_repository,
+                        logger=logger)
+            else:
+                logger.debug('rm %s', target)
+                target.unlink()
+    # rm pages/
+    if page_directory.exists() and not list(page_directory.iterdir()):
+        page_directory.rmdir()
+
+
+def _copy_backup(
+        project: str,
+        git_repository: pathlib.Path,
+        backup_path: pathlib.Path,
+        logger: logging.Logger) -> list[pathlib.Path]:
+    copied: list[pathlib.Path] = []
+    # load backup
+    backup: Optional[BackupJSON] = load_json(backup_path)
+    if backup is None:
+        logger.error('failed to load "%s"', backup_path)
+        return copied
+    # copy
+    logger.info(
+            "copy backup created at %s (%d)",
+            datetime.datetime.fromtimestamp(backup['exported']),
+            backup['exported'])
+    # copy: ${project}.json
+    backup_path = git_repository.joinpath(f'{_escape_filename(project)}.json')
+    logger.debug('save "%s"', backup_path)
+    save_json(
+            git_repository.joinpath(f'{_escape_filename(project)}.json'),
+            backup)
+    copied.append(backup_path)
+    # copy: page/${title}.json
+    page_directory = git_repository.joinpath('pages')
+    for page in backup['pages']:
+        page_path = page_directory.joinpath(
+                f'{_escape_filename(page["title"])}.json')
+        logger.debug('save "%s"', page_path)
+        save_json(page_path, page)
+        copied.append(page_path)
+    return copied
+
+
+def _commit(
+        project: str,
+        git_repository: pathlib.Path,
+        backup: _Backup,
+        targets: list[pathlib.Path],
+        logger: logging.Logger) -> None:
+    # git add
+    for target in targets:
+        command = ['git', 'add', target.as_posix()]
+        git_command(command, git_repository, logger=logger)
+    # commit message
+    message: list[str] = []
+    message.append('{0} {1}'.format(
+            project,
+            datetime.datetime.fromtimestamp(backup['timestamp'])))
+    if backup['info_path'] is not None:
+        info: Optional[BackupInfoJSON] = load_json(backup['info_path'])
+        if info is not None:
+            message.append('')
+            message.extend(
+                    f'{repr(key)}: {repr(value)}'
+                    for key, value in info.items())
+    # commit
+    git_commit(
+            git_repository,
+            '\n'.join(message),
+            timestamp=backup['timestamp'],
+            logger=logger)
+
+
+def _escape_filename(text: str) -> str:
+    table: dict[str, Union[int, str, None]] = {
+            ' ': '_',
+            '#': '%23',
+            '%': '%25',
+            '/': '%2F'}
+    return text.translate(str.maketrans(table))
