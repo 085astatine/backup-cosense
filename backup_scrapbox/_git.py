@@ -21,10 +21,6 @@ def git_commit(
         timestamp: Optional[int] = None,
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
-    # check if the repository exists
-    if not is_git_repository(repository):
-        logger.warning('git repository "%s" does not exist', repository)
-        return None
     # commit
     command = ['git', 'commit', '--message', message]
     env: dict[str, str] = {}
@@ -35,7 +31,7 @@ def git_commit(
         commit_time = datetime.datetime.fromtimestamp(timestamp)
         env['GIT_AUTHOR_DATE'] = commit_time.isoformat()
         env['GIT_COMMITTER_DATE'] = commit_time.isoformat()
-    _run(command, repository, logger, env=env if env else None)
+    git_command(command, repository, logger=logger, env=env if env else None)
 
 
 def git_show_latest_timestamp(
@@ -49,25 +45,29 @@ def git_show_latest_timestamp(
         return None
     # git show -s --format=%ct
     command = ['git', 'show', '-s', '--format=%ct']
-    process = _run(command, repository, logger)
+    process = git_command(command, repository, logger=logger)
     timestamp = process.stdout.rstrip('\n')
     if timestamp.isdigit():
         return int(timestamp)
     return None
 
 
-def _run(
+def git_command(
         command: list[str],
-        cwd: pathlib.Path,
-        logger: logging.Logger,
+        repository: pathlib.Path,
         *,
+        logger: Optional[logging.Logger] = None,
         env: Optional[dict[str, str]] = None) -> subprocess.CompletedProcess:
-    logger.info('command: %s', command)
+    logger = logger or logging.getLogger(__name__)
+    logger.debug('command: %s', command)
+    # check if the repository exists
+    if not is_git_repository(repository):
+        logger.error('git repository "%s" does not exist', repository)
     try:
         process = subprocess.run(
                 command,
                 check=True,
-                cwd=cwd,
+                cwd=repository,
                 env=dict(os.environ, **env) if env is not None else None,
                 encoding='utf-8',
                 stdout=subprocess.PIPE,
