@@ -13,6 +13,19 @@ def is_git_repository(
     return path.is_dir() and path.joinpath('.git').exists()
 
 
+def git_ls_files(
+        repository: pathlib.Path,
+        *,
+        logger: Optional[logging.Logger] = None) -> list[pathlib.Path]:
+    logger = logger or logging.getLogger(__name__)
+    # ls-files
+    command = ['git', 'ls-files']
+    process = git_command(command, repository, logger=logger)
+    return [repository.joinpath(path)
+            for path in process.stdout.split('\n')
+            if path]
+
+
 def git_commit(
         repository: pathlib.Path,
         message: str,
