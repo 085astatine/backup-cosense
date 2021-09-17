@@ -124,7 +124,9 @@ def load_json(
 
 def save_json(
         path: pathlib.Path,
-        data: Any) -> None:
+        data: Any,
+        *,
+        indent: Optional[int] = 2) -> None:
     if not path.parent.exists():
         path.parent.mkdir(parents=True)
     with path.open(mode='w') as file:
@@ -132,5 +134,5 @@ def save_json(
                 data,
                 file,
                 ensure_ascii=False,
-                indent=2)
+                indent=indent)
         file.write('\n')
