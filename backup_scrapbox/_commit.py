@@ -6,7 +6,9 @@ import pathlib
 import re
 from typing import Optional, TypedDict, Union
 from ._env import Env
-from ._json import BackupJSON, BackupInfoJSON, load_json, save_json
+from ._json import (
+        BackupJSON, BackupInfoJSON, jsonschema_backup, jsonschema_backup_info,
+        load_json, save_json)
 from ._git import (
         git_command, git_commit, git_ls_files, git_show_latest_timestamp,
         is_git_repository)
@@ -107,7 +109,9 @@ def _clear_repository(
     previous_backup_path = git_repository.joinpath(
             f'{_escape_filename(project)}.json')
     logger.debug('load previous backup "%s"', previous_backup_path)
-    previous_backup: Optional[BackupJSON] = load_json(previous_backup_path)
+    previous_backup: Optional[BackupJSON] = load_json(
+            previous_backup_path,
+            schema=jsonschema_backup())
     if previous_backup is None:
         logger.debug('previous backup dose not exist')
         return
@@ -185,7 +189,9 @@ def _commit(
             project,
             datetime.datetime.fromtimestamp(backup['timestamp'])))
     if backup['info_path'] is not None:
-        info: Optional[BackupInfoJSON] = load_json(backup['info_path'])
+        info: Optional[BackupInfoJSON] = load_json(
+                backup['info_path'],
+                schema=jsonschema_backup_info())
         if info is not None:
             message.append('')
             message.extend(

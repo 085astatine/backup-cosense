@@ -3,6 +3,7 @@
 import json
 import pathlib
 from typing import Any, Optional, TypedDict
+import jsonschema
 
 
 class BackupInfoJSON(TypedDict):
@@ -106,11 +107,19 @@ def jsonschema_backup():
 
 
 def load_json(
-        path: pathlib.Path) -> Optional[Any]:
+        path: pathlib.Path,
+        *,
+        schema: Optional[dict] = None) -> Optional[Any]:
     if not path.exists():
         return None
     with path.open() as file:
-        return json.load(file)
+        value = json.load(file)
+    # JSON Schema validation
+    if schema is not None:
+        jsonschema.validate(
+                instance=value,
+                schema=schema)
+    return value
 
 
 def save_json(
