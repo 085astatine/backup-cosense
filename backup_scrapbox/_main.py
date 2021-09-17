@@ -37,14 +37,16 @@ def backup_scrapbox(
 def main(
         *,
         args: Optional[list[str]] = None,
-        env: Optional[Env] = None) -> None:
+        env: Optional[Env] = None,
+        logger: Optional[logging.Logger] = None) -> None:
     # logger
-    logger = logging.getLogger('backup-scrapbox')
-    logger.setLevel(logging.INFO)
-    handler = logging.StreamHandler()
-    handler.formatter = logging.Formatter(
-            fmt='%(asctime)s %(name)s:%(levelname)s:%(message)s')
-    logger.addHandler(handler)
+    if logger is None:
+        logger = logging.getLogger('backup-scrapbox')
+        logger.setLevel(logging.INFO)
+        handler = logging.StreamHandler()
+        handler.formatter = logging.Formatter(
+                fmt='%(asctime)s %(name)s:%(levelname)s:%(message)s')
+        logger.addHandler(handler)
     # option
     option = _argument_parser().parse_args(args=args)
     if option.verbose:
