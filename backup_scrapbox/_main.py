@@ -34,7 +34,10 @@ def backup_scrapbox(
         commit(env, logger)
 
 
-def main() -> None:
+def main(
+        *,
+        args: Optional[list[str]] = None,
+        env: Optional[Env] = None) -> None:
     # logger
     logger = logging.getLogger('backup-scrapbox')
     logger.setLevel(logging.INFO)
@@ -43,18 +46,19 @@ def main() -> None:
             fmt='%(asctime)s %(name)s:%(levelname)s:%(message)s')
     logger.addHandler(handler)
     # option
-    option = _argument_parser().parse_args()
+    option = _argument_parser().parse_args(args=args)
     if option.verbose:
         logger.setLevel(logging.DEBUG)
     logger.debug('option: %s', option)
     # .env
-    try:
-        env = load_env(option.env, logger=logger)
-    except Exception as error:
-        sys.stderr.write(f'invalid env file: {option.env}\n')
-        sys.stderr.write('{0}'.format(
-                textwrap.indent(str(error), ' ' * 4)))
-        sys.exit(1)
+    if env is None:
+        try:
+            env = load_env(option.env, logger=logger)
+        except Exception as error:
+            sys.stderr.write(f'invalid env file: {option.env}\n')
+            sys.stderr.write('{0}'.format(
+                    textwrap.indent(str(error), ' ' * 4)))
+            sys.exit(1)
     # main
     backup_scrapbox(
             env,
