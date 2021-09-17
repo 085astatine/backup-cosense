@@ -12,6 +12,10 @@ class Env(TypedDict):
     git_repository: str
 
 
+class InvalidEnvError(Exception):
+    pass
+
+
 def load_env(
         envfile: str,
         *,
@@ -34,4 +38,4 @@ def validate_env(env: dict[str, Optional[str]]) -> None:
         for key in keys
         if not (key in env and isinstance(env[key], str)))
     if messages:
-        raise Exception(''.join(messages))
+        raise InvalidEnvError(''.join(messages))

@@ -5,7 +5,7 @@ import logging
 import sys
 import textwrap
 from typing import Final, Literal, Optional
-from ._env import Env, load_env
+from ._env import Env, InvalidEnvError, load_env
 from ._download import download
 from ._commit import commit
 
@@ -54,7 +54,7 @@ def main(
     if env is None:
         try:
             env = load_env(option.env, logger=logger)
-        except Exception as error:
+        except InvalidEnvError as error:
             sys.stderr.write(f'invalid env file: {option.env}\n')
             sys.stderr.write('{0}'.format(
                     textwrap.indent(str(error), ' ' * 4)))
