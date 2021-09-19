@@ -27,9 +27,17 @@ def download(
             schema=jsonschema_backup_list())
     if backup_list is None:
         return
-    logger.debug(
-            'response:\n%s',
-            json.dumps(backup_list, ensure_ascii=False, indent=2))
+    if not backup_list['backups']:
+        logger.info('there are no backup')
+        return
+    else:
+        logger.info(
+                'there are %d backups: %s ~ %s',
+                len(backup_list['backups']),
+                format_timestamp(
+                        min(x['backuped'] for x in backup_list['backups'])),
+                format_timestamp(
+                        max(x['backuped'] for x in backup_list['backups'])))
     time.sleep(request_interval)
     # get the latest backup timestamp from the git repository
     latest_timestamp = git_show_latest_timestamp(
@@ -42,7 +50,7 @@ def download(
         if (latest_timestamp is not None
                 and info['backuped'] <= latest_timestamp):
             logger.info(
-                    'skip backup created at %s',
+                    'skip backup %s: older than latest',
                     format_timestamp(info['backuped']))
             continue
         # download
@@ -60,17 +68,19 @@ def _download_backup(
         request_interval: float) -> None:
     # timestamp
     timestamp = info['backuped']
-    logger.info(
-            'download the backup created at %s',
-            format_timestamp(timestamp))
     # path
     save_directory = pathlib.Path(env['save_directory'])
     backup_path = save_directory.joinpath(f'{timestamp}.json')
     info_path = save_directory.joinpath(f'{timestamp}.info.json')
     if backup_path.exists() and info_path.exists():
-        logger.info('skip download because backup already exists')
+        logger.debug(
+                'skip backup %s: already exists',
+                format_timestamp(timestamp))
         return
     # request
+    logger.info(
+            'download backup %s',
+            format_timestamp(timestamp))
     url = f'{_base_url(env)}/{info["id"]}.json'
     backup: Optional[BackupJSON] = _request_json(
             url,
