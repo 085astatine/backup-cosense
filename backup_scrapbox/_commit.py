@@ -12,6 +12,7 @@ from ._json import (
 from ._git import (
         git_command, git_commit, git_ls_files, git_show_latest_timestamp,
         is_git_repository)
+from ._utility import format_timestamp
 
 
 def commit(
@@ -30,10 +31,7 @@ def commit(
             logger)
     # commit
     for info in backup_targets:
-        logger.info(
-                'commit %s (%d)',
-                datetime.datetime.fromtimestamp(info['timestamp']),
-                info['timestamp'])
+        logger.info('commit %s', format_timestamp(info['timestamp']))
         # clear
         _clear_repository(
                 env['project'],
@@ -67,11 +65,7 @@ def _backup_targets(
     latest_timestamp = git_show_latest_timestamp(
             git_repository,
             logger=logger)
-    logger.info(
-            'latest backup: %s (%s)',
-            datetime.datetime.fromtimestamp(latest_timestamp)
-            if latest_timestamp is not None else None,
-            latest_timestamp)
+    logger.info('latest backup: %s', format_timestamp(latest_timestamp))
     # find backup
     targets: list[_Backup] = []
     for path in directory.iterdir():
@@ -152,9 +146,8 @@ def _copy_backup(
         return copied
     # copy
     logger.info(
-            "copy backup created at %s (%d)",
-            datetime.datetime.fromtimestamp(backup['exported']),
-            backup['exported'])
+            "copy backup created at %s",
+            format_timestamp(backup['exported']))
     # copy: ${project}.json
     backup_path = git_repository.joinpath(f'{_escape_filename(project)}.json')
     logger.debug('save "%s"', backup_path)

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import datetime
 import json
 import logging
 import pathlib
@@ -13,6 +12,7 @@ from ._git import git_show_latest_timestamp
 from ._json import (
     BackupJSON, BackupInfoJSON, BackupListJSON, jsonschema_backup,
     jsonschema_backup_list, save_json)
+from ._utility import format_timestamp
 
 
 def download(
@@ -35,20 +35,15 @@ def download(
     latest_timestamp = git_show_latest_timestamp(
             pathlib.Path(env['git_repository']),
             logger=logger)
-    logger.info(
-            'latest backup: %s (%s)',
-            datetime.datetime.fromtimestamp(latest_timestamp)
-            if latest_timestamp is not None else None,
-            latest_timestamp)
+    logger.info('latest backup: %s', format_timestamp(latest_timestamp))
     # backup
     for info in sorted(backup_list['backups'], key=lambda x: x['backuped']):
         # check whether or not it is a target
         if (latest_timestamp is not None
                 and info['backuped'] <= latest_timestamp):
             logger.info(
-                    'skip backup created at %s (%d)',
-                    datetime.datetime.fromtimestamp(info['backuped']),
-                    info['backuped'])
+                    'skip backup created at %s',
+                    format_timestamp(info['backuped']))
             continue
         # download
         _download_backup(env, info, logger, request_interval)
@@ -66,9 +61,8 @@ def _download_backup(
     # timestamp
     timestamp = info['backuped']
     logger.info(
-            'download the backup created at %s (%d)',
-            datetime.datetime.fromtimestamp(timestamp),
-            timestamp)
+            'download the backup created at %s',
+            format_timestamp(timestamp))
     # path
     save_directory = pathlib.Path(env['save_directory'])
     backup_path = save_directory.joinpath(f'{timestamp}.json')
