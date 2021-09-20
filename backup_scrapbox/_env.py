@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
-from typing import Optional, TypedDict, cast
+from typing import Final, Optional, TypedDict, cast
 import dotenv
 
 
@@ -10,6 +10,15 @@ class Env(TypedDict):
     session_id: str
     save_directory: str
     git_repository: str
+    git_branch: Optional[str]
+
+
+_REQUIRED_KEYS: Final[list[str]] = [
+        'project',
+        'session_id',
+        'save_directory',
+        'git_repository']
+_OPTIONAL_KEYS: Final[list[str]] = ['git_branch']
 
 
 class InvalidEnvError(Exception):
@@ -24,6 +33,13 @@ def load_env(
     # load
     logger.info('load env from "%s"', envfile)
     env = dotenv.dotenv_values(envfile)
+    logger.debug('loaded env: %s', env)
+    # set optional key
+    for key in _OPTIONAL_KEYS:
+        if key not in env:
+            env[key] = None
+        elif env[key] == '':
+            env[key] = None
     logger.debug('env: %s', env)
     # validate
     validate_env(env)
@@ -32,10 +48,17 @@ def load_env(
 
 def validate_env(env: dict[str, Optional[str]]) -> None:
     messages: list[str] = []
-    keys = ['project', 'session_id', 'save_directory', 'git_repository']
-    messages.extend(
-        f'"{key}" is not defined\n'
-        for key in keys
-        if not (key in env and isinstance(env[key], str)))
+    # required keys
+    for key in _REQUIRED_KEYS:
+        if key not in env:
+            messages.append(f'"{key}" is not defined\n')
+        elif not isinstance(env[key], str):
+            messages.append(f'"{key}" is not string\n')
+    # optional keys
+    for key in _OPTIONAL_KEYS:
+        if key not in env:
+            messages.append(f'"{key}" is not defined\n')
+        elif not (env[key] is None or isinstance(env[key], str)):
+            messages.append(f'"{key}" is not None or string\n')
     if messages:
         raise InvalidEnvError(''.join(messages))
