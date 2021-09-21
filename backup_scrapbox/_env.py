@@ -1,8 +1,16 @@
 # -*- coding: utf-8 -*-
 
 import logging
-from typing import Final, Optional, TypedDict, cast
+from typing import Final, Literal, Optional, TypedDict, cast
 import dotenv
+
+
+PageOrder = Literal['as-is', 'created-asc', 'created-desc']
+_PAGE_ORDERS: Final[list[Optional[str]]] = [
+        None,
+        'as-is',
+        'created-asc',
+        'created-desc']
 
 
 class Env(TypedDict):
@@ -11,6 +19,7 @@ class Env(TypedDict):
     save_directory: str
     git_repository: str
     git_branch: Optional[str]
+    page_order: Optional[PageOrder]
 
 
 _REQUIRED_KEYS: Final[list[str]] = [
@@ -18,7 +27,7 @@ _REQUIRED_KEYS: Final[list[str]] = [
         'session_id',
         'save_directory',
         'git_repository']
-_OPTIONAL_KEYS: Final[list[str]] = ['git_branch']
+_OPTIONAL_KEYS: Final[list[str]] = ['git_branch', 'page_order']
 
 
 class InvalidEnvError(Exception):
@@ -60,5 +69,10 @@ def validate_env(env: dict[str, Optional[str]]) -> None:
             messages.append(f'"{key}" is not defined\n')
         elif not (env[key] is None or isinstance(env[key], str)):
             messages.append(f'"{key}" is not None or string\n')
+    # page order
+    if 'page_order' in env:
+        if env['page_order'] not in _PAGE_ORDERS:
+            messages.append('"page_order" is not {0}\n'.format(
+                    ' / '.join(repr(x) for x in _PAGE_ORDERS)))
     if messages:
         raise InvalidEnvError(''.join(messages))

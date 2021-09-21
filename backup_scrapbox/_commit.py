@@ -5,7 +5,7 @@ import logging
 import pathlib
 import re
 from typing import Optional, TypedDict, Union
-from ._env import Env
+from ._env import Env, PageOrder
 from ._json import (
         BackupJSON, BackupInfoJSON, jsonschema_backup, jsonschema_backup_info,
         load_json, save_json)
@@ -49,6 +49,7 @@ def commit(
                 env['project'],
                 git_repository,
                 info['backup_path'],
+                env['page_order'],
                 logger)
         # commit
         _commit(env['project'],
@@ -144,6 +145,7 @@ def _copy_backup(
         project: str,
         git_repository: pathlib.Path,
         backup_path: pathlib.Path,
+        page_order: Optional[PageOrder],
         logger: logging.Logger) -> list[pathlib.Path]:
     copied: list[pathlib.Path] = []
     # load backup
@@ -151,6 +153,7 @@ def _copy_backup(
     if backup is None:
         logger.error('failed to load "%s"', backup_path)
         return copied
+    _sort_pages(backup, page_order)
     # copy
     logger.info(
             "copy backup created at %s",
@@ -203,6 +206,19 @@ def _commit(
             '\n'.join(message),
             timestamp=backup['timestamp'],
             logger=logger)
+
+
+def _sort_pages(
+        backup: BackupJSON,
+        page_order: Optional[PageOrder]) -> None:
+    if page_order in (None, 'as-is'):
+        return
+    elif page_order == 'created-asc':
+        # sort pages by created (asc)
+        backup['pages'].sort(key=lambda page: page['created'])
+    elif page_order == 'created-desc':
+        # sort pages by created (desc)
+        backup['pages'].sort(key=lambda page: - page['created'])
 
 
 def _escape_filename(text: str) -> str:
