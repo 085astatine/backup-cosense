@@ -212,7 +212,7 @@ def _sort_pages(
         backup: BackupJSON,
         page_order: Optional[PageOrder]) -> None:
     if page_order in (None, 'as-is'):
-        return
+        pass
     elif page_order == 'created-asc':
         # sort pages by created (asc)
         backup['pages'].sort(key=lambda page: page['created'])

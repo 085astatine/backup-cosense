@@ -30,14 +30,13 @@ def download(
     if not backup_list['backups']:
         logger.info('there are no backup')
         return
-    else:
-        logger.info(
-                'there are %d backups: %s ~ %s',
-                len(backup_list['backups']),
-                format_timestamp(
-                        min(x['backuped'] for x in backup_list['backups'])),
-                format_timestamp(
-                        max(x['backuped'] for x in backup_list['backups'])))
+    logger.info(
+            'there are %d backups: %s ~ %s',
+            len(backup_list['backups']),
+            format_timestamp(
+                    min(x['backuped'] for x in backup_list['backups'])),
+            format_timestamp(
+                    max(x['backuped'] for x in backup_list['backups'])))
     time.sleep(request_interval)
     # switch Git branch
     git_repository = pathlib.Path(env['git_repository'])
