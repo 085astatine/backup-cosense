@@ -36,7 +36,7 @@ class BackupListJSON(TypedDict):
 def jsonschema_backup_list():
     schema = {
       'type': 'object',
-      'required': ['backupEnable', 'backups'],
+      'required': ['backups'],
       'additionalProperties': False,
       'properties': {
         'backupEnable': {'type': 'boolean'},
