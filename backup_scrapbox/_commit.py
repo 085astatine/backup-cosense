@@ -1,8 +1,9 @@
+import dataclasses
 import datetime
 import logging
 import pathlib
 import re
-from typing import Optional, TypedDict, Union
+from typing import Optional, Union
 from ._env import Env, PageOrder
 from ._json import (
         BackupJSON, BackupInfoJSON, jsonschema_backup, jsonschema_backup_info,
@@ -36,7 +37,7 @@ def commit(
             logger)
     # commit
     for info in backup_targets:
-        logger.info('commit %s', format_timestamp(info['timestamp']))
+        logger.info('commit %s', format_timestamp(info.timestamp))
         # clear
         _clear_repository(
                 env.project,
@@ -46,7 +47,7 @@ def commit(
         commit_targets = _copy_backup(
                 env.project,
                 git_repository,
-                info['backup_path'],
+                info.backup_path,
                 env.page_order,
                 logger)
         # commit
@@ -57,7 +58,8 @@ def commit(
                 logger)
 
 
-class _Backup(TypedDict):
+@dataclasses.dataclass
+class _Backup:
     timestamp: int
     backup_path: pathlib.Path
     info_path: Optional[pathlib.Path]
@@ -96,7 +98,7 @@ def _backup_targets(
                 backup_path=path,
                 info_path=info_path if info_path.exists() else None))
     # sort by oldest timestamp
-    targets.sort(key=lambda x: x['timestamp'])
+    targets.sort(key=lambda x: x.timestamp)
     return targets
 
 
@@ -188,10 +190,10 @@ def _commit(
     message: list[str] = []
     message.append('{0} {1}'.format(
             project,
-            datetime.datetime.fromtimestamp(backup['timestamp'])))
-    if backup['info_path'] is not None:
+            datetime.datetime.fromtimestamp(backup.timestamp)))
+    if backup.info_path is not None:
         info: Optional[BackupInfoJSON] = load_json(
-                backup['info_path'],
+                backup.info_path,
                 schema=jsonschema_backup_info())
         if info is not None:
             message.append('')
@@ -202,7 +204,7 @@ def _commit(
     git_commit(
             git_repository,
             '\n'.join(message),
-            timestamp=backup['timestamp'],
+            timestamp=backup.timestamp,
             logger=logger)
 
 
