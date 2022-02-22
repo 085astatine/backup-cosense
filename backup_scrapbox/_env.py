@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import logging
 from typing import Final, Literal, Optional, TypedDict, cast
 import dotenv

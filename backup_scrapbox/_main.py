@@ -1,5 +1,3 @@
-# -*- config: utf-8 -*-
-
 import argparse
 import logging
 import sys
