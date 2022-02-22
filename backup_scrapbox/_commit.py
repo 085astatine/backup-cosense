@@ -16,17 +16,17 @@ from ._utility import format_timestamp
 def commit(
         env: Env,
         logger: logging.Logger) -> None:
-    git_repository = pathlib.Path(env['git_repository'])
-    backup_directory = pathlib.Path(env['save_directory'])
+    git_repository = pathlib.Path(env.git_repository)
+    backup_directory = pathlib.Path(env.save_directory)
     # check if the git repository exists
     if not is_git_repository(git_repository):
         logger.error('git repository "%s" does not exist', git_repository)
         return
     # switch Git branch
-    if env['git_branch'] is not None:
-        logger.info('switch git branch "%s"', env['git_branch'])
+    if env.git_branch is not None:
+        logger.info('switch git branch "%s"', env.git_branch)
         git_command(
-                ['git', 'switch', env['git_branch']],
+                ['git', 'switch', env.git_branch],
                 git_repository,
                 logger=logger)
     # backup targets
@@ -39,18 +39,18 @@ def commit(
         logger.info('commit %s', format_timestamp(info['timestamp']))
         # clear
         _clear_repository(
-                env['project'],
+                env.project,
                 git_repository,
                 logger)
         # copy
         commit_targets = _copy_backup(
-                env['project'],
+                env.project,
                 git_repository,
                 info['backup_path'],
-                env['page_order'],
+                env.page_order,
                 logger)
         # commit
-        _commit(env['project'],
+        _commit(env.project,
                 git_repository,
                 info,
                 commit_targets,

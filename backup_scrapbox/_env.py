@@ -1,5 +1,7 @@
+import dataclasses
 import logging
-from typing import Final, Literal, Optional, TypedDict, cast
+from typing import Final, Literal, Optional
+import dacite
 import dotenv
 
 
@@ -11,13 +13,14 @@ _PAGE_ORDERS: Final[list[Optional[str]]] = [
         'created-desc']
 
 
-class Env(TypedDict):
+@dataclasses.dataclass
+class Env:
     project: str
     session_id: str
     save_directory: str
     git_repository: str
-    git_branch: Optional[str]
-    page_order: Optional[PageOrder]
+    git_branch: Optional[str] = None
+    page_order: Optional[PageOrder] = None
 
 
 _REQUIRED_KEYS: Final[list[str]] = [
@@ -50,7 +53,7 @@ def load_env(
     logger.debug('env: %s', env)
     # validate
     validate_env(env)
-    return cast(Env, env)
+    return dacite.from_dict(data_class=Env, data=env)
 
 
 def validate_env(env: dict[str, Optional[str]]) -> None:
