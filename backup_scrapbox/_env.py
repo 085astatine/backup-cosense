@@ -1,16 +1,11 @@
 import dataclasses
 import logging
-from typing import Final, Literal, Optional
+from typing import Final, Literal, Optional, get_args
 import dacite
 import dotenv
 
 
 PageOrder = Literal['as-is', 'created-asc', 'created-desc']
-_PAGE_ORDERS: Final[list[Optional[str]]] = [
-        None,
-        'as-is',
-        'created-asc',
-        'created-desc']
 
 
 @dataclasses.dataclass
@@ -72,8 +67,9 @@ def validate_env(env: dict[str, Optional[str]]) -> None:
             messages.append(f'"{key}" is not None or string\n')
     # page order
     if 'page_order' in env:
-        if env['page_order'] not in _PAGE_ORDERS:
+        page_orders = [None, *get_args(PageOrder)]
+        if env['page_order'] not in page_orders:
             messages.append('"page_order" is not {0}\n'.format(
-                    ' / '.join(repr(x) for x in _PAGE_ORDERS)))
+                    ' / '.join(repr(x) for x in page_orders)))
     if messages:
         raise InvalidEnvError(''.join(messages))
