@@ -1,8 +1,10 @@
 import dataclasses
 import logging
+import pathlib
 from typing import Final, Literal, Optional, get_args
 import dacite
 import dotenv
+from ._git import Git
 
 
 PageOrder = Literal['as-is', 'created-asc', 'created-desc']
@@ -16,6 +18,15 @@ class Env:
     git_repository: str
     git_branch: Optional[str] = None
     page_order: Optional[PageOrder] = None
+
+    def git(
+            self,
+            *,
+            logger: Optional[logging.Logger] = None) -> Git:
+        return Git(
+                pathlib.Path(self.git_repository),
+                branch=self.git_branch,
+                logger=logger)
 
 
 _REQUIRED_KEYS: Final[list[str]] = [

@@ -6,6 +6,25 @@ import subprocess
 from typing import Optional
 
 
+class Git:
+    def __init__(
+            self,
+            path: pathlib.Path,
+            *,
+            branch: Optional[str] = None,
+            logger: Optional[logging.Logger] = None) -> None:
+        self._path = path
+        self._branch = branch
+        self._logger = logger or logging.getLogger(__name__)
+
+    @property
+    def path(self) -> pathlib.Path:
+        return self._path
+
+    def exists(self) -> bool:
+        return self.path.is_dir() and self.path.joinpath('.git').is_dir()
+
+
 def is_git_repository(
         path: pathlib.Path) -> bool:
     return path.is_dir() and path.joinpath('.git').exists()
