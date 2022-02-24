@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import json
 import pathlib
 from typing import Any, Optional, TypedDict

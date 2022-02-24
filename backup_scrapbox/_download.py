@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import json
 import logging
 import pathlib
@@ -22,7 +20,7 @@ def download(
     # list
     backup_list: Optional[BackupListJSON] = _request_json(
             f'{_base_url(env)}/list',
-            env['session_id'],
+            env.session_id,
             logger,
             schema=jsonschema_backup_list())
     if backup_list is None:
@@ -39,11 +37,11 @@ def download(
                     max(x['backuped'] for x in backup_list['backups'])))
     time.sleep(request_interval)
     # switch Git branch
-    git_repository = pathlib.Path(env['git_repository'])
-    if env['git_branch'] is not None:
-        logger.info('switch git branch "%s"', env['git_branch'])
+    git_repository = pathlib.Path(env.git_repository)
+    if env.git_branch is not None:
+        logger.info('switch git branch "%s"', env.git_branch)
         git_command(
-                ['git', 'switch', env['git_branch']],
+                ['git', 'switch', env.git_branch],
                 git_repository,
                 logger=logger)
     # get the latest backup timestamp from the Git repository
@@ -65,7 +63,7 @@ def download(
 
 
 def _base_url(env: Env) -> str:
-    return f'https://scrapbox.io/api/project-backup/{env["project"]}'
+    return f'https://scrapbox.io/api/project-backup/{env.project}'
 
 
 def _download_backup(
@@ -76,7 +74,7 @@ def _download_backup(
     # timestamp
     timestamp = info['backuped']
     # path
-    save_directory = pathlib.Path(env['save_directory'])
+    save_directory = pathlib.Path(env.save_directory)
     backup_path = save_directory.joinpath(f'{timestamp}.json')
     info_path = save_directory.joinpath(f'{timestamp}.info.json')
     if backup_path.exists() and info_path.exists():
@@ -91,7 +89,7 @@ def _download_backup(
     url = f'{_base_url(env)}/{info["id"]}.json'
     backup: Optional[BackupJSON] = _request_json(
             url,
-            env['session_id'],
+            env.session_id,
             logger,
             schema=jsonschema_backup())
     time.sleep(request_interval)

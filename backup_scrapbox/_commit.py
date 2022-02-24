@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
-
+import dataclasses
 import datetime
 import logging
 import pathlib
 import re
-from typing import Optional, TypedDict, Union
+from typing import Optional, Union
 from ._env import Env, PageOrder
 from ._json import (
         BackupJSON, BackupInfoJSON, jsonschema_backup, jsonschema_backup_info,
@@ -18,17 +17,17 @@ from ._utility import format_timestamp
 def commit(
         env: Env,
         logger: logging.Logger) -> None:
-    git_repository = pathlib.Path(env['git_repository'])
-    backup_directory = pathlib.Path(env['save_directory'])
+    git_repository = pathlib.Path(env.git_repository)
+    backup_directory = pathlib.Path(env.save_directory)
     # check if the git repository exists
     if not is_git_repository(git_repository):
         logger.error('git repository "%s" does not exist', git_repository)
         return
     # switch Git branch
-    if env['git_branch'] is not None:
-        logger.info('switch git branch "%s"', env['git_branch'])
+    if env.git_branch is not None:
+        logger.info('switch git branch "%s"', env.git_branch)
         git_command(
-                ['git', 'switch', env['git_branch']],
+                ['git', 'switch', env.git_branch],
                 git_repository,
                 logger=logger)
     # backup targets
@@ -38,28 +37,29 @@ def commit(
             logger)
     # commit
     for info in backup_targets:
-        logger.info('commit %s', format_timestamp(info['timestamp']))
+        logger.info('commit %s', format_timestamp(info.timestamp))
         # clear
         _clear_repository(
-                env['project'],
+                env.project,
                 git_repository,
                 logger)
         # copy
         commit_targets = _copy_backup(
-                env['project'],
+                env.project,
                 git_repository,
-                info['backup_path'],
-                env['page_order'],
+                info.backup_path,
+                env.page_order,
                 logger)
         # commit
-        _commit(env['project'],
+        _commit(env.project,
                 git_repository,
                 info,
                 commit_targets,
                 logger)
 
 
-class _Backup(TypedDict):
+@dataclasses.dataclass
+class _Backup:
     timestamp: int
     backup_path: pathlib.Path
     info_path: Optional[pathlib.Path]
@@ -98,7 +98,7 @@ def _backup_targets(
                 backup_path=path,
                 info_path=info_path if info_path.exists() else None))
     # sort by oldest timestamp
-    targets.sort(key=lambda x: x['timestamp'])
+    targets.sort(key=lambda x: x.timestamp)
     return targets
 
 
@@ -190,10 +190,10 @@ def _commit(
     message: list[str] = []
     message.append('{0} {1}'.format(
             project,
-            datetime.datetime.fromtimestamp(backup['timestamp'])))
-    if backup['info_path'] is not None:
+            datetime.datetime.fromtimestamp(backup.timestamp)))
+    if backup.info_path is not None:
         info: Optional[BackupInfoJSON] = load_json(
-                backup['info_path'],
+                backup.info_path,
                 schema=jsonschema_backup_info())
         if info is not None:
             message.append('')
@@ -204,7 +204,7 @@ def _commit(
     git_commit(
             git_repository,
             '\n'.join(message),
-            timestamp=backup['timestamp'],
+            timestamp=backup.timestamp,
             logger=logger)
 
 
