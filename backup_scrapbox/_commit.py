@@ -170,10 +170,21 @@ def _commit(
     for target in targets:
         git.execute(['git', 'add', target.as_posix()])
     # commit message
+    message = _commit_message(project, backup)
+    # commit
+    git.commit(
+            message,
+            timestamp=backup.timestamp)
+
+
+def _commit_message(
+        project: str,
+        backup: _Backup) -> str:
     message: list[str] = []
-    message.append('{0} {1}'.format(
-            project,
-            datetime.datetime.fromtimestamp(backup.timestamp)))
+    # header
+    timestamp = datetime.datetime.fromtimestamp(backup.timestamp)
+    message.append(f'{project} {timestamp}')
+    # info
     if backup.info_path is not None:
         info: Optional[BackupInfoJSON] = load_json(
                 backup.info_path,
@@ -183,10 +194,7 @@ def _commit(
             message.extend(
                     f'{repr(key)}: {repr(value)}'
                     for key, value in info.items())
-    # commit
-    git.commit(
-            '\n'.join(message),
-            timestamp=backup.timestamp)
+    return '\n'.join(message)
 
 
 def _sort_pages(
