@@ -1,14 +1,11 @@
-import json
 import logging
 import pathlib
 import time
-from typing import Any, Optional
-import jsonschema
-import requests
+from typing import Optional
 from ._env import Env
 from ._json import (
     BackupJSON, BackupInfoJSON, BackupListJSON, jsonschema_backup,
-    jsonschema_backup_list, save_json)
+    jsonschema_backup_list, request_json, save_json)
 from ._utility import format_timestamp
 
 
@@ -18,11 +15,11 @@ def download(
         request_interval: float) -> None:
     git = env.git(logger=logger)
     # list
-    backup_list: Optional[BackupListJSON] = _request_json(
+    backup_list: Optional[BackupListJSON] = request_json(
             f'{_base_url(env)}/list',
             env.session_id,
-            logger,
-            schema=jsonschema_backup_list())
+            schema=jsonschema_backup_list(),
+            logger=logger)
     if backup_list is None:
         return
     if not backup_list['backups']:
@@ -77,11 +74,11 @@ def _download_backup(
             'download backup %s',
             format_timestamp(timestamp))
     url = f'{_base_url(env)}/{info["id"]}.json'
-    backup: Optional[BackupJSON] = _request_json(
+    backup: Optional[BackupJSON] = request_json(
             url,
             env.session_id,
-            logger,
-            schema=jsonschema_backup())
+            schema=jsonschema_backup(),
+            logger=logger)
     time.sleep(request_interval)
     if backup is None:
         return
@@ -91,23 +88,3 @@ def _download_backup(
     # save backup info
     logger.info('save %s', info_path)
     save_json(info_path, info)
-
-
-def _request_json(
-        url: str,
-        session_id: str,
-        logger: logging.Logger,
-        schema: Optional[dict] = None) -> Optional[Any]:
-    cookie = {'connect.sid': session_id}
-    logger.info('get request: %s', url)
-    response = requests.get(url, cookies=cookie)
-    if not response.ok:
-        logger.error('failed to get request "%s"', url)
-        return None
-    # jsonschema validation
-    result = json.loads(response.text)
-    if schema is not None:
-        jsonschema.validate(
-                instance=result,
-                schema=schema)
-    return result

@@ -1,7 +1,9 @@
 import json
+import logging
 import pathlib
 from typing import Any, Optional, TypedDict
 import jsonschema
+import requests
 
 
 class BackupInfoJSON(TypedDict):
@@ -134,3 +136,25 @@ def save_json(
                 ensure_ascii=False,
                 indent=indent)
         file.write('\n')
+
+
+def request_json(
+        url: str,
+        session_id: str,
+        *,
+        schema: Optional[dict] = None,
+        logger: Optional[logging.Logger] = None) -> Optional[Any]:
+    logger = logger or logging.getLogger(__name__)
+    cookie = {'connect.sid': session_id}
+    logger.info('get request: %s', url)
+    response = requests.get(url, cookies=cookie)
+    if not response.ok:
+        logger.error('failed to get request "%s"', url)
+        return None
+    # jsonschema validation
+    value = json.loads(response.text)
+    if schema is not None:
+        jsonschema.validate(
+                instance=value,
+                schema=schema)
+    return value
