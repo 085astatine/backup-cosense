@@ -24,7 +24,7 @@ def commit(
     # switch Git branch
     if env.git_branch is not None:
         logger.info('switch git branch "%s"', env.git_branch)
-        git.command(['git', 'switch', env.git_branch])
+        git.execute(['git', 'switch', env.git_branch])
     # backup targets
     backup_targets = _backup_targets(
             backup_directory,
@@ -121,7 +121,7 @@ def _clear_repository(
     for target in targets:
         if target.exists():
             if target in staged:
-                git.command(['git', 'rm', target.as_posix()])
+                git.execute(['git', 'rm', target.as_posix()])
             else:
                 logger.debug('rm %s', target)
                 target.unlink()
@@ -172,7 +172,7 @@ def _commit(
         targets: list[pathlib.Path]) -> None:
     # git add
     for target in targets:
-        git.command(['git', 'add', target.as_posix()])
+        git.execute(['git', 'add', target.as_posix()])
     # commit message
     message: list[str] = []
     message.append('{0} {1}'.format(

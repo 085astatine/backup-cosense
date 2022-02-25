@@ -24,7 +24,7 @@ class Git:
     def exists(self) -> bool:
         return self.path.is_dir() and self.path.joinpath('.git').is_dir()
 
-    def command(
+    def execute(
             self,
             command: list[str],
             *,
@@ -34,15 +34,14 @@ class Git:
         # check if the repository exists
         if not self.exists():
             self._logger.error('git repository "%s" does not exist', self.path)
-        return _git_command(
+        return _execute_git_command(
                 command,
                 self.path,
                 logger=self._logger,
                 env=env)
 
     def ls_files(self) -> list[pathlib.Path]:
-        command = ['git', 'ls-files', '-z']
-        process = self.command(command)
+        process = self.execute(['git', 'ls-files', '-z'])
         return [self.path.joinpath(path)
                 for path in process.stdout.split('\0')
                 if path]
@@ -63,7 +62,7 @@ class Git:
             commit_time = datetime.datetime.fromtimestamp(timestamp)
             env['GIT_AUTHOR_DATE'] = commit_time.isoformat()
             env['GIT_COMMITTER_DATE'] = commit_time.isoformat()
-        self.command(command, env=env if env else None)
+        self.execute(command, env=env if env else None)
 
     def latest_commit_timestamp(self) -> Optional[int]:
         # check if the repository exists
@@ -73,15 +72,14 @@ class Git:
                     self.path)
             return None
         # git show -s --format=%ct
-        command = ['git', 'show', '-s', '--format=%ct']
-        process = self.command(command)
+        process = self.execute(['git', 'show', '-s', '--format=%ct'])
         timestamp = process.stdout.rstrip('\n')
         if timestamp.isdigit():
             return int(timestamp)
         return None
 
 
-def _git_command(
+def _execute_git_command(
         command: list[str],
         repository: pathlib.Path,
         *,

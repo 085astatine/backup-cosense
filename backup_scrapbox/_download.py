@@ -39,7 +39,7 @@ def download(
     # switch Git branch
     if env.git_branch is not None:
         logger.info('switch git branch "%s"', env.git_branch)
-        git.command(['git', 'switch', env.git_branch])
+        git.execute(['git', 'switch', env.git_branch])
     # get the latest backup timestamp from the Git repository
     latest_timestamp = git.latest_commit_timestamp()
     logger.info('latest backup: %s', format_timestamp(latest_timestamp))
