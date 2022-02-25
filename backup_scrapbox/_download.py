@@ -36,10 +36,6 @@ def download(
             format_timestamp(
                     max(x['backuped'] for x in backup_list['backups'])))
     time.sleep(request_interval)
-    # switch Git branch
-    if env.git_branch is not None:
-        logger.info('switch git branch "%s"', env.git_branch)
-        git.execute(['git', 'switch', env.git_branch])
     # get the latest backup timestamp from the Git repository
     latest_timestamp = git.latest_commit_timestamp()
     logger.info('latest backup: %s', format_timestamp(latest_timestamp))

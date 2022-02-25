@@ -21,10 +21,6 @@ def commit(
     if not git.exists():
         logger.error('git repository "%s" does not exist', git.path)
         return
-    # switch Git branch
-    if env.git_branch is not None:
-        logger.info('switch git branch "%s"', env.git_branch)
-        git.execute(['git', 'switch', env.git_branch])
     # backup targets
     backup_targets = _backup_targets(
             backup_directory,

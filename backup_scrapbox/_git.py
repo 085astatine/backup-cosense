@@ -34,6 +34,21 @@ class Git:
         # check if the repository exists
         if not self.exists():
             self._logger.error('git repository "%s" does not exist', self.path)
+        # switch branch
+        if self._branch is not None:
+            branch = _execute_git_command(
+                    ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                    self.path,
+                    logger=self._logger).stdout.rstrip('\n')
+            if branch != self._branch:
+                self._logger.info(
+                        'switch git branch from "%s" to "%s"',
+                        branch,
+                        self._branch)
+                _execute_git_command(
+                        ['git', 'switch', self._branch],
+                        self.path,
+                        logger=self._logger)
         return _execute_git_command(
                 command,
                 self.path,
