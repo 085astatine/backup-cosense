@@ -24,75 +24,70 @@ class Git:
     def exists(self) -> bool:
         return self.path.is_dir() and self.path.joinpath('.git').is_dir()
 
+    def command(
+            self,
+            command: list[str],
+            *,
+            env: Optional[dict[str, str]] = None
+    ) -> subprocess.CompletedProcess:
+        self._logger.debug('command: %s', command)
+        # check if the repository exists
+        if not self.exists():
+            self._logger.error('git repository "%s" does not exist', self.path)
+        return _git_command(
+                command,
+                self.path,
+                logger=self._logger,
+                env=env)
 
-def is_git_repository(
-        path: pathlib.Path) -> bool:
-    return path.is_dir() and path.joinpath('.git').exists()
+    def ls_files(self) -> list[pathlib.Path]:
+        command = ['git', 'ls-files', '-z']
+        process = self.command(command)
+        return [self.path.joinpath(path)
+                for path in process.stdout.split('\0')
+                if path]
 
+    def commit(
+            self,
+            message: str,
+            *,
+            option: Optional[list[str]] = None,
+            timestamp: Optional[int] = None) -> None:
+        # commit
+        command = ['git', 'commit', '--message', message]
+        if option is not None:
+            command.extend(option)
+        # set: commit date & author date
+        env: dict[str, str] = {}
+        if timestamp is not None:
+            commit_time = datetime.datetime.fromtimestamp(timestamp)
+            env['GIT_AUTHOR_DATE'] = commit_time.isoformat()
+            env['GIT_COMMITTER_DATE'] = commit_time.isoformat()
+        self.command(command, env=env if env else None)
 
-def git_ls_files(
-        repository: pathlib.Path,
-        *,
-        logger: Optional[logging.Logger] = None) -> list[pathlib.Path]:
-    logger = logger or logging.getLogger(__name__)
-    # ls-files
-    command = ['git', 'ls-files', '-z']
-    process = git_command(command, repository, logger=logger)
-    return [repository.joinpath(path)
-            for path in process.stdout.split('\0')
-            if path]
-
-
-def git_commit(
-        repository: pathlib.Path,
-        message: str,
-        *,
-        option: Optional[list[str]] = None,
-        timestamp: Optional[int] = None,
-        logger: Optional[logging.Logger] = None) -> None:
-    logger = logger or logging.getLogger(__name__)
-    # commit
-    command = ['git', 'commit', '--message', message]
-    env: dict[str, str] = {}
-    if option is not None:
-        command.extend(option)
-    # set: commit date & author date
-    if timestamp is not None:
-        commit_time = datetime.datetime.fromtimestamp(timestamp)
-        env['GIT_AUTHOR_DATE'] = commit_time.isoformat()
-        env['GIT_COMMITTER_DATE'] = commit_time.isoformat()
-    git_command(command, repository, logger=logger, env=env if env else None)
-
-
-def git_show_latest_timestamp(
-        repository: pathlib.Path,
-        *,
-        logger: Optional[logging.Logger] = None) -> Optional[int]:
-    logger = logger or logging.getLogger(__name__)
-    # check if the repository exists
-    if not is_git_repository(repository):
-        logger.warning('git repository "%s" does not exist', repository)
+    def latest_commit_timestamp(self) -> Optional[int]:
+        # check if the repository exists
+        if not self.exists():
+            self._logger.warning(
+                    'git repository "%s" does not exist',
+                    self.path)
+            return None
+        # git show -s --format=%ct
+        command = ['git', 'show', '-s', '--format=%ct']
+        process = self.command(command)
+        timestamp = process.stdout.rstrip('\n')
+        if timestamp.isdigit():
+            return int(timestamp)
         return None
-    # git show -s --format=%ct
-    command = ['git', 'show', '-s', '--format=%ct']
-    process = git_command(command, repository, logger=logger)
-    timestamp = process.stdout.rstrip('\n')
-    if timestamp.isdigit():
-        return int(timestamp)
-    return None
 
 
-def git_command(
+def _git_command(
         command: list[str],
         repository: pathlib.Path,
         *,
         logger: Optional[logging.Logger] = None,
         env: Optional[dict[str, str]] = None) -> subprocess.CompletedProcess:
     logger = logger or logging.getLogger(__name__)
-    logger.debug('command: %s', command)
-    # check if the repository exists
-    if not is_git_repository(repository):
-        logger.error('git repository "%s" does not exist', repository)
     try:
         process = subprocess.run(
                 command,

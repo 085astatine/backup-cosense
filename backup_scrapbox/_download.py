@@ -6,7 +6,6 @@ from typing import Any, Optional
 import jsonschema
 import requests
 from ._env import Env
-from ._git import git_command, git_show_latest_timestamp
 from ._json import (
     BackupJSON, BackupInfoJSON, BackupListJSON, jsonschema_backup,
     jsonschema_backup_list, save_json)
@@ -17,6 +16,7 @@ def download(
         env: Env,
         logger: logging.Logger,
         request_interval: float) -> None:
+    git = env.git(logger=logger)
     # list
     backup_list: Optional[BackupListJSON] = _request_json(
             f'{_base_url(env)}/list',
@@ -37,17 +37,11 @@ def download(
                     max(x['backuped'] for x in backup_list['backups'])))
     time.sleep(request_interval)
     # switch Git branch
-    git_repository = pathlib.Path(env.git_repository)
     if env.git_branch is not None:
         logger.info('switch git branch "%s"', env.git_branch)
-        git_command(
-                ['git', 'switch', env.git_branch],
-                git_repository,
-                logger=logger)
+        git.command(['git', 'switch', env.git_branch])
     # get the latest backup timestamp from the Git repository
-    latest_timestamp = git_show_latest_timestamp(
-            git_repository,
-            logger=logger)
+    latest_timestamp = git.latest_commit_timestamp()
     logger.info('latest backup: %s', format_timestamp(latest_timestamp))
     # backup
     for info in sorted(backup_list['backups'], key=lambda x: x['backuped']):
