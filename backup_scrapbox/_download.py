@@ -15,29 +15,15 @@ def download(
         request_interval: float) -> None:
     git = env.git(logger=logger)
     # list
-    backup_list: Optional[BackupListJSON] = request_json(
-            f'{_base_url(env)}/list',
-            env.session_id,
-            schema=jsonschema_backup_list(),
-            logger=logger)
-    if backup_list is None:
-        return
-    if not backup_list['backups']:
-        logger.info('there are no backup')
-        return
-    logger.info(
-            'there are %d backups: %s ~ %s',
-            len(backup_list['backups']),
-            format_timestamp(
-                    min(x['backuped'] for x in backup_list['backups'])),
-            format_timestamp(
-                    max(x['backuped'] for x in backup_list['backups'])))
+    backup_list = _request_backup_list(env, logger)
     time.sleep(request_interval)
+    if not backup_list:
+        return
     # get the latest backup timestamp from the Git repository
     latest_timestamp = git.latest_commit_timestamp()
     logger.info('latest backup: %s', format_timestamp(latest_timestamp))
     # backup
-    for info in sorted(backup_list['backups'], key=lambda x: x['backuped']):
+    for info in backup_list:
         # check whether or not it is a target
         if (latest_timestamp is not None
                 and info['backuped'] <= latest_timestamp):
@@ -51,6 +37,34 @@ def download(
 
 def _base_url(env: Env) -> str:
     return f'https://scrapbox.io/api/project-backup/{env.project}'
+
+
+def _request_backup_list(
+        env: Env,
+        logger: logging.Logger) -> list[BackupInfoJSON]:
+    # request to .../project-backup/list
+    response: Optional[BackupListJSON] = request_json(
+            f'{_base_url(env)}/list',
+            env.session_id,
+            schema=jsonschema_backup_list(),
+            logger=logger)
+    # failed to request
+    if response is None:
+        return []
+    # backup info list
+    backup_list = response['backups']
+    # backups is empty
+    if not backup_list:
+        logger.info('there are no backup')
+        return []
+    # output to logger
+    oldest_backup_timestamp = min(info['backuped'] for info in backup_list)
+    latest_backup_timestamp = max(info['backuped'] for info in backup_list)
+    logger.info(f'there are {len(backup_list)} backups:'
+                f' {format_timestamp(oldest_backup_timestamp)}'
+                f' ~ {format_timestamp(latest_backup_timestamp)}')
+    # sort by old...new
+    return sorted(backup_list, key=lambda backup: backup['backuped'])
 
 
 def _download_backup(
