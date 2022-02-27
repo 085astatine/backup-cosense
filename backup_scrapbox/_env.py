@@ -4,6 +4,7 @@ import pathlib
 from typing import Final, Literal, Optional, get_args
 import dacite
 import dotenv
+import requests
 from ._git import Git
 
 
@@ -27,6 +28,14 @@ class Env:
                 pathlib.Path(self.git_repository),
                 branch=self.git_branch,
                 logger=logger)
+
+    def session(self) -> requests.Session:
+        session = requests.Session()
+        session.cookies.set(
+                'connect.sid',
+                self.session_id,
+                domain='scrapbox.io')
+        return session
 
 
 _REQUIRED_KEYS: Final[list[str]] = [

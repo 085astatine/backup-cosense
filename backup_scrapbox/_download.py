@@ -2,6 +2,7 @@ import logging
 import pathlib
 import time
 from typing import Optional
+import requests
 from ._env import Env
 from ._json import (
     BackupJSON, BackupInfoJSON, BackupListJSON, jsonschema_backup,
@@ -14,25 +15,26 @@ def download(
         logger: logging.Logger,
         request_interval: float) -> None:
     git = env.git(logger=logger)
-    # list
-    backup_list = _request_backup_list(env, logger)
-    time.sleep(request_interval)
-    if not backup_list:
-        return
-    # get the latest backup timestamp from the Git repository
-    latest_timestamp = git.latest_commit_timestamp()
-    logger.info('latest backup: %s', format_timestamp(latest_timestamp))
-    # backup
-    for info in backup_list:
-        # check whether or not it is a target
-        if (latest_timestamp is not None
-                and info['backuped'] <= latest_timestamp):
-            logger.info(
-                    'skip backup %s: older than latest',
-                    format_timestamp(info['backuped']))
-            continue
-        # download
-        _download_backup(env, info, logger, request_interval)
+    with env.session() as session:
+        # list
+        backup_list = _request_backup_list(env, session, logger)
+        time.sleep(request_interval)
+        if not backup_list:
+            return
+        # get the latest backup timestamp from the Git repository
+        latest_timestamp = git.latest_commit_timestamp()
+        logger.info('latest backup: %s', format_timestamp(latest_timestamp))
+        # backup
+        for info in backup_list:
+            # check whether or not it is a target
+            if (latest_timestamp is not None
+                    and info['backuped'] <= latest_timestamp):
+                logger.info(
+                        'skip backup %s: older than latest',
+                        format_timestamp(info['backuped']))
+                continue
+            # download
+            _download_backup(env, session, info, logger, request_interval)
 
 
 def _base_url(env: Env) -> str:
@@ -41,11 +43,12 @@ def _base_url(env: Env) -> str:
 
 def _request_backup_list(
         env: Env,
+        session: requests.Session,
         logger: logging.Logger) -> list[BackupInfoJSON]:
     # request to .../project-backup/list
     response: Optional[BackupListJSON] = request_json(
             f'{_base_url(env)}/list',
-            env.session_id,
+            session,
             schema=jsonschema_backup_list(),
             logger=logger)
     # failed to request
@@ -69,6 +72,7 @@ def _request_backup_list(
 
 def _download_backup(
         env: Env,
+        session: requests.Session,
         info: BackupInfoJSON,
         logger: logging.Logger,
         request_interval: float) -> None:
@@ -90,7 +94,7 @@ def _download_backup(
     url = f'{_base_url(env)}/{info["id"]}.json'
     backup: Optional[BackupJSON] = request_json(
             url,
-            env.session_id,
+            session,
             schema=jsonschema_backup(),
             logger=logger)
     time.sleep(request_interval)

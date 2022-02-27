@@ -140,14 +140,14 @@ def save_json(
 
 def request_json(
         url: str,
-        session_id: str,
+        session: requests.Session,
         *,
         schema: Optional[dict] = None,
         logger: Optional[logging.Logger] = None) -> Optional[Any]:
     logger = logger or logging.getLogger(__name__)
-    cookie = {'connect.sid': session_id}
+    # request
     logger.info('get request: %s', url)
-    response = requests.get(url, cookies=cookie)
+    response = session.get(url)
     if not response.ok:
         logger.error('failed to get request "%s"', url)
         return None
