@@ -1,9 +1,10 @@
 import logging
 import pathlib
 import time
-from typing import Optional
+from typing import Callable, Optional
 import requests
 from ._env import Env
+from ._git import Git
 from ._json import (
     BackupJSON, BackupInfoJSON, BackupListJSON, jsonschema_backup,
     jsonschema_backup_list, request_json, save_json)
@@ -21,18 +22,8 @@ def download(
         time.sleep(request_interval)
         if not backup_list:
             return
-        # get the latest backup timestamp from the Git repository
-        latest_timestamp = git.latest_commit_timestamp()
-        logger.info('latest backup: %s', format_timestamp(latest_timestamp))
         # backup
-        for info in backup_list:
-            # check whether or not it is a target
-            if (latest_timestamp is not None
-                    and info['backuped'] <= latest_timestamp):
-                logger.info(
-                        'skip backup %s: older than latest',
-                        format_timestamp(info['backuped']))
-                continue
+        for info in filter(_backup_filter(git, logger), backup_list):
             # download
             _download_backup(env, session, info, logger, request_interval)
 
@@ -68,6 +59,21 @@ def _request_backup_list(
                 f' ~ {format_timestamp(latest_backup_timestamp)}')
     # sort by old...new
     return sorted(backup_list, key=lambda backup: backup['backuped'])
+
+
+def _backup_filter(
+        git: Git,
+        logger: logging.Logger) -> Callable[[BackupInfoJSON], bool]:
+    # get the latest backup timestamp from the Git repository
+    latest_timestamp = git.latest_commit_timestamp()
+    logger.info('latest backup: %s', format_timestamp(latest_timestamp))
+
+    def timestamp_filter(backup: BackupInfoJSON) -> bool:
+        if latest_timestamp is None:
+            return True
+        return latest_timestamp < backup['backuped']
+
+    return timestamp_filter
 
 
 def _download_backup(
