@@ -48,7 +48,7 @@ def _request_backup_list(
     # request to .../project-backup/list
     response: Optional[BackupListJSON] = request_json(
             f'{_base_url(env)}/list',
-            session,
+            session=session,
             schema=jsonschema_backup_list(),
             logger=logger)
     # failed to request
@@ -94,7 +94,7 @@ def _download_backup(
     url = f'{_base_url(env)}/{info["id"]}.json'
     backup: Optional[BackupJSON] = request_json(
             url,
-            session,
+            session=session,
             schema=jsonschema_backup(),
             logger=logger)
     time.sleep(request_interval)
