@@ -23,7 +23,8 @@ def download(
         # backup
         for info in filter(_backup_filter(env, logger), backup_list):
             # download
-            _download_backup(env, session, info, logger, request_interval)
+            _download_backup(env, session, info, logger)
+            time.sleep(request_interval)
 
 
 def _base_url(env: Env) -> str:
@@ -91,8 +92,7 @@ def _download_backup(
         env: Env,
         session: requests.Session,
         info: BackupInfoJSON,
-        logger: logging.Logger,
-        request_interval: float) -> None:
+        logger: logging.Logger) -> None:
     # timestamp
     timestamp = info['backuped']
     # request
@@ -105,7 +105,6 @@ def _download_backup(
             session=session,
             schema=jsonschema_backup(),
             logger=logger)
-    time.sleep(request_interval)
     if backup is None:
         return
     # save
