@@ -14,7 +14,6 @@ def download(
         env: Env,
         logger: logging.Logger,
         request_interval: float) -> None:
-    git = env.git(logger=logger)
     with env.session() as session:
         # list
         backup_list = _request_backup_list(env, session, logger)
@@ -22,7 +21,7 @@ def download(
         if not backup_list:
             return
         # backup
-        for info in filter(_backup_filter(git, logger), backup_list):
+        for info in filter(_backup_filter(env, logger), backup_list):
             # download
             _download_backup(env, session, info, logger, request_interval)
 
@@ -61,18 +60,31 @@ def _request_backup_list(
 
 
 def _backup_filter(
-        git: Git,
+        env: Env,
         logger: logging.Logger) -> Callable[[BackupInfoJSON], bool]:
     # get the latest backup timestamp from the Git repository
+    git = env.git(logger=logger)
     latest_timestamp = git.latest_commit_timestamp()
     logger.info('latest backup: %s', format_timestamp(latest_timestamp))
+    # backup storage
+    storage = env.backup_storage()
 
-    def timestamp_filter(backup: BackupInfoJSON) -> bool:
+    def backup_filter(backup: BackupInfoJSON) -> bool:
+        timestamp = backup['backuped']
+        if storage.exists(timestamp):
+            logger.debug(
+                    'skip %s: already downloaded',
+                    format_timestamp(timestamp))
+            return False
         if latest_timestamp is None:
             return True
-        return latest_timestamp < backup['backuped']
+        if timestamp <= latest_timestamp:
+            logger.debug(
+                    'skip %s: older than latest',
+                    format_timestamp(timestamp))
+        return latest_timestamp < timestamp
 
-    return timestamp_filter
+    return backup_filter
 
 
 def _download_backup(
@@ -83,13 +95,6 @@ def _download_backup(
         request_interval: float) -> None:
     # timestamp
     timestamp = info['backuped']
-    # path
-    storage = env.backup_storage()
-    if storage.exists(timestamp):
-        logger.debug(
-                'skip backup %s: already exists',
-                format_timestamp(timestamp))
-        return
     # request
     logger.info(
             'download backup %s',
@@ -103,6 +108,8 @@ def _download_backup(
     time.sleep(request_interval)
     if backup is None:
         return
+    # save
+    storage = env.backup_storage()
     # save backup
     backup_path = storage.backup_path(timestamp)
     logger.info('save %s', backup_path)
