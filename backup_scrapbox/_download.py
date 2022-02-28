@@ -1,5 +1,4 @@
 import logging
-import pathlib
 import time
 from typing import Callable, Optional
 import requests
@@ -85,10 +84,8 @@ def _download_backup(
     # timestamp
     timestamp = info['backuped']
     # path
-    save_directory = pathlib.Path(env.save_directory)
-    backup_path = save_directory.joinpath(f'{timestamp}.json')
-    info_path = save_directory.joinpath(f'{timestamp}.info.json')
-    if backup_path.exists() and info_path.exists():
+    storage = env.backup_storage()
+    if storage.exists(timestamp):
         logger.debug(
                 'skip backup %s: already exists',
                 format_timestamp(timestamp))
@@ -107,8 +104,10 @@ def _download_backup(
     if backup is None:
         return
     # save backup
+    backup_path = storage.backup_path(timestamp)
     logger.info('save %s', backup_path)
     save_json(backup_path, backup)
     # save backup info
+    info_path = storage.info_path(timestamp)
     logger.info('save %s', info_path)
     save_json(info_path, info)

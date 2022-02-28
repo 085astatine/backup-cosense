@@ -1,14 +1,11 @@
-import dataclasses
 import datetime
 import logging
 import pathlib
-import re
 from typing import Optional, Union
+from ._backup import Backup, BackupStorage
 from ._env import Env, PageOrder
 from ._git import Git
-from ._json import (
-        BackupJSON, BackupInfoJSON, jsonschema_backup, jsonschema_backup_info,
-        load_json, save_json)
+from ._json import BackupJSON, jsonschema_backup, load_json, save_json
 from ._utility import format_timestamp
 
 
@@ -16,14 +13,14 @@ def commit(
         env: Env,
         logger: logging.Logger) -> None:
     git = env.git(logger=logger)
-    backup_directory = pathlib.Path(env.save_directory)
+    storage = env.backup_storage()
     # check if the git repository exists
     if not git.exists():
         logger.error('git repository "%s" does not exist', git.path)
         return
     # backup targets
     backup_targets = _backup_targets(
-            backup_directory,
+            storage,
             git,
             logger)
     # commit
@@ -38,7 +35,7 @@ def commit(
         commit_targets = _copy_backup(
                 env.project,
                 git,
-                info.backup_path,
+                info,
                 env.page_order,
                 logger)
         # commit
@@ -48,45 +45,17 @@ def commit(
                 commit_targets)
 
 
-@dataclasses.dataclass
-class _Backup:
-    timestamp: int
-    backup_path: pathlib.Path
-    info_path: Optional[pathlib.Path]
-
-
 def _backup_targets(
-        directory: pathlib.Path,
+        storage: BackupStorage,
         git: Git,
-        logger: logging.Logger) -> list[_Backup]:
+        logger: logging.Logger) -> list[Backup]:
     # get latest backup timestamp
-    latest_timestamp = git.latest_commit_timestamp()
-    logger.info('latest backup: %s', format_timestamp(latest_timestamp))
+    latest = git.latest_commit_timestamp()
+    logger.info('latest backup: %s', format_timestamp(latest))
     # find backup
-    targets: list[_Backup] = []
-    for path in directory.iterdir():
-        # check if the path is file
-        if not path.is_file():
-            continue
-        # check if the filename is '${timestamp}.json'
-        match = re.match(
-            r'^(?P<timestamp>\d+)\.json$',
-            path.name)
-        if match is None:
-            continue
-        timestamp = int(match.group('timestamp'))
-        # check if it is newer than the latest backup
-        if (latest_timestamp is not None
-                and timestamp <= latest_timestamp):
-            continue
-        # add to targets
-        info_path = directory.joinpath(f'{timestamp}.info.json')
-        targets.append(_Backup(
-                timestamp=timestamp,
-                backup_path=path,
-                info_path=info_path if info_path.exists() else None))
-    # sort by oldest timestamp
-    targets.sort(key=lambda x: x.timestamp)
+    targets = [
+            backup for backup in storage.backups()
+            if latest is None or latest < backup.timestamp]
     return targets
 
 
@@ -129,14 +98,14 @@ def _clear_repository(
 def _copy_backup(
         project: str,
         git: Git,
-        backup_path: pathlib.Path,
+        backup_info: Backup,
         page_order: Optional[PageOrder],
         logger: logging.Logger) -> list[pathlib.Path]:
     copied: list[pathlib.Path] = []
     # load backup
-    backup: Optional[BackupJSON] = load_json(backup_path)
+    backup = backup_info.load_backup()
     if backup is None:
-        logger.error('failed to load "%s"', backup_path)
+        logger.error('failed to load "%s"', backup_info.backup_path)
         return copied
     _sort_pages(backup, page_order)
     # copy
@@ -164,7 +133,7 @@ def _copy_backup(
 def _commit(
         project: str,
         git: Git,
-        backup: _Backup,
+        backup: Backup,
         targets: list[pathlib.Path]) -> None:
     # git add
     for target in targets:
@@ -179,16 +148,14 @@ def _commit(
 
 def _commit_message(
         project: str,
-        backup: _Backup) -> str:
+        backup: Backup) -> str:
     message: list[str] = []
     # header
     timestamp = datetime.datetime.fromtimestamp(backup.timestamp)
     message.append(f'{project} {timestamp}')
     # info
     if backup.info_path is not None:
-        info: Optional[BackupInfoJSON] = load_json(
-                backup.info_path,
-                schema=jsonschema_backup_info())
+        info = backup.load_info()
         if info is not None:
             message.append('')
             message.extend(
