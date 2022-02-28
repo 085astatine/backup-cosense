@@ -1,8 +1,11 @@
 import dataclasses
+import json
 import logging
 import re
 from typing import Optional
+import jsonschema
 from ._env import Env
+from ._json import BackupInfoJSON, jsonschema_backup_info
 
 
 def export(
@@ -18,12 +21,28 @@ class Commit:
     timestamp: int
     body: str
 
+    def backup_info(self) -> Optional[BackupInfoJSON]:
+        # parse as JSON
+        body = '{' + ','.join(self.body.split('\n')).replace('\'', '"') + '}'
+        try:
+            info = json.loads(body)
+        except json.decoder.JSONDecodeError:
+            return None
+        # JSON Schema validation
+        try:
+            jsonschema.validate(
+                    instance=info,
+                    schema=jsonschema_backup_info())
+        except jsonschema.exceptions.ValidationError:
+            return None
+        return info
+
 
 def _to_commit(log: str) -> Optional[Commit]:
     commit_match = re.match(
             r'hash: (?P<hash>[0-9a-f]{40})\n'
             r'timestamp: (?P<timestamp>\d+)\n'
-            r'body:\n(?P<body>.*)$',
+            r'body:\n(?P<body>.*?)\n?$',
             log,
             re.DOTALL)
     if commit_match is None:
