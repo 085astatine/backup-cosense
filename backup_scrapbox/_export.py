@@ -5,7 +5,7 @@ import re
 from typing import Optional
 import jsonschema
 from ._env import Env
-from ._json import BackupInfoJSON, jsonschema_backup_info
+from ._json import BackupInfoJSON, jsonschema_backup_info, parse_json
 
 
 def export(
@@ -22,17 +22,17 @@ class Commit:
     body: str
 
     def backup_info(self) -> Optional[BackupInfoJSON]:
+        # check if the body is empty
+        if not self.body:
+            return None
         # parse as JSON
         body = '{' + ','.join(self.body.split('\n')).replace('\'', '"') + '}'
         try:
-            info = json.loads(body)
+            info = parse_json(
+                    body,
+                    schema=jsonschema_backup_info())
         except json.decoder.JSONDecodeError:
             return None
-        # JSON Schema validation
-        try:
-            jsonschema.validate(
-                    instance=info,
-                    schema=jsonschema_backup_info())
         except jsonschema.exceptions.ValidationError:
             return None
         return info

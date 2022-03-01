@@ -107,6 +107,19 @@ def jsonschema_backup():
     return schema
 
 
+def parse_json(
+        text: str,
+        *,
+        schema: Optional[dict] = None) -> Optional[Any]:
+    value = json.loads(text)
+    # JSON Schema validation
+    if schema is not None:
+        jsonschema.validate(
+                instance=value,
+                schema=schema)
+    return value
+
+
 def load_json(
         path: pathlib.Path,
         *,
