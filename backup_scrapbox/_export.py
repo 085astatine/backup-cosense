@@ -1,18 +1,31 @@
 import dataclasses
 import json
 import logging
+import pathlib
 import re
 from typing import Optional
 import jsonschema
 from ._env import Env
-from ._json import BackupInfoJSON, jsonschema_backup_info, parse_json
+from ._git import Git
+from ._json import (
+        BackupJSON, BackupInfoJSON, jsonschema_backup,
+        jsonschema_backup_info, parse_json, save_json)
 
 
 def export(
         env: Env,
+        destination: pathlib.Path,
         logger: logging.Logger) -> None:
+    git = env.git(logger=logger)
     # commits
-    commits = _commits(env, logger)
+    commits = _commits(git, logger)
+    # export
+    for commit in commits:
+        _export(env.project,
+                git,
+                commit,
+                destination,
+                logger)
 
 
 @dataclasses.dataclass
@@ -54,9 +67,8 @@ def _to_commit(log: str) -> Optional[Commit]:
 
 
 def _commits(
-        env: Env,
+        git: Git,
         logger: logging.Logger) -> list[Commit]:
-    git = env.git(logger=logger)
     # log format
     log_format = '\n'.join([
             'hash: %H',
@@ -81,3 +93,26 @@ def _commits(
             logger.warning('failed to parse commit "%s"', repr(log))
     # sort by old...new
     return sorted(commits, key=lambda commit: commit.timestamp)
+
+
+def _export(
+        project: str,
+        git: Git,
+        commit: Commit,
+        destination: pathlib.Path,
+        logger: logging.Logger) -> None:
+    # get backup.json
+    command = ['git', 'show', '-z', f'{commit.hash}:{project}.json']
+    process = git.execute(command)
+    backup_json: Optional[BackupJSON] = parse_json(
+            process.stdout,
+            schema=jsonschema_backup())
+    # save backup.json
+    backup_json_path = destination.joinpath(f'{commit.timestamp}.json')
+    save_json(backup_json_path, backup_json)
+    logger.debug('save %s', backup_json_path)
+    # save backup.info.json
+    info_json_path = destination.joinpath(f'{commit.timestamp}.info.json')
+    info_json = commit.backup_info()
+    if info_json is not None:
+        save_json(info_json_path, info_json)
