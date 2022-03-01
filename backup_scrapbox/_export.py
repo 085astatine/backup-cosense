@@ -2,6 +2,7 @@ import dataclasses
 import json
 import logging
 import pathlib
+import subprocess
 import re
 from typing import Optional
 import jsonschema
@@ -103,7 +104,11 @@ def _export(
         logger: logging.Logger) -> None:
     # get backup.json
     command = ['git', 'show', '-z', f'{commit.hash}:{project}.json']
-    process = git.execute(command)
+    try:
+        process = git.execute(command)
+    except subprocess.CalledProcessError:
+        logger.warning('skip commit: %s', commit.hash)
+        return
     backup_json: Optional[BackupJSON] = parse_json(
             process.stdout,
             schema=jsonschema_backup())
