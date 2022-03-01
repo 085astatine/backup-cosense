@@ -18,6 +18,11 @@ def export(
         destination: pathlib.Path,
         logger: logging.Logger) -> None:
     git = env.git(logger=logger)
+    # check if the destination exists
+    if not destination.exists():
+        logger.error(
+                f'export directory "{destination.as_posix()}" does not exist')
+        return
     # commits
     commits = _commits(git, logger)
     # export
