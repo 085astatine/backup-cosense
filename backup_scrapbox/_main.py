@@ -2,37 +2,13 @@ import argparse
 import logging
 import sys
 import textwrap
-from typing import Final, Literal, Optional
+from typing import Optional
 from ._env import Env, InvalidEnvError, load_env
 from ._download import download
 from ._commit import commit
 
 
-Target = Optional[Literal['download', 'commit']]
-
-
-_REQUEST_INTERVAL: Final[float] = 3.0
-
-
 def backup_scrapbox(
-        env: Env,
-        *,
-        target: Target = 'all',
-        logger: Optional[logging.Logger] = None,
-        request_interval: float = _REQUEST_INTERVAL) -> None:
-    logger = logger or logging.getLogger(__name__)
-    logger.info('backup-scrapbox')
-    # download backup
-    if target in (None, 'download'):
-        logger.info('target: download')
-        download(env, logger, request_interval)
-    # commit
-    if target in (None, 'commit'):
-        logger.info('target: commit')
-        commit(env, logger)
-
-
-def main(
         *,
         args: Optional[list[str]] = None,
         env: Optional[Env] = None,
@@ -60,11 +36,15 @@ def main(
                     textwrap.indent(str(error), ' ' * 4)))
             sys.exit(1)
     # main
-    backup_scrapbox(
-            env,
-            target=option.target,
-            logger=logger,
-            request_interval=option.request_interval)
+    logger.info('backup-scrapbox')
+    # download backup
+    if option.target in (None, 'download'):
+        logger.info('target: download')
+        download(env, logger, option.request_interval)
+    # commit
+    if option.target in (None, 'commit'):
+        logger.info('target: commit')
+        commit(env, logger)
 
 
 def _argument_parser() -> argparse.ArgumentParser:
@@ -112,6 +92,6 @@ def _add_download_arguments(parser: argparse.ArgumentParser) -> None:
             '--request-interval',
             dest='request_interval',
             type=float,
-            default=_REQUEST_INTERVAL,
+            default=3.0,
             metavar='SECONDS',
             help='request interval seconds (default %(default)s)')
