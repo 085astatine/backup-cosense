@@ -1,11 +1,13 @@
 import argparse
 import logging
+import pathlib
 import sys
 import textwrap
 from typing import Optional
 from ._env import Env, InvalidEnvError, load_env
 from ._download import download
 from ._commit import commit
+from ._export import export
 
 
 def backup_scrapbox(
@@ -45,6 +47,10 @@ def backup_scrapbox(
     if option.target in (None, 'commit'):
         logger.info('target: commit')
         commit(env, logger)
+    # export
+    if option.target == 'export':
+        logger.info('target: export')
+        export(env, option.destination, logger=logger)
 
 
 def _argument_parser() -> argparse.ArgumentParser:
@@ -67,6 +73,12 @@ def _argument_parser() -> argparse.ArgumentParser:
             'commit',
             help='commit to Git repository')
     _add_common_arguments(commit_parser)
+    # export
+    export_parser = sub_parsers.add_parser(
+            'export',
+            help='export backups from Git repository')
+    _add_common_arguments(export_parser)
+    _add_export_arguments(export_parser)
     return parser
 
 
@@ -95,3 +107,14 @@ def _add_download_arguments(parser: argparse.ArgumentParser) -> None:
             default=3.0,
             metavar='SECONDS',
             help='request interval seconds (default %(default)s)')
+
+
+def _add_export_arguments(parser: argparse.ArgumentParser) -> None:
+    # destination
+    parser.add_argument(
+            '-d', '--destination',
+            dest='destination',
+            type=pathlib.Path,
+            required=True,
+            metavar='DIR',
+            help='directory to export backups')
