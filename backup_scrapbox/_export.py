@@ -11,6 +11,7 @@ from ._git import Git
 from ._json import (
         BackupJSON, BackupInfoJSON, jsonschema_backup,
         jsonschema_backup_info, parse_json, save_json)
+from ._utility import format_timestamp
 
 
 def export(
@@ -25,8 +26,16 @@ def export(
         return
     # commits
     commits = _commits(git, logger)
+    if commits:
+        logger.info(
+                f'{len(commits)} commits:'
+                f' {format_timestamp(commits[0].timestamp)}'
+                f' ~ {format_timestamp(commits[-1].timestamp)}')
+    else:
+        logger.info('there are no commits')
     # export
     for commit in commits:
+        logger.info(f'export {format_timestamp(commit.timestamp)}')
         _export(env.project,
                 git,
                 commit,
