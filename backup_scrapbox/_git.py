@@ -118,5 +118,4 @@ def _execute_git_command(
                 'stderr': error.stderr}
         logger.error('%s: %s', error.__class__.__name__, error_info)
         raise error
-    logger.debug('stdout: %s', repr(process.stdout))
     return process

@@ -1,38 +1,16 @@
 import argparse
 import logging
+import pathlib
 import sys
 import textwrap
-from typing import Final, Literal, Optional
+from typing import Optional
 from ._env import Env, InvalidEnvError, load_env
 from ._download import download
 from ._commit import commit
-
-
-Target = Literal['all', 'download', 'commit']
-
-
-_REQUEST_INTERVAL: Final[float] = 3.0
+from ._export import export
 
 
 def backup_scrapbox(
-        env: Env,
-        *,
-        target: Target = 'all',
-        logger: Optional[logging.Logger] = None,
-        request_interval: float = _REQUEST_INTERVAL) -> None:
-    logger = logger or logging.getLogger(__name__)
-    logger.info('backup-scrapbox')
-    # download backup
-    if target in ('all', 'download'):
-        logger.info('target: download')
-        download(env, logger, request_interval)
-    # commit
-    if target in ('all', 'commit'):
-        logger.info('target: commit')
-        commit(env, logger)
-
-
-def main(
         *,
         args: Optional[list[str]] = None,
         env: Optional[Env] = None,
@@ -60,21 +38,51 @@ def main(
                     textwrap.indent(str(error), ' ' * 4)))
             sys.exit(1)
     # main
-    backup_scrapbox(
-            env,
-            target=option.target,
-            logger=logger,
-            request_interval=option.request_interval)
+    logger.info('backup-scrapbox')
+    # download backup
+    if option.target in (None, 'download'):
+        logger.info('target: download')
+        download(env, logger, option.request_interval)
+    # commit
+    if option.target in (None, 'commit'):
+        logger.info('target: commit')
+        commit(env, logger)
+    # export
+    if option.target == 'export':
+        logger.info('target: export')
+        export(env, option.destination, logger=logger)
 
 
 def _argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    # target
-    parser.add_argument(
-            '--target',
-            default='all',
-            choices=['all', 'download', 'commit'],
-            help='execution target (default %(default)s)')
+    # sub parser
+    sub_parsers = parser.add_subparsers(
+            dest='target',
+            help='default: download & commit')
+    # default: download & commit
+    _add_common_arguments(parser)
+    _add_download_arguments(parser)
+    # download
+    download_parser = sub_parsers.add_parser(
+            'download',
+            help='download backup from scrapbox.io')
+    _add_common_arguments(download_parser)
+    _add_download_arguments(download_parser)
+    # commit
+    commit_parser = sub_parsers.add_parser(
+            'commit',
+            help='commit to Git repository')
+    _add_common_arguments(commit_parser)
+    # export
+    export_parser = sub_parsers.add_parser(
+            'export',
+            help='export backups from Git repository')
+    _add_common_arguments(export_parser)
+    _add_export_arguments(export_parser)
+    return parser
+
+
+def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     # env
     parser.add_argument(
             '--env',
@@ -88,12 +96,25 @@ def _argument_parser() -> argparse.ArgumentParser:
             dest='verbose',
             action='store_true',
             help='set log level to debug')
+
+
+def _add_download_arguments(parser: argparse.ArgumentParser) -> None:
     # request interval
     parser.add_argument(
             '--request-interval',
             dest='request_interval',
             type=float,
-            default=_REQUEST_INTERVAL,
+            default=3.0,
             metavar='SECONDS',
             help='request interval seconds (default %(default)s)')
-    return parser
+
+
+def _add_export_arguments(parser: argparse.ArgumentParser) -> None:
+    # destination
+    parser.add_argument(
+            '-d', '--destination',
+            dest='destination',
+            type=pathlib.Path,
+            required=True,
+            metavar='DIR',
+            help='directory to export backups')
