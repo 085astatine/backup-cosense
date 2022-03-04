@@ -6,6 +6,7 @@ import os
 import pathlib
 import re
 import subprocess
+import textwrap
 from typing import Optional
 import jsonschema
 from ._json import BackupInfoJSON, jsonschema_backup_info, parse_json
@@ -22,7 +23,7 @@ class Commit:
         if not self.body:
             return None
         # parse as JSON
-        body = '{' + ','.join(self.body.split('\n')).replace('\'', '"') + '}'
+        body = '{' + ','.join(self.body.split('\n')) + '}'
         try:
             info = parse_json(
                     body,
@@ -44,8 +45,12 @@ class Commit:
         body: list[str] = []
         if info is not None:
             body.extend(
-                    f'{repr(key)}: {repr(value)}'
-                    for key, value in info.items())
+                    line.removesuffix(',')
+                    for line
+                    in textwrap.dedent(
+                            json.dumps(info, ensure_ascii=False, indent=2)
+                            .removeprefix('{\n')
+                            .removesuffix('\n}')).split('\n'))
         # message
         if not body:
             return header
