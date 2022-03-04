@@ -132,7 +132,7 @@ class Git:
 
     def commits(self) -> list[Commit]:
         # log format
-        log_format = '\n'.join([
+        log_format = '%n'.join([
                 'hash: %H',
                 'timestamp: %ct',
                 'body:',
