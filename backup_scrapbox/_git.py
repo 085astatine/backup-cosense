@@ -1,9 +1,37 @@
+import dataclasses
 import datetime
+import json
 import logging
 import os
 import pathlib
+import re
 import subprocess
 from typing import Optional
+import jsonschema
+from ._json import BackupInfoJSON, jsonschema_backup_info, parse_json
+
+
+@dataclasses.dataclass
+class Commit:
+    hash: str
+    timestamp: int
+    body: str
+
+    def backup_info(self) -> Optional[BackupInfoJSON]:
+        # check if the body is empty
+        if not self.body:
+            return None
+        # parse as JSON
+        body = '{' + ','.join(self.body.split('\n')).replace('\'', '"') + '}'
+        try:
+            info = parse_json(
+                    body,
+                    schema=jsonschema_backup_info())
+        except json.decoder.JSONDecodeError:
+            return None
+        except jsonschema.exceptions.ValidationError:
+            return None
+        return info
 
 
 class Git:
@@ -79,6 +107,32 @@ class Git:
             env['GIT_COMMITTER_DATE'] = commit_time.isoformat()
         self.execute(command, env=env if env else None)
 
+    def commits(self) -> list[Commit]:
+        # log format
+        log_format = '\n'.join([
+                'hash: %H',
+                'timestamp: %ct',
+                'body:',
+                '%b'])
+        # git log
+        command = ['git', 'log', '-z', f'--format={log_format}']
+        process = self.execute(command)
+        # parse
+        commits: list[Commit] = []
+        for log in process.stdout.split('\0'):
+            # skip empty log
+            if not log:
+                continue
+            # parse log as commit
+            commit = _log_to_commit(log)
+            if commit is not None:
+                self._logger.debug('commit: %s', repr(commit))
+                commits.append(commit)
+            else:
+                self._logger.warning('failed to parse commit "%s"', repr(log))
+        # sort by old...new
+        return sorted(commits, key=lambda commit: commit.timestamp)
+
     def latest_commit_timestamp(self) -> Optional[int]:
         # check if the repository exists
         if not self.exists():
@@ -119,3 +173,18 @@ def _execute_git_command(
         logger.error('%s: %s', error.__class__.__name__, error_info)
         raise error
     return process
+
+
+def _log_to_commit(log: str) -> Optional[Commit]:
+    commit_match = re.match(
+            r'hash: (?P<hash>[0-9a-f]{40})\n'
+            r'timestamp: (?P<timestamp>\d+)\n'
+            r'body:\n(?P<body>.*?)\n?$',
+            log,
+            re.DOTALL)
+    if commit_match is None:
+        return None
+    return Commit(
+            hash=commit_match.group('hash'),
+            timestamp=int(commit_match.group('timestamp')),
+            body=commit_match.group('body'))
