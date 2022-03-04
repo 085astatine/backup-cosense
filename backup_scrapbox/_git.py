@@ -33,6 +33,24 @@ class Commit:
             return None
         return info
 
+    @staticmethod
+    def message(
+            project: str,
+            timestamp: int,
+            info: Optional[BackupInfoJSON]) -> str:
+        # header
+        header = f'{project} {datetime.datetime.fromtimestamp(timestamp)}'
+        # body
+        body: list[str] = []
+        if info is not None:
+            body.extend(
+                    f'{repr(key)}: {repr(value)}'
+                    for key, value in info.items())
+        # message
+        if not body:
+            return header
+        return '\n'.join([header, '', *body])
+
 
 class Git:
     def __init__(
