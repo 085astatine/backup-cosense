@@ -18,6 +18,9 @@ class Commit:
     timestamp: int
     body: str
 
+    def time(self) -> datetime.datetime:
+        return datetime.datetime.fromtimestamp(self.timestamp)
+
     def backup_info(self) -> Optional[BackupInfoJSON]:
         # check if the body is empty
         if not self.body:
