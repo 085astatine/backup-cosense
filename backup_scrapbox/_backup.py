@@ -7,6 +7,31 @@ from ._json import (
         load_json)
 
 
+class Backup:
+    def __init__(
+            self,
+            project: str,
+            directory: pathlib.Path,
+            backup: BackupJSON,
+            info: Optional[BackupInfoJSON]) -> None:
+        self._project = project
+        self._directory = directory
+        self._backup = backup
+        self._info = info
+
+    @property
+    def project(self) -> str:
+        return self._project
+
+    @property
+    def directory(self) -> pathlib.Path:
+        return self._directory
+
+    @property
+    def timestamp(self) -> int:
+        return self._backup['exported']
+
+
 @dataclasses.dataclass
 class DownloadedBackup:
     timestamp: int
@@ -24,6 +49,20 @@ class DownloadedBackup:
         return load_json(
                 self.info_path,
                 schema=jsonschema_backup_info())
+
+    def load(
+            self,
+            project: str,
+            directory: pathlib.Path) -> Optional[Backup]:
+        backup = self.load_backup()
+        info = self.load_info()
+        if backup is None:
+            return None
+        return Backup(
+                project,
+                directory,
+                backup,
+                info)
 
 
 class BackupStorage:
