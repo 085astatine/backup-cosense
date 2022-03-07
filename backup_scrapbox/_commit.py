@@ -4,7 +4,7 @@ import pathlib
 from typing import Optional, Union
 from ._backup import Backup, BackupStorage
 from ._env import Env, PageOrder
-from ._git import Git, Commit
+from ._git import Commit, CommitTarget, Git
 from ._json import BackupJSON, jsonschema_backup, load_json, save_json
 from ._utility import format_timestamp
 
@@ -135,13 +135,11 @@ def _commit(
         git: Git,
         backup: Backup,
         targets: list[pathlib.Path]) -> None:
-    # git add
-    for target in targets:
-        git.execute(['git', 'add', target.as_posix()])
     # commit message
     message = Commit.message(project, backup.timestamp, backup.load_info())
     # commit
     git.commit(
+            CommitTarget(added=targets),
             message,
             timestamp=backup.timestamp)
 

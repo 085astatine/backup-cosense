@@ -60,6 +60,13 @@ class Commit:
         return '\n'.join([header, '', *body])
 
 
+@dataclasses.dataclass
+class CommitTarget:
+    added: list[pathlib.Path] = dataclasses.field(default_factory=list)
+    updated: list[pathlib.Path] = dataclasses.field(default_factory=list)
+    deleted: list[pathlib.Path] = dataclasses.field(default_factory=list)
+
+
 class Git:
     def __init__(
             self,
@@ -117,10 +124,18 @@ class Git:
 
     def commit(
             self,
+            target: CommitTarget,
             message: str,
             *,
             option: Optional[list[str]] = None,
             timestamp: Optional[int] = None) -> None:
+        # target
+        for added in target.added:
+            self.execute(['git', 'add', added.as_posix()])
+        for updated in target.updated:
+            self.execute(['git', 'add', updated.as_posix()])
+        for deleted in target.deleted:
+            self.execute(['git', 'rm', '--cached', deleted.as_posix()])
         # commit
         command = ['git', 'commit', '--message', message]
         if option is not None:
