@@ -2,7 +2,7 @@ import datetime
 import logging
 import pathlib
 from typing import Optional, Union
-from ._backup import Backup, BackupStorage
+from ._backup import BackupStorage, DownloadedBackup
 from ._env import Env, PageOrder
 from ._git import Commit, CommitTarget, Git
 from ._json import BackupJSON, jsonschema_backup, load_json, save_json
@@ -48,7 +48,7 @@ def commit(
 def _backup_targets(
         storage: BackupStorage,
         git: Git,
-        logger: logging.Logger) -> list[Backup]:
+        logger: logging.Logger) -> list[DownloadedBackup]:
     # get latest backup timestamp
     latest = git.latest_commit_timestamp()
     logger.info('latest backup: %s', format_timestamp(latest))
@@ -98,7 +98,7 @@ def _clear_repository(
 def _copy_backup(
         project: str,
         git: Git,
-        backup_info: Backup,
+        backup_info: DownloadedBackup,
         page_order: Optional[PageOrder],
         logger: logging.Logger) -> list[pathlib.Path]:
     copied: list[pathlib.Path] = []
@@ -133,7 +133,7 @@ def _copy_backup(
 def _commit(
         project: str,
         git: Git,
-        backup: Backup,
+        backup: DownloadedBackup,
         targets: list[pathlib.Path]) -> None:
     # commit message
     message = Commit.message(project, backup.timestamp, backup.load_info())

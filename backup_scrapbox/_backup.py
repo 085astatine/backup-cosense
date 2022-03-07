@@ -8,7 +8,7 @@ from ._json import (
 
 
 @dataclasses.dataclass
-class Backup:
+class DownloadedBackup:
     timestamp: int
     backup_path: pathlib.Path
     info_path: Optional[pathlib.Path]
@@ -39,8 +39,8 @@ class BackupStorage:
     def exists(self, timestamp: int) -> bool:
         return self.backup_path(timestamp).exists()
 
-    def backups(self) -> list[Backup]:
-        backups: list[Backup] = []
+    def backups(self) -> list[DownloadedBackup]:
+        backups: list[DownloadedBackup] = []
         for path in self._directory.iterdir():
             # check if the path is file
             if not path.is_file():
@@ -54,7 +54,7 @@ class BackupStorage:
             timestamp = int(filename_match.group('timestamp'))
             # info path
             info_path = self.info_path(timestamp)
-            backups.append(Backup(
+            backups.append(DownloadedBackup(
                     timestamp=timestamp,
                     backup_path=path,
                     info_path=info_path if info_path.exists() else None))
