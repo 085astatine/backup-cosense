@@ -133,7 +133,10 @@ class Git:
             env['GIT_COMMITTER_DATE'] = commit_time.isoformat()
         self.execute(command, env=env if env else None)
 
-    def commits(self) -> list[Commit]:
+    def commits(
+            self,
+            *,
+            option: Optional[list[str]] = None) -> list[Commit]:
         # log format
         log_format = '%n'.join([
                 'hash: %H',
@@ -142,6 +145,8 @@ class Git:
                 '%b'])
         # git log
         command = ['git', 'log', '-z', f'--format={log_format}']
+        if option is not None:
+            command.extend(option)
         process = self.execute(command)
         # parse
         commits: list[Commit] = []
