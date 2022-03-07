@@ -1,10 +1,11 @@
 import dataclasses
+import logging
 import pathlib
 import re
 from typing import Optional
 from ._json import (
         BackupInfoJSON, BackupJSON, jsonschema_backup, jsonschema_backup_info,
-        load_json)
+        load_json, save_json)
 
 
 class Backup:
@@ -30,6 +31,36 @@ class Backup:
     @property
     def timestamp(self) -> int:
         return self._backup['exported']
+
+    def save_files(self) -> list[pathlib.Path]:
+        files: list[pathlib.Path] = []
+        # {project}.json
+        files.append(self.directory.joinpath(
+                f'{_escape_filename(self.project)}.json'))
+        # pages
+        page_directory = self.directory.joinpath('pages')
+        for page in self._backup['pages']:
+            files.append(page_directory.joinpath(
+                    f'{_escape_filename(page["title"])}.json'))
+        return files
+
+    def save(
+            self,
+            *,
+            logger: Optional[logging.Logger] = None) -> None:
+        logger = logger or logging.getLogger(__name__)
+        # {project}.json
+        backup_path = self.directory.joinpath(
+                f'{_escape_filename(self.project)}.json')
+        logger.debug(f'save "{backup_path.as_posix()}"')
+        save_json(backup_path, self._backup)
+        # pages
+        page_directory = self.directory.joinpath('pages')
+        for page in self._backup['pages']:
+            page_path = page_directory.joinpath(
+                    f'{_escape_filename(page["title"])}.json')
+            logger.debug(f'save "{page_path.as_posix()}"')
+            save_json(page_path, page)
 
 
 @dataclasses.dataclass
@@ -99,3 +130,12 @@ class BackupStorage:
                     info_path=info_path if info_path.exists() else None))
         # sort by old...new
         return sorted(backups, key=lambda backup: backup.timestamp)
+
+
+def _escape_filename(text: str) -> str:
+    table: dict[str, int | str | None] = {
+            ' ': '_',
+            '#': '%23',
+            '%': '%25',
+            '/': '%2F'}
+    return text.translate(str.maketrans(table))
