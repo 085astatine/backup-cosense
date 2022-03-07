@@ -4,7 +4,7 @@ import pathlib
 from typing import Optional, Union
 from ._backup import Backup, BackupStorage
 from ._env import Env, PageOrder
-from ._git import Git
+from ._git import Git, Commit
 from ._json import BackupJSON, jsonschema_backup, load_json, save_json
 from ._utility import format_timestamp
 
@@ -139,29 +139,11 @@ def _commit(
     for target in targets:
         git.execute(['git', 'add', target.as_posix()])
     # commit message
-    message = _commit_message(project, backup)
+    message = Commit.message(project, backup.timestamp, backup.load_info())
     # commit
     git.commit(
             message,
             timestamp=backup.timestamp)
-
-
-def _commit_message(
-        project: str,
-        backup: Backup) -> str:
-    message: list[str] = []
-    # header
-    timestamp = datetime.datetime.fromtimestamp(backup.timestamp)
-    message.append(f'{project} {timestamp}')
-    # info
-    if backup.info_path is not None:
-        info = backup.load_info()
-        if info is not None:
-            message.append('')
-            message.extend(
-                    f'{repr(key)}: {repr(value)}'
-                    for key, value in info.items())
-    return '\n'.join(message)
 
 
 def _sort_pages(
