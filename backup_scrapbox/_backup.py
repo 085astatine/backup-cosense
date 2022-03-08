@@ -35,8 +35,12 @@ class Backup:
     def save_files(self) -> list[pathlib.Path]:
         files: list[pathlib.Path] = []
         # {project}.json
-        files.append(self.directory.joinpath(
-                f'{_escape_filename(self.project)}.json'))
+        backup_path = self.directory.joinpath(
+                f'{_escape_filename(self.project)}.json')
+        files.append(backup_path)
+        # {project}.info.json
+        if self._info is not None:
+            files.append(backup_path.with_suffix('.info.json'))
         # pages
         page_directory = self.directory.joinpath('pages')
         for page in self._backup['pages']:
@@ -54,6 +58,11 @@ class Backup:
                 f'{_escape_filename(self.project)}.json')
         logger.debug(f'save "{backup_path.as_posix()}"')
         save_json(backup_path, self._backup)
+        # {project}.info.json
+        if self._info is not None:
+            info_path = backup_path.with_suffix('.info.json')
+            logger.debug(f'save "{info_path.as_posix()}"')
+            save_json(info_path, self._info)
         # pages
         page_directory = self.directory.joinpath('pages')
         for page in self._backup['pages']:
