@@ -1,3 +1,4 @@
+from __future__ import annotations
 import dataclasses
 import logging
 import pathlib
@@ -70,6 +71,29 @@ class Backup:
                     f'{_escape_filename(page["title"])}.json')
             logger.debug(f'save "{page_path.as_posix()}"')
             save_json(page_path, page)
+
+    @classmethod
+    def load(
+            cls,
+            project: str,
+            directory: pathlib.Path) -> Optional[Backup]:
+        # {project}.json
+        backup_path = directory.joinpath(f'{_escape_filename(project)}.json')
+        backup: Optional[BackupJSON] = load_json(
+                backup_path,
+                schema=jsonschema_backup())
+        if backup is None:
+            return None
+        # {project}.info.json
+        info_path = backup_path.with_suffix('.info.json')
+        info: Optional[BackupInfoJSON] = load_json(
+                info_path,
+                schema=jsonschema_backup_info())
+        return cls(
+                project,
+                directory,
+                backup,
+                info)
 
 
 @dataclasses.dataclass
