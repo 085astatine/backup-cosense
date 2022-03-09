@@ -1,15 +1,12 @@
 import dataclasses
 import logging
 import pathlib
-from typing import Final, Literal, Optional, get_args
+from typing import Final, Optional, get_args
 import dacite
 import dotenv
 import requests
-from ._backup import BackupStorage
+from ._backup import BackupStorage, PageOrder
 from ._git import Git
-
-
-PageOrder = Literal['as-is', 'created-asc', 'created-desc']
 
 
 @dataclasses.dataclass

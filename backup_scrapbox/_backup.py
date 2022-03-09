@@ -3,11 +3,14 @@ import dataclasses
 import logging
 import pathlib
 import re
-from typing import Optional
+from typing import Literal, Optional
 import jsonschema
 from ._json import (
         BackupInfoJSON, BackupJSON, jsonschema_backup, jsonschema_backup_info,
         load_json, save_json)
+
+
+PageOrder = Literal['as-is', 'created-asc', 'created-desc']
 
 
 class Backup:
@@ -41,6 +44,17 @@ class Backup:
     @property
     def timestamp(self) -> int:
         return self._backup['exported']
+
+    def sort_pages(
+            self,
+            order: Optional[PageOrder] = None) -> None:
+        match order:
+            case None | 'as-is':
+                pass
+            case 'created-asc':
+                self._backup['pages'].sort(key=lambda page: page['created'])
+            case 'created-desc':
+                self._backup['pages'].sort(key=lambda page: - page['created'])
 
     def save_files(self) -> list[pathlib.Path]:
         files: list[pathlib.Path] = []
