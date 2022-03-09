@@ -45,6 +45,14 @@ class Backup:
     def timestamp(self) -> int:
         return self._backup['exported']
 
+    @property
+    def data(self) -> BackupJSON:
+        return self._backup
+
+    @property
+    def info(self) -> Optional[BackupInfoJSON]:
+        return self._info
+
     def sort_pages(
             self,
             order: Optional[PageOrder] = None) -> None:
