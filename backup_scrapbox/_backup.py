@@ -4,6 +4,7 @@ import logging
 import pathlib
 import re
 from typing import Optional
+import jsonschema
 from ._json import (
         BackupInfoJSON, BackupJSON, jsonschema_backup, jsonschema_backup_info,
         load_json, save_json)
@@ -20,6 +21,14 @@ class Backup:
         self._directory = directory
         self._backup = backup
         self._info = info
+        # JSON Schema validation
+        jsonschema.validate(
+                instance=self._backup,
+                schema=jsonschema_backup())
+        if self._info is not None:
+            jsonschema.validate(
+                    instance=self._info,
+                    schema=jsonschema_backup_info())
 
     @property
     def project(self) -> str:
