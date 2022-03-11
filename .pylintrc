@@ -1,8 +1,9 @@
 [MESSAGE CONTROL]
-disable=missing-module-docstring,
-        missing-class-docstring,
-        missing-function-docstring,
-        logging-fstring-interpolation,
+disable=missing-module-docstring,  # C0114
+        missing-class-docstring,  # C0115
+        missing-function-docstring, # C0116
+        consider-using-f-string,  # C0209
+        logging-fstring-interpolation,  # W1203
 
 [LOGGING]
 logging-format-style=new

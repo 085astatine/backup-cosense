@@ -34,8 +34,7 @@ def backup_scrapbox(
             env = load_env(option.env, logger=logger)
         except InvalidEnvError as error:
             sys.stderr.write(f'invalid env file: {option.env}\n')
-            sys.stderr.write('{0}'.format(
-                    textwrap.indent(str(error), ' ' * 4)))
+            sys.stderr.write(textwrap.indent(str(error), ' ' * 4))
             sys.exit(1)
     # main
     logger.info('backup-scrapbox')

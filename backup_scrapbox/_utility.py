@@ -6,6 +6,4 @@ def format_timestamp(
         timestamp: Optional[int]) -> str:
     if timestamp is None:
         return 'None'
-    return "{0} ({1})".format(
-            datetime.datetime.fromtimestamp(timestamp),
-            timestamp)
+    return f'{datetime.datetime.fromtimestamp(timestamp)} ({timestamp})'
