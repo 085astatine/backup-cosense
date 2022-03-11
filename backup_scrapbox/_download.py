@@ -66,7 +66,7 @@ def _backup_filter(
     # get the latest backup timestamp from the Git repository
     git = env.git(logger=logger)
     latest_timestamp = git.latest_commit_timestamp()
-    logger.info('latest backup: %s', format_timestamp(latest_timestamp))
+    logger.info(f'latest backup: {format_timestamp(latest_timestamp)}')
     # backup storage
     storage = env.backup_storage()
 
@@ -74,15 +74,13 @@ def _backup_filter(
         timestamp = backup['backuped']
         if storage.exists(timestamp):
             logger.debug(
-                    'skip %s: already downloaded',
-                    format_timestamp(timestamp))
+                    f'skip {format_timestamp(timestamp)}: already downloaded')
             return False
         if latest_timestamp is None:
             return True
         if timestamp <= latest_timestamp:
             logger.debug(
-                    'skip %s: older than latest',
-                    format_timestamp(timestamp))
+                    f'skip {format_timestamp(timestamp)}: older than latest')
         return latest_timestamp < timestamp
 
     return backup_filter
@@ -97,8 +95,7 @@ def _download_backup(
     timestamp = info['backuped']
     # request
     logger.info(
-            'download backup %s',
-            format_timestamp(timestamp))
+            f'download backup {format_timestamp(timestamp)}')
     url = f'{_base_url(env)}/{info["id"]}.json'
     backup: Optional[BackupJSON] = request_json(
             url,
@@ -111,9 +108,9 @@ def _download_backup(
     storage = env.backup_storage()
     # save backup
     backup_path = storage.backup_path(timestamp)
-    logger.info('save %s', backup_path)
+    logger.info(f'save "{backup_path}"')
     save_json(backup_path, backup)
     # save backup info
     info_path = storage.info_path(timestamp)
-    logger.info('save %s', info_path)
+    logger.info(f'save "{info_path}"')
     save_json(info_path, info)

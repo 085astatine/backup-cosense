@@ -91,10 +91,10 @@ class Git:
             *,
             env: Optional[dict[str, str]] = None
     ) -> subprocess.CompletedProcess:
-        self._logger.debug('command: %s', command)
+        self._logger.debug(f'command: {command}')
         # check if the repository exists
         if not self.exists():
-            self._logger.error('git repository "%s" does not exist', self.path)
+            self._logger.error(f'git repository "{self.path}" does not exist')
         # switch branch
         if self._branch is not None:
             branch = _execute_git_command(
@@ -103,9 +103,8 @@ class Git:
                     logger=self._logger).stdout.rstrip('\n')
             if branch != self._branch:
                 self._logger.info(
-                        'switch git branch from "%s" to "%s"',
-                        branch,
-                        self._branch)
+                        'switch git branch'
+                        f' from "{branch}" to "{self._branch}"')
                 _execute_git_command(
                         ['git', 'switch', self._branch],
                         self.path,
@@ -172,10 +171,10 @@ class Git:
             # parse log as commit
             commit = _log_to_commit(log)
             if commit is not None:
-                self._logger.debug('commit: %s', repr(commit))
+                self._logger.debug(f'commit: {repr(commit)}')
                 commits.append(commit)
             else:
-                self._logger.warning('failed to parse commit "%s"', repr(log))
+                self._logger.warning(f'failed to parse commit "{repr(log)}"')
         # sort by old...new
         return sorted(commits, key=lambda commit: commit.timestamp)
 
@@ -183,8 +182,7 @@ class Git:
         # check if the repository exists
         if not self.exists():
             self._logger.warning(
-                    'git repository "%s" does not exist',
-                    self.path)
+                    f'git repository "{self.path}" does not exist')
             return None
         # git show -s --format=%ct
         process = self.execute(['git', 'show', '-s', '--format=%ct'])
@@ -216,7 +214,7 @@ def _execute_git_command(
                 'command': error.cmd,
                 'stdout': error.stdout,
                 'stderr': error.stderr}
-        logger.error('%s: %s', error.__class__.__name__, error_info)
+        logger.error(f'{error.__class__.__name__}: {error_info}')
         raise error
     return process
 

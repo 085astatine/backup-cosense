@@ -27,7 +27,7 @@ def backup_scrapbox(
     option = _argument_parser().parse_args(args=args)
     if option.verbose:
         logger.setLevel(logging.DEBUG)
-    logger.debug('option: %s', option)
+    logger.debug(f'option: {option}')
     # .env
     if env is None:
         try:

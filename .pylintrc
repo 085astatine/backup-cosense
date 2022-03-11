@@ -2,3 +2,7 @@
 disable=missing-module-docstring,
         missing-class-docstring,
         missing-function-docstring,
+        logging-fstring-interpolation,
+
+[LOGGING]
+logging-format-style=new
