@@ -57,16 +57,16 @@ def load_env(
         logger: Optional[logging.Logger] = None) -> Env:
     logger = logger or logging.getLogger(__name__)
     # load
-    logger.info('load env from "%s"', envfile)
+    logger.info(f'load env from "{envfile}"')
     env = dotenv.dotenv_values(envfile)
-    logger.debug('loaded env: %s', env)
+    logger.debug(f'loaded env: {env}')
     # set optional key
     for key in _OPTIONAL_KEYS:
         if key not in env:
             env[key] = None
         elif env[key] == '':
             env[key] = None
-    logger.debug('env: %s', env)
+    logger.debug(f'env: {env}')
     # validate
     validate_env(env)
     return dacite.from_dict(data_class=Env, data=env)

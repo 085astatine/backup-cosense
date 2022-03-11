@@ -12,7 +12,7 @@ def commit(
     storage = env.backup_storage()
     # check if the git repository exists
     if not git.exists():
-        logger.error('git repository "%s" does not exist', git.path)
+        logger.error(f'git repository "{git.path}" does not exist')
         return
     # backup targets
     backup_targets = _backup_targets(storage, git, logger)
@@ -38,7 +38,7 @@ def _backup_targets(
         logger: logging.Logger) -> list[DownloadedBackup]:
     # get latest backup timestamp
     latest = git.latest_commit_timestamp()
-    logger.info('latest backup: %s', format_timestamp(latest))
+    logger.info(f'latest backup: {format_timestamp(latest)}')
     # find backup
     targets = [
             backup for backup in storage.backups()

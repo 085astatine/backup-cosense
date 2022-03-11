@@ -48,7 +48,7 @@ def _export(
     try:
         process = git.execute(command)
     except subprocess.CalledProcessError:
-        logger.warning('skip commit: %s', commit.hash)
+        logger.warning(f'skip commit: {commit.hash}')
         return
     backup_json: Optional[BackupJSON] = parse_json(
             process.stdout,
@@ -56,9 +56,10 @@ def _export(
     # save backup.json
     backup_json_path = destination.joinpath(f'{commit.timestamp}.json')
     save_json(backup_json_path, backup_json)
-    logger.debug('save %s', backup_json_path)
+    logger.debug(f'save "{backup_json_path}"')
     # save backup.info.json
     info_json_path = destination.joinpath(f'{commit.timestamp}.info.json')
     info_json = commit.backup_info()
     if info_json is not None:
+        logger.debug(f'save "{info_json_path}"')
         save_json(info_json_path, info_json)

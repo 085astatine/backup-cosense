@@ -174,11 +174,11 @@ def request_json(
         logger: Optional[logging.Logger] = None) -> Optional[Any]:
     logger = logger or logging.getLogger(__name__)
     # request
-    logger.info('get request: %s', url)
+    logger.info(f'get request: {url}')
     with with_session(session) as session_:
         response = session_.get(url)
         if not response.ok:
-            logger.error('failed to get request "%s"', url)
+            logger.error(f'failed to get request "{url}"')
             return None
     # jsonschema validation
     value = json.loads(response.text)

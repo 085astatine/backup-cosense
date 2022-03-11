@@ -27,15 +27,14 @@ def backup_scrapbox(
     option = _argument_parser().parse_args(args=args)
     if option.verbose:
         logger.setLevel(logging.DEBUG)
-    logger.debug('option: %s', option)
+    logger.debug(f'option: {option}')
     # .env
     if env is None:
         try:
             env = load_env(option.env, logger=logger)
         except InvalidEnvError as error:
             sys.stderr.write(f'invalid env file: {option.env}\n')
-            sys.stderr.write('{0}'.format(
-                    textwrap.indent(str(error), ' ' * 4)))
+            sys.stderr.write(textwrap.indent(str(error), ' ' * 4))
             sys.exit(1)
     # main
     logger.info('backup-scrapbox')
