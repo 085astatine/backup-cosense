@@ -3,7 +3,6 @@ import time
 from typing import Callable, Optional
 import requests
 from ._env import Env
-from ._git import Git
 from ._json import (
     BackupJSON, BackupInfoJSON, BackupListJSON, jsonschema_backup,
     jsonschema_backup_list, request_json, save_json)
