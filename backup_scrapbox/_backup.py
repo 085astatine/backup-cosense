@@ -53,6 +53,9 @@ class Backup:
     def info(self) -> Optional[BackupInfoJSON]:
         return self._info
 
+    def page_titles(self) -> list[str]:
+        return sorted(page['title'] for page in self._backup['pages'])
+
     def sort_pages(
             self,
             order: Optional[PageOrder] = None) -> None:
