@@ -3,7 +3,7 @@ import dataclasses
 import logging
 import pathlib
 import re
-from typing import Generator, Literal, Optional
+from typing import Generator, Literal, Optional, Tuple
 import jsonschema
 from ._json import (
         BackupInfoJSON, BackupJSON, BackupPageJSON, jsonschema_backup,
@@ -11,6 +11,12 @@ from ._json import (
 
 
 PageOrder = Literal['as-is', 'created-asc', 'created-desc']
+
+
+@dataclasses.dataclass
+class Location:
+    title: str
+    line: int
 
 
 class Backup:
@@ -208,7 +214,9 @@ def _escape_filename(text: str) -> str:
     return text.translate(str.maketrans(table))
 
 
-def _filter_code(page: BackupPageJSON) -> Generator[str, None, None]:
+def _filter_code(
+        page: BackupPageJSON) -> Generator[Tuple[str, Location], None, None]:
+    title = page['title']
     # regex
     code_block = re.compile(r'(?P<indent>(\t| )*)code:.+')
     cli_notation = re.compile(r'(\t| )*(\$|%) .+')
@@ -217,11 +225,14 @@ def _filter_code(page: BackupPageJSON) -> Generator[str, None, None]:
     # code block
     code_block_indent_level: Optional[int] = None
     # iterate lines
-    for line in page['lines']:
+    for i, line in enumerate(page['lines']):
         # in code block
         if code_block_indent_level is not None:
             indent_match = indent.match(line)
-            indent_level = len(indent_match.group())
+            indent_level = (
+                    len(indent_match.group())
+                    if indent_match is not None
+                    else 0)
             # end code block
             if indent_level <= code_block_indent_level:
                 code_block_indent_level = None
@@ -236,4 +247,4 @@ def _filter_code(page: BackupPageJSON) -> Generator[str, None, None]:
             continue
         # code snippets
         line = code_snippets.sub(' ', line)
-        yield line
+        yield line, Location(title=title, line=i)
