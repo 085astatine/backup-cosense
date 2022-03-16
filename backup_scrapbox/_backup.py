@@ -19,6 +19,12 @@ class Location:
     line: int
 
 
+@dataclasses.dataclass
+class ExternalLink:
+    url: str
+    locations: list[Location]
+
+
 class Backup:
     def __init__(
             self,
@@ -61,6 +67,26 @@ class Backup:
 
     def page_titles(self) -> list[str]:
         return sorted(page['title'] for page in self._backup['pages'])
+
+    def external_links(self) -> list[ExternalLink]:
+        # regex
+        regex = re.compile(r'https?://[^\s\]]+')
+        # links
+        links: list[ExternalLink] = []
+        for page in self._backup['pages']:
+            for line, location in _filter_code(page):
+                for url in regex.findall(line):
+                    found = next(
+                            (link for link in links if link.url == url),
+                            None)
+                    if found is not None:
+                        found.locations.append(location)
+                    else:
+                        links.append(ExternalLink(
+                                url=url,
+                                locations=[location]))
+        links.sort(key=lambda link: link.url)
+        return links
 
     def sort_pages(
             self,
