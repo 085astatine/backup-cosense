@@ -20,6 +20,12 @@ class Location:
 
 
 @dataclasses.dataclass
+class InternalLink:
+    page: str
+    links: list[str]
+
+
+@dataclasses.dataclass
 class ExternalLink:
     url: str
     locations: list[Location]
@@ -67,6 +73,22 @@ class Backup:
 
     def page_titles(self) -> list[str]:
         return sorted(page['title'] for page in self._backup['pages'])
+
+    def internal_links(self) -> list[InternalLink]:
+        # page
+        pages = dict(
+                (page.lower().replace(' ', '_'), page)
+                for page in self.page_titles())
+        # links
+        links: list[InternalLink] = []
+        for page in self._backup['pages']:
+            links.append(InternalLink(
+                    page=page['title'],
+                    links=sorted(
+                            pages.get(page, page)
+                            for page in page['linksLc'])))
+        links.sort(key=lambda link: link.page)
+        return links
 
     def external_links(self) -> list[ExternalLink]:
         # regex
