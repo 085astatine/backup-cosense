@@ -11,6 +11,7 @@ from ._json import (
 
 
 PageOrder = Literal['as-is', 'created-asc', 'created-desc']
+InternalLinkType = Literal['page', 'word']
 
 
 @dataclasses.dataclass
@@ -20,9 +21,15 @@ class Location:
 
 
 @dataclasses.dataclass
+class InternalLinkNode:
+    name: str
+    type: InternalLinkType
+
+
+@dataclasses.dataclass
 class InternalLink:
-    page: str
-    links: list[str]
+    node: InternalLinkNode
+    to_links: list[InternalLinkNode]
 
 
 @dataclasses.dataclass
@@ -77,17 +84,23 @@ class Backup:
     def internal_links(self) -> list[InternalLink]:
         # page
         pages = dict(
-                (page.lower().replace(' ', '_'), page)
+                (_normalize_page_title(page), page)
                 for page in self.page_titles())
         # links
         links: list[InternalLink] = []
         for page in self._backup['pages']:
+            to_links = sorted(
+                    (InternalLinkNode(
+                            name=pages.get(link, link),
+                            type=('page'
+                                  if _normalize_page_title(link) in pages
+                                  else 'word'))
+                        for link in page['linksLc']),
+                    key=lambda node: node.name)
             links.append(InternalLink(
-                    page=page['title'],
-                    links=sorted(
-                            pages.get(page, page)
-                            for page in page['linksLc'])))
-        links.sort(key=lambda link: link.page)
+                    node=InternalLinkNode(name=page['title'], type='page'),
+                    to_links=to_links))
+        links.sort(key=lambda link: link.node.name)
         return links
 
     def external_links(self) -> list[ExternalLink]:
@@ -260,6 +273,10 @@ def _escape_filename(text: str) -> str:
             '%': '%25',
             '/': '%2F'}
     return text.translate(str.maketrans(table))
+
+
+def _normalize_page_title(title: str) -> str:
+    return title.lower().replace(' ', '_')
 
 
 def _filter_code(
