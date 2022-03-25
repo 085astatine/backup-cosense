@@ -3,14 +3,39 @@ import dataclasses
 import logging
 import pathlib
 import re
-from typing import Literal, Optional
+from typing import Generator, Literal, Optional, Tuple
 import jsonschema
 from ._json import (
-        BackupInfoJSON, BackupJSON, jsonschema_backup, jsonschema_backup_info,
-        load_json, save_json)
+        BackupInfoJSON, BackupJSON, BackupPageJSON, jsonschema_backup,
+        jsonschema_backup_info, load_json, save_json)
 
 
 PageOrder = Literal['as-is', 'created-asc', 'created-desc']
+InternalLinkType = Literal['page', 'word']
+
+
+@dataclasses.dataclass
+class Location:
+    title: str
+    line: int
+
+
+@dataclasses.dataclass
+class InternalLinkNode:
+    name: str
+    type: InternalLinkType
+
+
+@dataclasses.dataclass
+class InternalLink:
+    node: InternalLinkNode
+    to_links: list[InternalLinkNode]
+
+
+@dataclasses.dataclass
+class ExternalLink:
+    url: str
+    locations: list[Location]
 
 
 class Backup:
@@ -52,6 +77,51 @@ class Backup:
     @property
     def info(self) -> Optional[BackupInfoJSON]:
         return self._info
+
+    def page_titles(self) -> list[str]:
+        return sorted(page['title'] for page in self._backup['pages'])
+
+    def internal_links(self) -> list[InternalLink]:
+        # page
+        pages = dict(
+                (_normalize_page_title(page), page)
+                for page in self.page_titles())
+        # links
+        links: list[InternalLink] = []
+        for page in self._backup['pages']:
+            to_links = sorted(
+                    (InternalLinkNode(
+                            name=pages.get(link, link),
+                            type=('page'
+                                  if _normalize_page_title(link) in pages
+                                  else 'word'))
+                        for link in page['linksLc']),
+                    key=lambda node: node.name)
+            links.append(InternalLink(
+                    node=InternalLinkNode(name=page['title'], type='page'),
+                    to_links=to_links))
+        links.sort(key=lambda link: link.node.name)
+        return links
+
+    def external_links(self) -> list[ExternalLink]:
+        # regex
+        regex = re.compile(r'https?://[^\s\]]+')
+        # links
+        links: list[ExternalLink] = []
+        for page in self._backup['pages']:
+            for line, location in _filter_code(page):
+                for url in regex.findall(line):
+                    found = next(
+                            (link for link in links if link.url == url),
+                            None)
+                    if found is not None:
+                        found.locations.append(location)
+                    else:
+                        links.append(ExternalLink(
+                                url=url,
+                                locations=[location]))
+        links.sort(key=lambda link: link.url)
+        return links
 
     def sort_pages(
             self,
@@ -203,3 +273,43 @@ def _escape_filename(text: str) -> str:
             '%': '%25',
             '/': '%2F'}
     return text.translate(str.maketrans(table))
+
+
+def _normalize_page_title(title: str) -> str:
+    return title.lower().replace(' ', '_')
+
+
+def _filter_code(
+        page: BackupPageJSON) -> Generator[Tuple[str, Location], None, None]:
+    title = page['title']
+    # regex
+    code_block = re.compile(r'(?P<indent>(\t| )*)code:.+')
+    cli_notation = re.compile(r'(\t| )*(\$|%) .+')
+    code_snippets = re.compile(r'`.*?`')
+    indent = re.compile(r'(\t| )*')
+    # code block
+    code_block_indent_level: Optional[int] = None
+    # iterate lines
+    for i, line in enumerate(page['lines']):
+        # in code block
+        if code_block_indent_level is not None:
+            indent_match = indent.match(line)
+            indent_level = (
+                    len(indent_match.group())
+                    if indent_match is not None
+                    else 0)
+            # end code block
+            if indent_level <= code_block_indent_level:
+                code_block_indent_level = None
+            else:
+                continue
+        # start code_block
+        if code_block_match := code_block.match(line):
+            code_block_indent_level = len(code_block_match.group('indent'))
+            continue
+        # CLI notation
+        if cli_notation.match(line):
+            continue
+        # code snippets
+        line = code_snippets.sub(' ', line)
+        yield line, Location(title=title, line=i)
