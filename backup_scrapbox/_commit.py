@@ -29,24 +29,10 @@ def commit_backups(
         # sort pages
         backup.sort_pages(env.page_order)
         # commit
-        _commit(git, backup, logger)
+        commit_backup(git, backup, logger)
 
 
-def _backup_targets(
-        storage: BackupStorage,
-        git: Git,
-        logger: logging.Logger) -> list[DownloadedBackup]:
-    # get latest backup timestamp
-    latest = git.latest_commit_timestamp()
-    logger.info(f'latest backup: {format_timestamp(latest)}')
-    # find backup
-    targets = [
-            backup for backup in storage.backups()
-            if latest is None or latest < backup.timestamp]
-    return targets
-
-
-def _commit(
+def commit_backup(
         git: Git,
         backup: Backup,
         logger: logging.Logger) -> None:
@@ -78,3 +64,17 @@ def _commit(
             target,
             message,
             timestamp=backup.timestamp)
+
+
+def _backup_targets(
+        storage: BackupStorage,
+        git: Git,
+        logger: logging.Logger) -> list[DownloadedBackup]:
+    # get latest backup timestamp
+    latest = git.latest_commit_timestamp()
+    logger.info(f'latest backup: {format_timestamp(latest)}')
+    # find backup
+    targets = [
+            backup for backup in storage.backups()
+            if latest is None or latest < backup.timestamp]
+    return targets
