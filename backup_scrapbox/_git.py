@@ -9,7 +9,8 @@ import subprocess
 import textwrap
 from typing import Optional
 import jsonschema
-from ._json import BackupInfoJSON, jsonschema_backup_info, parse_json
+from ._backup import BackupInfoJSON, jsonschema_backup_info
+from ._json import parse_json
 
 
 @dataclasses.dataclass
