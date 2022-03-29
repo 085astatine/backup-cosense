@@ -5,7 +5,7 @@ from ._git import Commit, CommitTarget, Git
 from ._utility import format_timestamp
 
 
-def commit(
+def commit_backups(
         env: Env,
         logger: logging.Logger) -> None:
     git = env.git(logger=logger)

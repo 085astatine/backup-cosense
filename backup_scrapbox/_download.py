@@ -9,7 +9,7 @@ from ._json import (
 from ._utility import format_timestamp
 
 
-def download(
+def download_backups(
         env: Env,
         logger: logging.Logger,
         request_interval: float) -> None:

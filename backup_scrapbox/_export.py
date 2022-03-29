@@ -8,7 +8,7 @@ from ._json import BackupJSON, jsonschema_backup, parse_json, save_json
 from ._utility import format_timestamp
 
 
-def export(
+def export_backups(
         env: Env,
         destination: pathlib.Path,
         logger: logging.Logger) -> None:
