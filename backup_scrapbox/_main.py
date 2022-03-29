@@ -41,11 +41,14 @@ def backup_scrapbox(
     # download backup
     if option.target in (None, 'download'):
         logger.info('target: download')
-        download_backups(env, logger, option.request_interval)
+        download_backups(
+                env,
+                logger=logger,
+                request_interval=option.request_interval)
     # commit
     if option.target in (None, 'commit'):
         logger.info('target: commit')
-        commit_backups(env, logger)
+        commit_backups(env, logger=logger)
     # export
     if option.target == 'export':
         logger.info('target: export')

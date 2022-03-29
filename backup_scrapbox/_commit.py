@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from ._backup import Backup, BackupStorage, DownloadedBackup
 from ._env import Env
 from ._git import Commit, CommitTarget, Git
@@ -7,7 +8,9 @@ from ._utility import format_timestamp
 
 def commit_backups(
         env: Env,
-        logger: logging.Logger) -> None:
+        *,
+        logger: Optional[logging.Logger] = None) -> None:
+    logger = logger or logging.getLogger(__name__)
     git = env.git(logger=logger)
     storage = env.backup_storage()
     # check if the git repository exists
@@ -29,13 +32,15 @@ def commit_backups(
         # sort pages
         backup.sort_pages(env.page_order)
         # commit
-        commit_backup(git, backup, logger)
+        commit_backup(git, backup, logger=logger)
 
 
 def commit_backup(
         git: Git,
         backup: Backup,
-        logger: logging.Logger) -> None:
+        *,
+        logger: Optional[logging.Logger] = None) -> None:
+    logger = logger or logging.getLogger(__name__)
     # load previous backup
     previous_backup = Backup.load(backup.project, git.path)
     previous_backup_files = set(

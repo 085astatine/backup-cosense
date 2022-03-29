@@ -11,8 +11,10 @@ from ._utility import format_timestamp
 
 def download_backups(
         env: Env,
-        logger: logging.Logger,
-        request_interval: float) -> None:
+        *,
+        logger: Optional[logging.Logger] = None,
+        request_interval: float = 3.0) -> None:
+    logger = logger or logging.getLogger(__name__)
     with env.session() as session:
         # list
         backup_list = _request_backup_list(env, session, logger)
