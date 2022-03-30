@@ -63,9 +63,9 @@ class Commit:
 
 @dataclasses.dataclass
 class CommitTarget:
-    added: list[pathlib.Path] = dataclasses.field(default_factory=list)
-    updated: list[pathlib.Path] = dataclasses.field(default_factory=list)
-    deleted: list[pathlib.Path] = dataclasses.field(default_factory=list)
+    added: set[pathlib.Path] = dataclasses.field(default_factory=set)
+    updated: set[pathlib.Path] = dataclasses.field(default_factory=set)
+    deleted: set[pathlib.Path] = dataclasses.field(default_factory=set)
 
 
 class Git:

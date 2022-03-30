@@ -90,6 +90,6 @@ def _update_backup_json(
     backup.save()
     # commit target
     return CommitTarget(
-            added=sorted(next_files - previous_files),
-            updated=sorted(next_files & previous_files),
-            deleted=sorted(previous_files - next_files))
+            added=next_files - previous_files,
+            updated=next_files & previous_files,
+            deleted=previous_files - next_files)
