@@ -43,22 +43,8 @@ def commit_backup(
     logger = logger or logging.getLogger(__name__)
     # load previous backup
     previous_backup = Backup.load(backup.project, git.path)
-    previous_backup_files = set(
-            previous_backup.save_files()
-            if previous_backup is not None
-            else [])
-    # clear previous backup
-    for previous_file in previous_backup_files:
-        logger.debug(f'remove "{previous_file.as_posix()}"')
-        previous_file.unlink()
-    # copy backup
-    backup_files = set(backup.save_files())
-    backup.save()
-    # commit target
-    target = CommitTarget(
-            added=sorted(backup_files - previous_backup_files),
-            updated=sorted(backup_files & previous_backup_files),
-            deleted=sorted(previous_backup_files - backup_files))
+    # update backup json
+    target = _update_backup_json(backup, previous_backup, logger)
     # commit message
     message = Commit.message(
             backup.project,
@@ -83,3 +69,27 @@ def _backup_targets(
             backup for backup in storage.backups()
             if latest is None or latest < backup.timestamp]
     return targets
+
+
+def _update_backup_json(
+        backup: Backup,
+        previous_backup: Optional[Backup],
+        logger: logging.Logger) -> CommitTarget:
+    # previous files
+    previous_files = set(
+            previous_backup.save_files()
+            if previous_backup is not None
+            else [])
+    # clear previous files
+    for previous_file in previous_files:
+        logger.debug(f'remove "{previous_file.as_posix()}"')
+        previous_file.unlink()
+    # next files
+    next_files = set(backup.save_files())
+    # copy next files
+    backup.save()
+    # commit target
+    return CommitTarget(
+            added=sorted(next_files - previous_files),
+            updated=sorted(next_files & previous_files),
+            deleted=sorted(previous_files - next_files))
