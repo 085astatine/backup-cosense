@@ -1,3 +1,4 @@
+from __future__ import annotations
 import dataclasses
 import datetime
 import itertools
@@ -94,6 +95,13 @@ class CommitTarget:
         # raise error
         if errors:
             raise CommitTargetError(''.join(errors))
+
+    def update(self, other: CommitTarget) -> CommitTarget:
+        self.added |= other.added
+        self.updated |= other.updated
+        self.deleted |= other.deleted
+        self.validate()
+        return self
 
 
 class Git:
