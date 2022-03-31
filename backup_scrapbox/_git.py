@@ -67,6 +67,14 @@ class CommitTarget:
     updated: set[pathlib.Path] = dataclasses.field(default_factory=set)
     deleted: set[pathlib.Path] = dataclasses.field(default_factory=set)
 
+    def __post_init__(self) -> None:
+        self.normalize()
+
+    def normalize(self) -> None:
+        self.added = set(path.resolve() for path in self.added)
+        self.updated = set(path.resolve() for path in self.updated)
+        self.deleted = set(path.resolve() for path in self.deleted)
+
 
 class Git:
     def __init__(
