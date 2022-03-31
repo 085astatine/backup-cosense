@@ -1,5 +1,6 @@
 import dataclasses
 import datetime
+import itertools
 import json
 import logging
 import os
@@ -61,6 +62,10 @@ class Commit:
         return '\n'.join([header, '', *body])
 
 
+class CommitTargetError(Exception):
+    pass
+
+
 @dataclasses.dataclass
 class CommitTarget:
     added: set[pathlib.Path] = dataclasses.field(default_factory=set)
@@ -69,11 +74,26 @@ class CommitTarget:
 
     def __post_init__(self) -> None:
         self.normalize()
+        self.validate()
 
     def normalize(self) -> None:
         self.added = set(path.resolve() for path in self.added)
         self.updated = set(path.resolve() for path in self.updated)
         self.deleted = set(path.resolve() for path in self.deleted)
+
+    def validate(self) -> None:
+        errors: list[str] = []
+        # check intersection
+        for set1, set2 in itertools.combinations(
+                ['added', 'updated', 'deleted'],
+                2):
+            for path in getattr(self, set1) & getattr(self, set2):
+                errors.append(
+                        f'"{path.as_posix()}" exists'
+                        f' in both "{set1}" and "{set2}"')
+        # raise error
+        if errors:
+            raise CommitTargetError(''.join(errors))
 
 
 class Git:
