@@ -87,7 +87,7 @@ def _update_backup_json(
     # next files
     next_files = set(backup.save_files())
     # copy next files
-    backup.save()
+    backup.save(logger=logger)
     # commit target
     return CommitTarget(
             added=next_files - previous_files,
