@@ -1,18 +1,41 @@
 import logging
 import time
-from typing import Callable, Optional
+from typing import Callable, Optional, TypedDict
 import requests
+from ._backup import (
+    BackupJSON, BackupInfoJSON, jsonschema_backup, jsonschema_backup_info)
 from ._env import Env
-from ._json import (
-    BackupJSON, BackupInfoJSON, BackupListJSON, jsonschema_backup,
-    jsonschema_backup_list, request_json, save_json)
+from ._json import request_json, save_json
 from ._utility import format_timestamp
 
 
-def download(
+class BackupListJSON(TypedDict):
+    backupEnable: bool
+    backups: list[BackupInfoJSON]
+
+
+def jsonschema_backup_list():
+    schema = {
+      'type': 'object',
+      'required': ['backups'],
+      'additionalProperties': False,
+      'properties': {
+        'backupEnable': {'type': 'boolean'},
+        'backups': {
+          'type': 'array',
+          'items': jsonschema_backup_info(),
+        },
+      },
+    }
+    return schema
+
+
+def download_backups(
         env: Env,
-        logger: logging.Logger,
-        request_interval: float) -> None:
+        *,
+        logger: Optional[logging.Logger] = None,
+        request_interval: float = 3.0) -> None:
+    logger = logger or logging.getLogger(__name__)
     with env.session() as session:
         # list
         backup_list = _request_backup_list(env, session, logger)

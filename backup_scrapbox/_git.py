@@ -1,5 +1,7 @@
+from __future__ import annotations
 import dataclasses
 import datetime
+import itertools
 import json
 import logging
 import os
@@ -9,7 +11,8 @@ import subprocess
 import textwrap
 from typing import Optional
 import jsonschema
-from ._json import BackupInfoJSON, jsonschema_backup_info, parse_json
+from ._backup import BackupInfoJSON, jsonschema_backup_info
+from ._json import parse_json
 
 
 @dataclasses.dataclass
@@ -60,11 +63,45 @@ class Commit:
         return '\n'.join([header, '', *body])
 
 
+class CommitTargetError(Exception):
+    pass
+
+
 @dataclasses.dataclass
 class CommitTarget:
-    added: list[pathlib.Path] = dataclasses.field(default_factory=list)
-    updated: list[pathlib.Path] = dataclasses.field(default_factory=list)
-    deleted: list[pathlib.Path] = dataclasses.field(default_factory=list)
+    added: set[pathlib.Path] = dataclasses.field(default_factory=set)
+    updated: set[pathlib.Path] = dataclasses.field(default_factory=set)
+    deleted: set[pathlib.Path] = dataclasses.field(default_factory=set)
+
+    def __post_init__(self) -> None:
+        self.normalize()
+        self.validate()
+
+    def normalize(self) -> None:
+        self.added = set(path.resolve() for path in self.added)
+        self.updated = set(path.resolve() for path in self.updated)
+        self.deleted = set(path.resolve() for path in self.deleted)
+
+    def validate(self) -> None:
+        errors: list[str] = []
+        # check intersection
+        for set1, set2 in itertools.combinations(
+                ['added', 'updated', 'deleted'],
+                2):
+            for path in getattr(self, set1) & getattr(self, set2):
+                errors.append(
+                        f'"{path.as_posix()}" exists'
+                        f' in both "{set1}" and "{set2}"')
+        # raise error
+        if errors:
+            raise CommitTargetError(''.join(errors))
+
+    def update(self, other: CommitTarget) -> CommitTarget:
+        self.added |= other.added
+        self.updated |= other.updated
+        self.deleted |= other.deleted
+        self.validate()
+        return self
 
 
 class Git:

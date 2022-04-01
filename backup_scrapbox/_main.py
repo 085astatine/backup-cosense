@@ -5,9 +5,9 @@ import sys
 import textwrap
 from typing import Optional
 from ._env import Env, InvalidEnvError, load_env
-from ._download import download
-from ._commit import commit
-from ._export import export
+from ._download import download_backups
+from ._commit import commit_backups
+from ._export import export_backups
 
 
 def backup_scrapbox(
@@ -41,15 +41,18 @@ def backup_scrapbox(
     # download backup
     if option.target in (None, 'download'):
         logger.info('target: download')
-        download(env, logger, option.request_interval)
+        download_backups(
+                env,
+                logger=logger,
+                request_interval=option.request_interval)
     # commit
     if option.target in (None, 'commit'):
         logger.info('target: commit')
-        commit(env, logger)
+        commit_backups(env, logger=logger)
     # export
     if option.target == 'export':
         logger.info('target: export')
-        export(env, option.destination, logger=logger)
+        export_backups(env, option.destination, logger=logger)
 
 
 def _argument_parser() -> argparse.ArgumentParser:

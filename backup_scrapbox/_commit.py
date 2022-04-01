@@ -1,13 +1,16 @@
 import logging
+from typing import Optional
 from ._backup import Backup, BackupStorage, DownloadedBackup
 from ._env import Env
 from ._git import Commit, CommitTarget, Git
 from ._utility import format_timestamp
 
 
-def commit(
+def commit_backups(
         env: Env,
-        logger: logging.Logger) -> None:
+        *,
+        logger: Optional[logging.Logger] = None) -> None:
+    logger = logger or logging.getLogger(__name__)
     git = env.git(logger=logger)
     storage = env.backup_storage()
     # check if the git repository exists
@@ -29,7 +32,29 @@ def commit(
         # sort pages
         backup.sort_pages(env.page_order)
         # commit
-        _commit(git, backup, logger)
+        commit_backup(git, backup, logger=logger)
+
+
+def commit_backup(
+        git: Git,
+        backup: Backup,
+        *,
+        logger: Optional[logging.Logger] = None) -> None:
+    logger = logger or logging.getLogger(__name__)
+    # load previous backup
+    previous_backup = Backup.load(backup.project, git.path)
+    # update backup json
+    target = _update_backup_json(backup, previous_backup, logger)
+    # commit message
+    message = Commit.message(
+            backup.project,
+            backup.timestamp,
+            backup.info)
+    # commit
+    git.commit(
+            target,
+            message,
+            timestamp=backup.timestamp)
 
 
 def _backup_targets(
@@ -46,35 +71,25 @@ def _backup_targets(
     return targets
 
 
-def _commit(
-        git: Git,
+def _update_backup_json(
         backup: Backup,
-        logger: logging.Logger) -> None:
-    # load previous backup
-    previous_backup = Backup.load(backup.project, git.path)
-    previous_backup_files = set(
+        previous_backup: Optional[Backup],
+        logger: logging.Logger) -> CommitTarget:
+    # previous files
+    previous_files = set(
             previous_backup.save_files()
             if previous_backup is not None
             else [])
-    # clear previous backup
-    for previous_file in previous_backup_files:
+    # clear previous files
+    for previous_file in previous_files:
         logger.debug(f'remove "{previous_file.as_posix()}"')
         previous_file.unlink()
-    # copy backup
-    backup_files = set(backup.save_files())
-    backup.save()
+    # next files
+    next_files = set(backup.save_files())
+    # copy next files
+    backup.save(logger=logger)
     # commit target
-    target = CommitTarget(
-            added=sorted(backup_files - previous_backup_files),
-            updated=sorted(backup_files & previous_backup_files),
-            deleted=sorted(previous_backup_files - backup_files))
-    # commit message
-    message = Commit.message(
-            backup.project,
-            backup.timestamp,
-            backup.info)
-    # commit
-    git.commit(
-            target,
-            message,
-            timestamp=backup.timestamp)
+    return CommitTarget(
+            added=next_files - previous_files,
+            updated=next_files & previous_files,
+            deleted=previous_files - next_files)

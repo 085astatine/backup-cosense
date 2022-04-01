@@ -3,15 +3,92 @@ import dataclasses
 import logging
 import pathlib
 import re
-from typing import Generator, Literal, Optional, Tuple
+from typing import Generator, Literal, Optional, Tuple, TypedDict
 import jsonschema
-from ._json import (
-        BackupInfoJSON, BackupJSON, BackupPageJSON, jsonschema_backup,
-        jsonschema_backup_info, load_json, save_json)
+from ._json import load_json, save_json
 
 
 PageOrder = Literal['as-is', 'created-asc', 'created-desc']
 InternalLinkType = Literal['page', 'word']
+
+
+class BackupInfoJSON(TypedDict):
+    id: str
+    backuped: int
+    totalPages: int
+    totalLinks: int
+
+
+def jsonschema_backup_info():
+    schema = {
+      'type': 'object',
+      'required': ['id', 'backuped'],
+      'additionalProperties': False,
+      'properties': {
+        'id': {'type': 'string'},
+        'backuped': {'type': 'integer'},
+        'totalPages': {'type': 'integer'},
+        'totalLinks': {'type': 'integer'},
+      },
+    }
+    return schema
+
+
+class BackupPageJSON(TypedDict):
+    title: str
+    created: int
+    updated: int
+    id: str
+    lines: list[str]
+    linksLc: list[str]
+
+
+def jsonschema_backup_page():
+    schema = {
+      'type': 'object',
+      'required': ['title', 'created', 'updated', 'lines'],
+      'additionalProperties': False,
+      'properties': {
+        'title': {'type': 'string'},
+        'created': {'type': 'integer'},
+        'updated': {'type': 'integer'},
+        'id': {'type': 'string'},
+        'lines': {
+          'type': 'array',
+          'items': {'type': 'string'},
+        },
+        'linksLc': {
+          'type': 'array',
+          'items': {'type': 'string'},
+        },
+      },
+    }
+    return schema
+
+
+class BackupJSON(TypedDict):
+    name: str
+    displayName: str
+    exported: int
+    pages: list[BackupPageJSON]
+
+
+def jsonschema_backup():
+    schema = {
+      'type': 'object',
+      'required': ['name', 'displayName', 'exported', 'pages'],
+      'additionalProperties': False,
+      'properties': {
+        'name': {'type': 'string'},
+        'displayName': {'type': 'string'},
+        'exported': {'type': 'integer'},
+        'pages': {
+          'type': 'array',
+          'items': jsonschema_backup_page(),
+        },
+      },
+    }
+    return schema
 
 
 @dataclasses.dataclass
