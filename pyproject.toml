@@ -15,6 +15,7 @@ requests = "^2.26.0"
 [tool.poetry.dev-dependencies]
 mypy = "^0.942"
 pylint = "^2.12.2"
+types-requests = "^2.27.16"
 
 [tool.pylint.messages_control]
 disable = [
