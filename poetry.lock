@@ -235,6 +235,14 @@ optional = false
 python-versions = ">=3.7"
 
 [[package]]
+name = "types-jsonschema"
+version = "4.4.2"
+description = "Typing stubs for jsonschema"
+category = "dev"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "types-requests"
 version = "2.27.16"
 description = "Typing stubs for requests"
@@ -285,7 +293,7 @@ python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "78de7b0fe2802a3a06344b327bd9818f59ec0743af7479d3aff243ff65471e1f"
+content-hash = "e4a7205183356e0afdfc306523808b20c67af5c49e097a806c736c7241506e62"
 
 [metadata.files]
 astroid = [
@@ -446,6 +454,10 @@ toml = [
 tomli = [
     {file = "tomli-2.0.1-py3-none-any.whl", hash = "sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc"},
     {file = "tomli-2.0.1.tar.gz", hash = "sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f"},
+]
+types-jsonschema = [
+    {file = "types-jsonschema-4.4.2.tar.gz", hash = "sha256:6ffeda7c1e4b79fa8a93fd3a489d878968ee2cee768fa8ed00ae40a5119861ef"},
+    {file = "types_jsonschema-4.4.2-py3-none-any.whl", hash = "sha256:d48fb9d6cf748ba24c00568f84feaf456fa40da2635914ef8667b8db9446106c"},
 ]
 types-requests = [
     {file = "types-requests-2.27.16.tar.gz", hash = "sha256:c8010c18b291a7efb60b1452dbe12530bc25693dd657e70c62803fcdc4bffe9b"},
