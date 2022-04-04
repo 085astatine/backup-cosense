@@ -18,6 +18,12 @@ pylint = "^2.12.2"
 types-jsonschema = "^4.4.2"
 types-requests = "^2.27.16"
 
+[tool.mypy]
+check_untyped_defs = true
+disallow_untyped_defs = true
+strict_optional = true
+warn_redundant_casts = true
+
 [tool.pylint.messages_control]
 disable = [
     "missing-module-docstring",  # C0114
