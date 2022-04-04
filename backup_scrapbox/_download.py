@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Callable, Optional, TypedDict
+from typing import Any, Callable, Optional, TypedDict
 import requests
 from ._backup import (
     BackupJSON, BackupInfoJSON, jsonschema_backup, jsonschema_backup_info)
@@ -14,7 +14,7 @@ class BackupListJSON(TypedDict):
     backups: list[BackupInfoJSON]
 
 
-def jsonschema_backup_list():
+def jsonschema_backup_list() -> dict[str, Any]:
     schema = {
       'type': 'object',
       'required': ['backups'],

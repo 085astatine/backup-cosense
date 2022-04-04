@@ -3,7 +3,7 @@ import dataclasses
 import logging
 import pathlib
 import re
-from typing import Generator, Literal, Optional, Tuple, TypedDict
+from typing import Any, Generator, Literal, Optional, Tuple, TypedDict
 import jsonschema
 from ._json import load_json, save_json
 
@@ -19,7 +19,7 @@ class BackupInfoJSON(TypedDict):
     totalLinks: int
 
 
-def jsonschema_backup_info():
+def jsonschema_backup_info() -> dict[str, Any]:
     schema = {
       'type': 'object',
       'required': ['id', 'backuped'],
@@ -43,7 +43,7 @@ class BackupPageJSON(TypedDict):
     linksLc: list[str]
 
 
-def jsonschema_backup_page():
+def jsonschema_backup_page() -> dict[str, Any]:
     schema = {
       'type': 'object',
       'required': ['title', 'created', 'updated', 'lines'],
@@ -73,7 +73,7 @@ class BackupJSON(TypedDict):
     pages: list[BackupPageJSON]
 
 
-def jsonschema_backup():
+def jsonschema_backup() -> dict[str, Any]:
     schema = {
       'type': 'object',
       'required': ['name', 'displayName', 'exported', 'pages'],
