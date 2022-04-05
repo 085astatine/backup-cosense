@@ -13,7 +13,16 @@ python-dotenv = "^0.19.0"
 requests = "^2.26.0"
 
 [tool.poetry.dev-dependencies]
+mypy = "^0.942"
 pylint = "^2.12.2"
+types-jsonschema = "^4.4.2"
+types-requests = "^2.27.16"
+
+[tool.mypy]
+check_untyped_defs = true
+disallow_untyped_defs = true
+strict_optional = true
+warn_redundant_casts = true
 
 [tool.pylint.messages_control]
 disable = [
