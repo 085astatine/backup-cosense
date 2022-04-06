@@ -15,22 +15,26 @@ async def save_external_links(
 
     # parallel requests
     async def _parallel_request(
+            session: aiohttp.ClientSession,
             index: int,
             url: str,
             logger: logging.Logger) -> None:
         async with semaphore:
-            await _request(index, url, logger)
+            await _request(session, index, url, logger)
 
-    tasks = [_parallel_request(i, url, logger) for i, url in enumerate(urls)]
-    await asyncio.gather(*tasks)
+    async with aiohttp.ClientSession() as session:
+        tasks = [
+                _parallel_request(session, i, url, logger)
+                for i, url in enumerate(urls)]
+        await asyncio.gather(*tasks)
 
 
 async def _request(
+        session: aiohttp.ClientSession,
         index: int,
         url: str,
         logger: logging.Logger) -> None:
     logger.debug(f'request({index}): url={url}')
     # request
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            logger.debug(f'request({index}): status={response.status}')
+    async with session.get(url) as response:
+        logger.debug(f'request({index}): status={response.status}')
