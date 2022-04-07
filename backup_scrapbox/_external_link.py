@@ -36,5 +36,9 @@ async def _request(
         logger: logging.Logger) -> None:
     logger.debug(f'request({index}): url={url}')
     # request
-    async with session.get(url) as response:
-        logger.debug(f'request({index}): status={response.status}')
+    try:
+        async with session.get(url) as response:
+            logger.debug(f'request({index}): status={response.status}')
+    except aiohttp.ClientError as error:
+        logger.debug(f'request({index}): '
+                     f'error={error.__class__.__name__}({error})')
