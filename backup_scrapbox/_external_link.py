@@ -2,6 +2,7 @@ import asyncio
 import dataclasses
 import logging
 import pathlib
+import time
 from typing import Any, Literal, Optional
 import aiohttp
 from ._json import save_json
@@ -29,6 +30,7 @@ def jsonschema_response_log() -> dict[str, Any]:
 @dataclasses.dataclass
 class ExternalLinkLog:
     url: str
+    access_timestamp: int
     response: Literal['error'] | ResponseLog
 
 
@@ -39,6 +41,7 @@ def jsonschema_external_link_log() -> dict[str, Any]:
         'additionalProperties': False,
         'properties': {
             'url': {'type': 'string'},
+            'access_timestamp': {'type': 'integer'},
             'response': {
                 'oneOf': [
                     {'type': 'string', 'enum': ['error']},
@@ -95,6 +98,8 @@ async def _request(
         url: str,
         logger: logging.Logger) -> ExternalLinkLog:
     logger.debug(f'request({index}): url={url}')
+    # access timestamp
+    access_timestamp = int(time.time())
     # request
     try:
         async with session.get(url) as response:
@@ -105,10 +110,12 @@ async def _request(
             logger.debug(f'request({index}): response={response_log}')
             return ExternalLinkLog(
                 url=url,
+                access_timestamp=access_timestamp,
                 response=response_log)
     except aiohttp.ClientError as error:
         logger.debug(f'request({index}): '
                      f'error={error.__class__.__name__}({error})')
         return ExternalLinkLog(
                 url=url,
+                access_timestamp=access_timestamp,
                 response='error')
