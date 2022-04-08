@@ -64,11 +64,25 @@ def jsonschema_external_link_logs() -> dict[str, Any]:
 async def save_external_links(
         urls: list[str],
         *,
-        parallel: int = 5,
+        parallel_limit: int = 5,
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
+    # request
+    logs = await _request_external_links(urls, parallel_limit, logger)
+    # save
+    save_path = pathlib.Path('links.json')
+    save_json(
+            save_path,
+            [dataclasses.asdict(log) for log in logs],
+            schema=jsonschema_external_link_logs())
+
+
+async def _request_external_links(
+        urls: list[str],
+        parallel_limit: int,
+        logger: logging.Logger) -> list[ExternalLinkLog]:
     # semaphore
-    semaphore = asyncio.Semaphore(parallel)
+    semaphore = asyncio.Semaphore(parallel_limit)
 
     # parallel requests
     async def _parallel_request(
@@ -83,13 +97,7 @@ async def save_external_links(
         tasks = [
                 _parallel_request(session, i, url, logger)
                 for i, url in enumerate(urls)]
-        logs = await asyncio.gather(*tasks)
-    # save
-    save_path = pathlib.Path('links.json')
-    save_json(
-            save_path,
-            [dataclasses.asdict(log) for log in logs],
-            schema=jsonschema_external_link_logs())
+        return await asyncio.gather(*tasks)
 
 
 async def _request(
