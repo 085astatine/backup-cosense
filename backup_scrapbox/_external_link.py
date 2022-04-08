@@ -61,14 +61,15 @@ def jsonschema_external_link_logs() -> dict[str, Any]:
     return schema
 
 
-async def save_external_links(
+def save_external_links(
         urls: list[str],
         *,
         parallel_limit: int = 5,
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
     # request
-    logs = await _request_external_links(urls, parallel_limit, logger)
+    logs = asyncio.run(
+            _request_external_links(urls, parallel_limit, logger))
     # save
     save_path = pathlib.Path('links.json')
     save_json(
