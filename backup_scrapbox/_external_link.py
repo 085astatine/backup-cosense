@@ -1,8 +1,10 @@
 import asyncio
 import dataclasses
 import logging
-from typing import Literal, Optional
+import pathlib
+from typing import Any, Literal, Optional
 import aiohttp
+from ._json import save_json
 
 
 @dataclasses.dataclass
@@ -11,10 +13,49 @@ class ResponseLog:
     content_type: Optional[str]
 
 
+def jsonschema_response_log() -> dict[str, Any]:
+    schema = {
+        'type': 'object',
+        'required': ['status_code', 'content_type'],
+        'additionalProperties': False,
+        'properties': {
+            'status_code': {'type': 'integer'},
+            'content_type': {'type': ['string', 'null']},
+        },
+    }
+    return schema
+
+
 @dataclasses.dataclass
 class ExternalLinkLog:
     url: str
     response: Literal['error'] | ResponseLog
+
+
+def jsonschema_external_link_log() -> dict[str, Any]:
+    schema = {
+        'type': 'object',
+        'required': ['url', 'response'],
+        'additionalProperties': False,
+        'properties': {
+            'url': {'type': 'string'},
+            'response': {
+                'oneOf': [
+                    {'type': 'string', 'enum': ['error']},
+                    jsonschema_response_log(),
+                ],
+            },
+        },
+    }
+    return schema
+
+
+def jsonschema_external_link_logs() -> dict[str, Any]:
+    schema = {
+        'type': 'array',
+        'items': jsonschema_external_link_log(),
+    }
+    return schema
 
 
 async def save_external_links(
@@ -39,8 +80,13 @@ async def save_external_links(
         tasks = [
                 _parallel_request(session, i, url, logger)
                 for i, url in enumerate(urls)]
-        responses = await asyncio.gather(*tasks)
-    print(responses)
+        logs = await asyncio.gather(*tasks)
+    # save
+    save_path = pathlib.Path('links.json')
+    save_json(
+            save_path,
+            [dataclasses.asdict(log) for log in logs],
+            schema=jsonschema_external_link_logs())
 
 
 async def _request(
