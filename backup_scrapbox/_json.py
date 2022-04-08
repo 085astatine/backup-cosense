@@ -40,7 +40,13 @@ def save_json(
         path: pathlib.Path,
         data: Any,
         *,
+        schema: Optional[dict] = None,
         indent: Optional[int] = 2) -> None:
+    # JSON Schema validation
+    if schema is not None:
+        jsonschema.validate(
+                instance=data,
+                schema=schema)
     if not path.parent.exists():
         path.parent.mkdir(parents=True)
     with path.open(mode='w') as file:
