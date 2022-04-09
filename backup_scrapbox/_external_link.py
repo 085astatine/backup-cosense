@@ -5,7 +5,7 @@ import pathlib
 import time
 from typing import Any, Literal, Optional
 import aiohttp
-from ._backup import ExternalLink, Location, jsonschema_location
+from ._backup import Backup, ExternalLink, Location, jsonschema_location
 from ._json import save_json
 
 
@@ -68,7 +68,7 @@ def jsonschema_external_link_logs() -> dict[str, Any]:
 
 
 def save_external_links(
-        links: list[ExternalLink],
+        backup: Backup,
         *,
         parallel_limit: int = 5,
         timeout_seconds: float = 30.0,
@@ -76,7 +76,7 @@ def save_external_links(
     logger = logger or logging.getLogger(__name__)
     # request
     logs = asyncio.run(_request_external_links(
-            links,
+            backup.external_links(),
             parallel_limit,
             timeout_seconds,
             logger))
