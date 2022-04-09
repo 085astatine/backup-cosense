@@ -71,11 +71,15 @@ def save_external_links(
         links: list[ExternalLink],
         *,
         parallel_limit: int = 5,
+        timeout_seconds: float = 30.0,
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
     # request
-    logs = asyncio.run(
-            _request_external_links(links, parallel_limit, logger))
+    logs = asyncio.run(_request_external_links(
+            links,
+            parallel_limit,
+            timeout_seconds,
+            logger))
     # save
     save_path = pathlib.Path('links.json')
     save_json(
@@ -87,7 +91,10 @@ def save_external_links(
 async def _request_external_links(
         links: list[ExternalLink],
         parallel_limit: int,
+        timeout_seconds: float,
         logger: logging.Logger) -> list[ExternalLinkLog]:
+    # timeout
+    timeout = aiohttp.ClientTimeout(total=timeout_seconds)
     # semaphore
     semaphore = asyncio.Semaphore(parallel_limit)
 
@@ -100,7 +107,7 @@ async def _request_external_links(
         async with semaphore:
             return await _request(session, index, link, logger)
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         tasks = [
                 _parallel_request(session, i, link, logger)
                 for i, link in enumerate(links)]
