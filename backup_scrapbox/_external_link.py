@@ -135,7 +135,7 @@ async def _request(
                 locations=link.locations,
                 access_timestamp=access_timestamp,
                 response=response_log)
-    except aiohttp.ClientError as error:
+    except (asyncio.TimeoutError, aiohttp.ClientError) as error:
         logger.debug(f'request({index}): '
                      f'error={error.__class__.__name__}({error})')
         return ExternalLinkLog(
