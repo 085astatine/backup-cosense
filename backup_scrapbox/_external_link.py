@@ -5,7 +5,7 @@ import pathlib
 import time
 from typing import Any, Literal, Optional
 import aiohttp
-from ._backup import ExternalLink
+from ._backup import ExternalLink, Location, jsonschema_location
 from ._json import save_json
 
 
@@ -31,6 +31,7 @@ def jsonschema_response_log() -> dict[str, Any]:
 @dataclasses.dataclass
 class ExternalLinkLog:
     url: str
+    locations: list[Location]
     access_timestamp: int
     response: Literal['error'] | ResponseLog
 
@@ -43,6 +44,10 @@ def jsonschema_external_link_log() -> dict[str, Any]:
         'properties': {
             'url': {'type': 'string'},
             'access_timestamp': {'type': 'integer'},
+            'locations': {
+                'type': 'array',
+                'items': jsonschema_location(),
+            },
             'response': {
                 'oneOf': [
                     {'type': 'string', 'enum': ['error']},
@@ -120,6 +125,7 @@ async def _request(
             logger.debug(f'request({index}): response={response_log}')
             return ExternalLinkLog(
                 url=link.url,
+                locations=link.locations,
                 access_timestamp=access_timestamp,
                 response=response_log)
     except aiohttp.ClientError as error:
@@ -127,5 +133,6 @@ async def _request(
                      f'error={error.__class__.__name__}({error})')
         return ExternalLinkLog(
                 url=link.url,
+                locations=link.locations,
                 access_timestamp=access_timestamp,
                 response='error')
