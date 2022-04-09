@@ -74,6 +74,8 @@ def save_external_links(
         timeout_seconds: float = 30.0,
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
+    # log directory
+    log_directory = pathlib.Path('log')
     # request
     logs = asyncio.run(_request_external_links(
             backup.external_links(),
@@ -81,7 +83,8 @@ def save_external_links(
             timeout_seconds,
             logger))
     # save
-    save_path = pathlib.Path('links.json')
+    save_path = log_directory.joinpath(
+            f'external_link_{backup.timestamp}.json')
     save_json(
             save_path,
             [dataclasses.asdict(log) for log in logs],
