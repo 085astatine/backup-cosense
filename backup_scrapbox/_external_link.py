@@ -5,6 +5,7 @@ import pathlib
 import time
 from typing import Any, Literal, Optional
 import aiohttp
+from ._backup import ExternalLink
 from ._json import save_json
 
 
@@ -62,14 +63,14 @@ def jsonschema_external_link_logs() -> dict[str, Any]:
 
 
 def save_external_links(
-        urls: list[str],
+        links: list[ExternalLink],
         *,
         parallel_limit: int = 5,
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
     # request
     logs = asyncio.run(
-            _request_external_links(urls, parallel_limit, logger))
+            _request_external_links(links, parallel_limit, logger))
     # save
     save_path = pathlib.Path('links.json')
     save_json(
@@ -79,7 +80,7 @@ def save_external_links(
 
 
 async def _request_external_links(
-        urls: list[str],
+        links: list[ExternalLink],
         parallel_limit: int,
         logger: logging.Logger) -> list[ExternalLinkLog]:
     # semaphore
@@ -89,42 +90,42 @@ async def _request_external_links(
     async def _parallel_request(
             session: aiohttp.ClientSession,
             index: int,
-            url: str,
+            link: ExternalLink,
             logger: logging.Logger) -> ExternalLinkLog:
         async with semaphore:
-            return await _request(session, index, url, logger)
+            return await _request(session, index, link, logger)
 
     async with aiohttp.ClientSession() as session:
         tasks = [
-                _parallel_request(session, i, url, logger)
-                for i, url in enumerate(urls)]
+                _parallel_request(session, i, link, logger)
+                for i, link in enumerate(links)]
         return await asyncio.gather(*tasks)
 
 
 async def _request(
         session: aiohttp.ClientSession,
         index: int,
-        url: str,
+        link: ExternalLink,
         logger: logging.Logger) -> ExternalLinkLog:
-    logger.debug(f'request({index}): url={url}')
+    logger.debug(f'request({index}): url={link.url}')
     # access timestamp
     access_timestamp = int(time.time())
     # request
     try:
-        async with session.get(url) as response:
+        async with session.get(link.url) as response:
             logger.debug(f'request({index}): status={response.status}')
             response_log = ResponseLog(
                     status_code=response.status,
                     content_type=response.headers.get('content-type'))
             logger.debug(f'request({index}): response={response_log}')
             return ExternalLinkLog(
-                url=url,
+                url=link.url,
                 access_timestamp=access_timestamp,
                 response=response_log)
     except aiohttp.ClientError as error:
         logger.debug(f'request({index}): '
                      f'error={error.__class__.__name__}({error})')
         return ExternalLinkLog(
-                url=url,
+                url=link.url,
                 access_timestamp=access_timestamp,
                 response='error')
