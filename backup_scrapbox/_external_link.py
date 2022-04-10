@@ -1,12 +1,15 @@
+from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
 import pathlib
+import re
 import time
 from typing import Any, Literal, Optional
 import aiohttp
+import dacite
 from ._backup import Backup, ExternalLink, Location, jsonschema_location
-from ._json import save_json
+from ._json import load_json, save_json
 
 
 @dataclasses.dataclass
@@ -84,11 +87,59 @@ def save_external_links(
             logger))
     # save
     save_path = log_directory.joinpath(
-            f'external_link_{backup.timestamp}.json')
+            _ExternalLinkLogsFile.filename(backup.timestamp))
     save_json(
             save_path,
             [dataclasses.asdict(log) for log in logs],
             schema=jsonschema_external_link_logs())
+
+
+@dataclasses.dataclass
+class _ExternalLinkLogsFile:
+    path: pathlib.Path
+    timestamp: int
+
+    def load(self) -> Optional[list[ExternalLinkLog]]:
+        logs = load_json(
+                self.path,
+                schema=jsonschema_external_link_logs())
+        if logs is None:
+            return None
+        return [dacite.from_dict(data_class=ExternalLinkLog, data=log)
+                for log in logs]
+
+    @classmethod
+    def filename(cls, timestamp: int) -> str:
+        return f'external_link_{timestamp}.json'
+
+    @classmethod
+    def find(cls, directory: pathlib.Path) -> list[_ExternalLinkLogsFile]:
+        log_files: list[_ExternalLinkLogsFile] = []
+        for path in directory.iterdir():
+            # check if the path is file
+            if not path.is_file():
+                continue
+            # filename match
+            if filename_match := re.match(
+                    r'external_link_(?P<timestamp>\d+).json',
+                    path.name):
+                log_files.append(cls(
+                        path=path,
+                        timestamp=int(filename_match.group('timestamp'))))
+        # sort by old...new
+        log_files.sort(key=lambda log_file: log_file.timestamp)
+        return log_files
+
+    @classmethod
+    def find_latest(
+            cls,
+            directory: pathlib.Path,
+            *,
+            current: Optional[int] = None) -> Optional[_ExternalLinkLogsFile]:
+        return next(
+                (log_file for log_file in reversed(cls.find(directory))
+                 if current is None or current > log_file.timestamp),
+                None)
 
 
 async def _request_external_links(
