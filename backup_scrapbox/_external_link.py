@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import dataclasses
+import copy
 import logging
 import pathlib
 import re
@@ -140,6 +141,52 @@ class _ExternalLinkLogsFile:
                 (log_file for log_file in reversed(cls.find(directory))
                  if current is None or current > log_file.timestamp),
                 None)
+
+
+@dataclasses.dataclass
+class _LinkLogPair:
+    link: Optional[ExternalLink] = None
+    log: Optional[ExternalLinkLog] = None
+
+
+@dataclasses.dataclass
+class _ClassifiedExternalLinks:
+    new_links: list[ExternalLink]
+    logs: list[ExternalLinkLog]
+    deleted_links: list[str]
+
+
+def _classify_external_links(
+        links: list[ExternalLink],
+        previous_logs: list[ExternalLinkLog]) -> _ClassifiedExternalLinks:
+    # link & log pair
+    pairs: dict[str, _LinkLogPair] = dict(
+            (link.url, _LinkLogPair(link=link)) for link in links)
+    for log in previous_logs:
+        if log.url in pairs:
+            pairs[log.url].log = log
+        else:
+            pairs[log.url] = _LinkLogPair(log=log)
+    # classify
+    new_links: list[ExternalLink] = []
+    logs: list[ExternalLinkLog] = []
+    deleted_links: list[str] = []
+    for pair in pairs.values():
+        if pair.log is None:
+            if pair.link is not None:
+                new_links.append(pair.link)
+        else:
+            if pair.link is None:
+                deleted_links.append(pair.log.url)
+            else:
+                # replace locations
+                log = copy.copy(pair.log)
+                log.locations = copy.copy(pair.link.locations)
+                logs.append(log)
+    return _ClassifiedExternalLinks(
+            new_links,
+            logs,
+            deleted_links)
 
 
 async def _request_external_links(
