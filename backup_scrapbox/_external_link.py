@@ -80,12 +80,28 @@ def save_external_links(
     logger = logger or logging.getLogger(__name__)
     # log directory
     log_directory = pathlib.Path('log')
+    # load previous log
+    previous_log_file = _ExternalLinkLogsFile.find_latest(
+            log_directory,
+            current=backup.timestamp)
+    previous_logs = (
+            previous_log_file.load() or []
+            if previous_log_file is not None
+            else [])
+    # classify
+    classified_links = _classify_external_links(
+            backup.external_links(),
+            previous_logs)
     # request
     logs = asyncio.run(_request_external_links(
-            backup.external_links(),
+            classified_links.new_links,
             parallel_limit,
             timeout_seconds,
             logger))
+    # merge logs
+    logs.extend(classified_links.logs)
+    # sort by URL
+    logs.sort(key=lambda log: log.url)
     # save
     save_path = log_directory.joinpath(
             _ExternalLinkLogsFile.filename(backup.timestamp))
