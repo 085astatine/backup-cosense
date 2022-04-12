@@ -4,6 +4,7 @@ import dataclasses
 import copy
 import logging
 import pathlib
+import random
 import re
 import time
 from typing import Any, Literal, Optional
@@ -93,6 +94,7 @@ def save_external_links(
             backup.external_links(),
             previous_logs)
     # request
+    random.shuffle(classified_links.new_links)
     logs = asyncio.run(_request_external_links(
             classified_links.new_links,
             parallel_limit,
