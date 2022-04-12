@@ -134,6 +134,10 @@ class _ExternalLinkLogsFile:
     @classmethod
     def find(cls, directory: pathlib.Path) -> list[_ExternalLinkLogsFile]:
         log_files: list[_ExternalLinkLogsFile] = []
+        # check if the path is directory
+        if not directory.is_dir():
+            return log_files
+        # find external_link_{timestamp}.json
         for path in directory.iterdir():
             # check if the path is file
             if not path.is_file():
