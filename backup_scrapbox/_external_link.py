@@ -86,15 +86,18 @@ def save_external_links(
     previous_log_file = _ExternalLinkLogsFile.find_latest(
             log_directory,
             current=backup.timestamp)
-    previous_logs = (
-            previous_log_file.load() or []
-            if previous_log_file is not None
-            else [])
+    previous_logs: list[ExternalLinkLog] = []
+    if previous_log_file is not None:
+        logger.info(
+                'load external links from'
+                f' "{previous_log_file.path.as_posix()}"')
+        previous_logs = previous_log_file.load() or []
     # classify
     classified_links = _classify_external_links(
             backup.external_links(),
             previous_logs)
     # request
+    logger.info(f'request {len(classified_links.new_links)} links')
     random.shuffle(classified_links.new_links)
     logs = asyncio.run(_request_external_links(
             classified_links.new_links,
@@ -109,6 +112,7 @@ def save_external_links(
     # save
     save_path = log_directory.joinpath(
             _ExternalLinkLogsFile.filename(backup.timestamp))
+    logger.info(f'save external links to "{save_path.as_posix()}"')
     save_json(
             save_path,
             [dataclasses.asdict(log) for log in logs],
