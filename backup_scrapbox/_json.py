@@ -26,7 +26,7 @@ def load_json(
         schema: Optional[dict] = None) -> Optional[Any]:
     if not path.exists():
         return None
-    with path.open() as file:
+    with path.open(encoding='utf-8') as file:
         value = json.load(file)
     # JSON Schema validation
     if schema is not None:
@@ -49,7 +49,7 @@ def save_json(
                 schema=schema)
     if not path.parent.exists():
         path.parent.mkdir(parents=True)
-    with path.open(mode='w') as file:
+    with path.open(mode='w', encoding='utf-8') as file:
         json.dump(
                 data,
                 file,
