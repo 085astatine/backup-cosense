@@ -97,6 +97,19 @@ class Location:
     line: int
 
 
+def jsonschema_location() -> dict[str, Any]:
+    schema = {
+        'type': 'object',
+        'required': ['title', 'line'],
+        'additionalProperties': False,
+        'properties': {
+            'title': {'type': 'string'},
+            'line': {'type': 'integer'},
+        },
+    }
+    return schema
+
+
 @dataclasses.dataclass
 class InternalLinkNode:
     name: str
