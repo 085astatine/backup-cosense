@@ -19,6 +19,7 @@ mypy = "^0.942"
 pylint = "^2.12.2"
 types-jsonschema = "^4.4.2"
 types-requests = "^2.27.16"
+types-toml = "^0.10.5"
 
 [tool.mypy]
 check_untyped_defs = true
