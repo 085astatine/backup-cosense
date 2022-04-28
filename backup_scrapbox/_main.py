@@ -1,10 +1,7 @@
 import argparse
 import logging
 import pathlib
-import sys
-import textwrap
 from typing import Optional
-from ._env import Env, InvalidEnvError, load_env
 from ._config import Config, load_config
 from ._download import download_backups
 from ._commit import commit_backups
@@ -14,7 +11,6 @@ from ._export import export_backups
 def backup_scrapbox(
         *,
         args: Optional[list[str]] = None,
-        env: Optional[Env] = None,
         config: Optional[Config] = None,
         logger: Optional[logging.Logger] = None) -> None:
     # logger
@@ -30,15 +26,7 @@ def backup_scrapbox(
     if option.verbose:
         logger.setLevel(logging.DEBUG)
     logger.debug(f'option: {option}')
-    # .env
-    if env is None:
-        try:
-            env = load_env(option.env, logger=logger)
-        except InvalidEnvError as error:
-            sys.stderr.write(f'invalid env file: {option.env}\n')
-            sys.stderr.write(textwrap.indent(str(error), ' ' * 4))
-            sys.exit(1)
-    # config
+    # config TOML
     if config is None:
         config = load_config(option.config, logger=logger)
     # main
@@ -90,13 +78,6 @@ def _argument_parser() -> argparse.ArgumentParser:
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
-    # env
-    parser.add_argument(
-            '--env',
-            dest='env',
-            default='.env',
-            metavar='DOTENV',
-            help='env file (default %(default)s)')
     # config
     parser.add_argument(
             '--config',
