@@ -36,7 +36,7 @@ def download_backups(
         logger: Optional[logging.Logger] = None,
         request_interval: float = 3.0) -> None:
     logger = logger or logging.getLogger(__name__)
-    with env.session() as session:
+    with _session(env) as session:
         # list
         backup_list = _request_backup_list(env, session, logger)
         time.sleep(request_interval)
@@ -51,6 +51,15 @@ def download_backups(
 
 def _base_url(env: Env) -> str:
     return f'https://scrapbox.io/api/project-backup/{env.project}'
+
+
+def _session(env: Env) -> requests.Session:
+    session = requests.Session()
+    session.cookies.set(
+            'connect.sid',
+            env.session_id,
+            domain='scrapbox.io')
+    return session
 
 
 def _request_backup_list(
