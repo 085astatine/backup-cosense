@@ -5,6 +5,7 @@ import sys
 import textwrap
 from typing import Optional
 from ._env import Env, InvalidEnvError, load_env
+from ._config import Config, load_config
 from ._download import download_backups
 from ._commit import commit_backups
 from ._export import export_backups
@@ -14,6 +15,7 @@ def backup_scrapbox(
         *,
         args: Optional[list[str]] = None,
         env: Optional[Env] = None,
+        config: Optional[Config] = None,
         logger: Optional[logging.Logger] = None) -> None:
     # logger
     if logger is None:
@@ -36,6 +38,9 @@ def backup_scrapbox(
             sys.stderr.write(f'invalid env file: {option.env}\n')
             sys.stderr.write(textwrap.indent(str(error), ' ' * 4))
             sys.exit(1)
+    # config
+    if config is None:
+        config = load_config(option.config, logger=logger)
     # main
     logger.info('backup-scrapbox')
     # download backup
@@ -92,6 +97,14 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
             default='.env',
             metavar='DOTENV',
             help='env file (default %(default)s)')
+    # config
+    parser.add_argument(
+            '--config',
+            dest='config',
+            default='config.toml',
+            metavar='TOML',
+            type=pathlib.Path,
+            help='.toml file (default %(default)s)')
     # verbose
     parser.add_argument(
             '-v', '--verbose',
