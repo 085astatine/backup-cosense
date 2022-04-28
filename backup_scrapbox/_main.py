@@ -53,7 +53,7 @@ def backup_scrapbox(
     # commit
     if option.target in (None, 'commit'):
         logger.info('target: commit')
-        commit_backups(env, logger=logger)
+        commit_backups(config, logger=logger)
     # export
     if option.target == 'export':
         logger.info('target: export')
