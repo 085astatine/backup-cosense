@@ -1,4 +1,3 @@
-from __future__ import annotations
 import dataclasses
 import logging
 import pathlib
@@ -7,25 +6,6 @@ import dacite
 import jsonschema
 import toml
 from ._backup import PageOrder
-
-
-@dataclasses.dataclass(frozen=True)
-class Config:
-    scrapbox: ScrapboxConfig
-    git: GitConfig
-
-
-def jsonschema_config() -> dict[str, Any]:
-    schema = {
-        'type': 'object',
-        'required': ['scrapbox', 'git'],
-        'additional_properties': False,
-        'properties': {
-            'scrapbox': jsonschema_scrapbox_config(),
-            'git': jsonschema_git_config(),
-        },
-    }
-    return schema
 
 
 @dataclasses.dataclass(frozen=True)
@@ -68,6 +48,60 @@ def jsonschema_git_config() -> dict[str, Any]:
                 'type': ['string', 'null'],
                 'enum': [None, *get_args(PageOrder)],
             },
+        },
+    }
+    return schema
+
+
+@dataclasses.dataclass(frozen=True)
+class ExternalLinkConfig:
+    enabled: bool = False
+    log_directory: str = 'log'
+    parallel_limit: int = 5
+    request_interval: float = 1.0
+    timeout: float = 30.0
+
+
+def jsonschema_external_link_config() -> dict[str, Any]:
+    schema = {
+        'type': 'object',
+        'additionalProperties': False,
+        'properties': {
+            'enabled': {'type': 'boolean'},
+            'log_directory': {'type': 'string'},
+            'parallel_limit': {
+                'type': 'integer',
+                'minimum': 1,
+            },
+            'request_interval': {
+                'type': 'number',
+                'exclusiveMinimum': 0.0,
+            },
+            'timeout': {
+                'type': 'number',
+                'exclusiveMinimum': 0.0,
+            },
+        },
+    }
+    return schema
+
+
+@dataclasses.dataclass(frozen=True)
+class Config:
+    scrapbox: ScrapboxConfig
+    git: GitConfig
+    external_link: ExternalLinkConfig = ExternalLinkConfig()
+
+
+def jsonschema_config() -> dict[str, Any]:
+    schema = {
+        'type': 'object',
+        'required': ['scrapbox', 'git'],
+        'additional_properties': False,
+        'properties': {
+            'scrapbox': jsonschema_scrapbox_config(),
+            'git': jsonschema_git_config(),
+            'external_link': jsonschema_external_link_config(),
         },
     }
     return schema
