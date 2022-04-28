@@ -1,10 +1,8 @@
 import argparse
 import logging
 import pathlib
-import sys
-import textwrap
 from typing import Optional
-from ._env import Env, InvalidEnvError, load_env
+from ._config import Config, load_config
 from ._download import download_backups
 from ._commit import commit_backups
 from ._export import export_backups
@@ -13,7 +11,7 @@ from ._export import export_backups
 def backup_scrapbox(
         *,
         args: Optional[list[str]] = None,
-        env: Optional[Env] = None,
+        config: Optional[Config] = None,
         logger: Optional[logging.Logger] = None) -> None:
     # logger
     if logger is None:
@@ -28,31 +26,26 @@ def backup_scrapbox(
     if option.verbose:
         logger.setLevel(logging.DEBUG)
     logger.debug(f'option: {option}')
-    # .env
-    if env is None:
-        try:
-            env = load_env(option.env, logger=logger)
-        except InvalidEnvError as error:
-            sys.stderr.write(f'invalid env file: {option.env}\n')
-            sys.stderr.write(textwrap.indent(str(error), ' ' * 4))
-            sys.exit(1)
+    # config TOML
+    if config is None:
+        config = load_config(option.config, logger=logger)
     # main
     logger.info('backup-scrapbox')
     # download backup
     if option.target in (None, 'download'):
         logger.info('target: download')
         download_backups(
-                env,
+                config,
                 logger=logger,
                 request_interval=option.request_interval)
     # commit
     if option.target in (None, 'commit'):
         logger.info('target: commit')
-        commit_backups(env, logger=logger)
+        commit_backups(config, logger=logger)
     # export
     if option.target == 'export':
         logger.info('target: export')
-        export_backups(env, option.destination, logger=logger)
+        export_backups(config, option.destination, logger=logger)
 
 
 def _argument_parser() -> argparse.ArgumentParser:
@@ -85,13 +78,14 @@ def _argument_parser() -> argparse.ArgumentParser:
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
-    # env
+    # config
     parser.add_argument(
-            '--env',
-            dest='env',
-            default='.env',
-            metavar='DOTENV',
-            help='env file (default %(default)s)')
+            '--config',
+            dest='config',
+            default='config.toml',
+            metavar='TOML',
+            type=pathlib.Path,
+            help='.toml file (default %(default)s)')
     # verbose
     parser.add_argument(
             '-v', '--verbose',

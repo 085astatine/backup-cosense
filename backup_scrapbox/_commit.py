@@ -1,18 +1,19 @@
 import logging
+import pathlib
 from typing import Optional
 from ._backup import Backup, BackupStorage, DownloadedBackup
-from ._env import Env
+from ._config import Config
 from ._git import Commit, CommitTarget, Git
 from ._utility import format_timestamp
 
 
 def commit_backups(
-        env: Env,
+        config: Config,
         *,
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
-    git = env.git(logger=logger)
-    storage = env.backup_storage()
+    git = Git(pathlib.Path(config.git.path), logger=logger)
+    storage = BackupStorage(pathlib.Path(config.scrapbox.save_directory))
     # check if the git repository exists
     if not git.exists():
         logger.error(f'git repository "{git.path}" does not exist')
@@ -23,14 +24,14 @@ def commit_backups(
     for target in backup_targets:
         logger.info(f'commit {format_timestamp(target.timestamp)}')
         # load backup
-        backup = target.load(env.project, git.path)
+        backup = target.load(config.scrapbox.project, git.path)
         if backup is None:
             logger.info(
                     'failed to load backup'
                     f' {format_timestamp(target.timestamp)}')
             continue
         # sort pages
-        backup.sort_pages(env.page_order)
+        backup.sort_pages(config.git.page_order)
         # commit
         commit_backup(git, backup, logger=logger)
 
