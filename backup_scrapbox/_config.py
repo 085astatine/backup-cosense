@@ -1,5 +1,6 @@
 from __future__ import annotations
 import dataclasses
+import logging
 import pathlib
 from typing import Any, Optional, get_args
 import dacite
@@ -72,15 +73,23 @@ def jsonschema_git_config() -> dict[str, Any]:
     return schema
 
 
-def load_config(path: pathlib.Path) -> Config:
+def load_config(
+        path: pathlib.Path,
+        *,
+        logger: Optional[logging.Logger] = None) -> Config:
+    logger = logger or logging.getLogger(__name__)
     # load TOML
+    logger.info(f'load config from "{path.as_posix()}"')
     with path.open(encoding='utf-8') as file:
         loaded = toml.load(file)
+    logger.debug(f'loaded toml: {repr(loaded)}')
     # JSON Schema validation
     jsonschema.validate(
             instance=loaded,
             schema=jsonschema_config())
-    return dacite.from_dict(
+    config = dacite.from_dict(
             data_class=Config,
             data=loaded,
             config=dacite.Config(strict=True))
+    logger.debug(f'config: {repr(config)}')
+    return config
