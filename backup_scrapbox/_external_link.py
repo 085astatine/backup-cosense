@@ -11,6 +11,7 @@ from typing import Any, Literal, Optional
 import aiohttp
 import dacite
 from ._backup import Backup, ExternalLink, Location, jsonschema_location
+from ._config import ExternalLinkConfig
 from ._json import load_json, save_json
 
 
@@ -75,13 +76,12 @@ def jsonschema_external_link_logs() -> dict[str, Any]:
 def save_external_links(
         backup: Backup,
         *,
-        parallel_limit: int = 5,
-        request_interval: float = 1.0,
-        timeout_seconds: float = 30.0,
+        config: Optional[ExternalLinkConfig] = None,
         logger: Optional[logging.Logger] = None) -> None:
+    config = config or ExternalLinkConfig()
     logger = logger or logging.getLogger(__name__)
     # log directory
-    log_directory = pathlib.Path('log')
+    log_directory = pathlib.Path(config.log_directory)
     # load previous log
     previous_log_file = _ExternalLinkLogsFile.find_latest(
             log_directory,
@@ -101,9 +101,9 @@ def save_external_links(
     random.shuffle(classified_links.new_links)
     logs = asyncio.run(_request_external_links(
             classified_links.new_links,
-            parallel_limit,
-            request_interval,
-            timeout_seconds,
+            config.parallel_limit,
+            config.request_interval,
+            config.timeout,
             logger))
     # merge logs
     logs.extend(classified_links.logs)
