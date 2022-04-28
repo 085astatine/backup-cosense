@@ -1,10 +1,13 @@
 import logging
+import pathlib
 import time
 from typing import Any, Callable, Optional, TypedDict
 import requests
 from ._backup import (
-    BackupJSON, BackupInfoJSON, jsonschema_backup, jsonschema_backup_info)
-from ._env import Env
+    BackupJSON, BackupInfoJSON, BackupStorage, jsonschema_backup,
+    jsonschema_backup_info)
+from ._config import Config
+from ._git import Git
 from ._json import request_json, save_json
 from ._utility import format_timestamp
 
@@ -31,44 +34,44 @@ def jsonschema_backup_list() -> dict[str, Any]:
 
 
 def download_backups(
-        env: Env,
+        config: Config,
         *,
         logger: Optional[logging.Logger] = None,
         request_interval: float = 3.0) -> None:
     logger = logger or logging.getLogger(__name__)
-    with _session(env) as session:
+    with _session(config) as session:
         # list
-        backup_list = _request_backup_list(env, session, logger)
+        backup_list = _request_backup_list(config, session, logger)
         time.sleep(request_interval)
         if not backup_list:
             return
         # backup
-        for info in filter(_backup_filter(env, logger), backup_list):
+        for info in filter(_backup_filter(config, logger), backup_list):
             # download
-            _download_backup(env, session, info, logger)
+            _download_backup(config, session, info, logger)
             time.sleep(request_interval)
 
 
-def _base_url(env: Env) -> str:
-    return f'https://scrapbox.io/api/project-backup/{env.project}'
+def _base_url(config: Config) -> str:
+    return f'https://scrapbox.io/api/project-backup/{config.scrapbox.project}'
 
 
-def _session(env: Env) -> requests.Session:
+def _session(config: Config) -> requests.Session:
     session = requests.Session()
     session.cookies.set(
             'connect.sid',
-            env.session_id,
+            config.scrapbox.session_id,
             domain='scrapbox.io')
     return session
 
 
 def _request_backup_list(
-        env: Env,
+        config: Config,
         session: requests.Session,
         logger: logging.Logger) -> list[BackupInfoJSON]:
     # request to .../project-backup/list
     response: Optional[BackupListJSON] = request_json(
-            f'{_base_url(env)}/list',
+            f'{_base_url(config)}/list',
             session=session,
             schema=jsonschema_backup_list(),
             logger=logger)
@@ -92,14 +95,14 @@ def _request_backup_list(
 
 
 def _backup_filter(
-        env: Env,
+        config: Config,
         logger: logging.Logger) -> Callable[[BackupInfoJSON], bool]:
     # get the latest backup timestamp from the Git repository
-    git = env.git(logger=logger)
+    git = Git(pathlib.Path(config.git.path), logger=logger)
     latest_timestamp = git.latest_commit_timestamp()
     logger.info(f'latest backup: {format_timestamp(latest_timestamp)}')
     # backup storage
-    storage = env.backup_storage()
+    storage = BackupStorage(pathlib.Path(config.scrapbox.save_directory))
 
     def backup_filter(backup: BackupInfoJSON) -> bool:
         timestamp = backup['backuped']
@@ -118,7 +121,7 @@ def _backup_filter(
 
 
 def _download_backup(
-        env: Env,
+        config: Config,
         session: requests.Session,
         info: BackupInfoJSON,
         logger: logging.Logger) -> None:
@@ -127,7 +130,7 @@ def _download_backup(
     # request
     logger.info(
             f'download backup {format_timestamp(timestamp)}')
-    url = f'{_base_url(env)}/{info["id"]}.json'
+    url = f'{_base_url(config)}/{info["id"]}.json'
     backup: Optional[BackupJSON] = request_json(
             url,
             session=session,
@@ -136,7 +139,7 @@ def _download_backup(
     if backup is None:
         return
     # save
-    storage = env.backup_storage()
+    storage = BackupStorage(pathlib.Path(config.scrapbox.save_directory))
     # save backup
     backup_path = storage.backup_path(timestamp)
     logger.info(f'save "{backup_path}"')

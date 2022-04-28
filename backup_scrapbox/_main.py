@@ -47,7 +47,7 @@ def backup_scrapbox(
     if option.target in (None, 'download'):
         logger.info('target: download')
         download_backups(
-                env,
+                config,
                 logger=logger,
                 request_interval=option.request_interval)
     # commit
