@@ -57,7 +57,7 @@ def backup_scrapbox(
     # export
     if option.target == 'export':
         logger.info('target: export')
-        export_backups(env, option.destination, logger=logger)
+        export_backups(config, option.destination, logger=logger)
 
 
 def _argument_parser() -> argparse.ArgumentParser:

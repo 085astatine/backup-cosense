@@ -3,17 +3,17 @@ import pathlib
 import subprocess
 from typing import Optional
 from ._backup import BackupJSON, jsonschema_backup
-from ._env import Env
+from ._config import Config
 from ._git import Git, Commit
 from ._json import parse_json, save_json
 from ._utility import format_timestamp
 
 
 def export_backups(
-        env: Env,
+        config: Config,
         destination: pathlib.Path,
         logger: logging.Logger) -> None:
-    git = env.git(logger=logger)
+    git = Git(pathlib.Path(config.git.path), logger=logger)
     # check if the destination exists
     if not destination.exists():
         logger.error(
@@ -31,7 +31,7 @@ def export_backups(
     # export
     for commit in commits:
         logger.info(f'export {format_timestamp(commit.timestamp)}')
-        _export(env.project,
+        _export(config.scrapbox.project,
                 git,
                 commit,
                 destination,
