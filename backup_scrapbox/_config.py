@@ -60,6 +60,7 @@ class ExternalLinkConfig:
     parallel_limit: int = 5
     request_interval: float = 1.0
     timeout: float = 30.0
+    content_types: list[str] = dataclasses.field(default_factory=list)
 
 
 def jsonschema_external_link_config() -> dict[str, Any]:
@@ -80,6 +81,10 @@ def jsonschema_external_link_config() -> dict[str, Any]:
             'timeout': {
                 'type': 'number',
                 'exclusiveMinimum': 0.0,
+            },
+            'content_types': {
+                'type': 'array',
+                'items': {'type': 'string'},
             },
         },
     }
