@@ -232,9 +232,7 @@ async def _request_external_links(
     async def _parallel_request(
             session: aiohttp.ClientSession,
             index: int,
-            link: ExternalLink,
-            content_types: list[re.Pattern[str]],
-            logger: logging.Logger) -> ExternalLinkLog:
+            link: ExternalLink) -> ExternalLinkLog:
         async with semaphore:
             response = await _request(
                     session,
@@ -247,7 +245,7 @@ async def _request_external_links(
 
     async with aiohttp.ClientSession(timeout=timeout) as session:
         tasks = [
-                _parallel_request(session, i, link, content_types, logger)
+                _parallel_request(session, i, link)
                 for i, link in enumerate(links)]
         return await asyncio.gather(*tasks)
 
