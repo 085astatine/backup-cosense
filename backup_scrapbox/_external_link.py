@@ -223,21 +223,31 @@ async def _request_external_links(
     timeout = aiohttp.ClientTimeout(total=config.timeout)
     # semaphore
     semaphore = asyncio.Semaphore(config.parallel_limit)
+    # content types
+    content_types = [
+            re.compile(content_type)
+            for content_type in config.content_types]
 
     # parallel requests
     async def _parallel_request(
             session: aiohttp.ClientSession,
             index: int,
             link: ExternalLink,
+            content_types: list[re.Pattern[str]],
             logger: logging.Logger) -> ExternalLinkLog:
         async with semaphore:
-            response = await _request(session, index, link, logger)
+            response = await _request(
+                    session,
+                    index,
+                    link,
+                    content_types,
+                    logger)
             await asyncio.sleep(config.request_interval)
             return response
 
     async with aiohttp.ClientSession(timeout=timeout) as session:
         tasks = [
-                _parallel_request(session, i, link, logger)
+                _parallel_request(session, i, link, content_types, logger)
                 for i, link in enumerate(links)]
         return await asyncio.gather(*tasks)
 
@@ -246,6 +256,7 @@ async def _request(
         session: aiohttp.ClientSession,
         index: int,
         link: ExternalLink,
+        content_types: list[re.Pattern[str]],
         logger: logging.Logger) -> ExternalLinkLog:
     logger.debug(f'request({index}): url={link.url}')
     # access timestamp
@@ -258,6 +269,13 @@ async def _request(
                     status_code=response.status,
                     content_type=response.headers.get('content-type'))
             logger.debug(f'request({index}): response={response_log}')
+            # check content type
+            if (response_log.content_type is not None
+                    and any(content_type.match(response_log.content_type)
+                            for content_type in content_types)):
+                logger.debug(
+                        f'request({index}):'
+                        f' save content ({response_log.content_type})')
             return ExternalLinkLog(
                 url=link.url,
                 locations=link.locations,
