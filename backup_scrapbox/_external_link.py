@@ -75,6 +75,7 @@ def jsonschema_external_link_logs() -> dict[str, Any]:
 
 def save_external_links(
         backup: Backup,
+        git_directory: pathlib.Path,
         *,
         config: Optional[ExternalLinkConfig] = None,
         logger: Optional[logging.Logger] = None) -> None:
@@ -101,6 +102,7 @@ def save_external_links(
     random.shuffle(classified_links.new_links)
     logs = asyncio.run(_request_external_links(
             classified_links.new_links,
+            git_directory.joinpath('links'),
             config,
             logger))
     # merge logs
@@ -217,6 +219,7 @@ def _classify_external_links(
 
 async def _request_external_links(
         links: list[ExternalLink],
+        save_directory: pathlib.Path,
         config: ExternalLinkConfig,
         logger: logging.Logger) -> list[ExternalLinkLog]:
     # timeout
@@ -238,6 +241,7 @@ async def _request_external_links(
                     session,
                     index,
                     link,
+                    save_directory,
                     content_types,
                     logger)
             await asyncio.sleep(config.request_interval)
@@ -254,6 +258,7 @@ async def _request(
         session: aiohttp.ClientSession,
         index: int,
         link: ExternalLink,
+        save_directory: pathlib.Path,
         content_types: list[re.Pattern[str]],
         logger: logging.Logger) -> ExternalLinkLog:
     logger.debug(f'request({index}): url={link.url}')
@@ -274,6 +279,15 @@ async def _request(
                 logger.debug(
                         f'request({index}):'
                         f' save content ({response_log.content_type})')
+                # save
+                save_path = _save_path(save_directory, link.url)
+                logger.debug(
+                        f'request({index}):'
+                        f' save to "{save_path.as_posix()}"')
+                if not save_path.parent.exists():
+                    save_path.parent.mkdir(parents=True)
+                with save_path.open(mode='bw') as file:
+                    file.write(await response.read())
             return ExternalLinkLog(
                 url=link.url,
                 locations=link.locations,
@@ -287,3 +301,7 @@ async def _request(
                 locations=link.locations,
                 access_timestamp=access_timestamp,
                 response='error')
+
+
+def _save_path(directory: pathlib.Path, url: str) -> pathlib.Path:
+    return directory.joinpath(re.sub(r'https?://', '', url))
