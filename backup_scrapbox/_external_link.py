@@ -101,9 +101,7 @@ def save_external_links(
     random.shuffle(classified_links.new_links)
     logs = asyncio.run(_request_external_links(
             classified_links.new_links,
-            config.parallel_limit,
-            config.request_interval,
-            config.timeout,
+            config,
             logger))
     # merge logs
     logs.extend(classified_links.logs)
@@ -219,14 +217,12 @@ def _classify_external_links(
 
 async def _request_external_links(
         links: list[ExternalLink],
-        parallel_limit: int,
-        request_interval: float,
-        timeout_seconds: float,
+        config: ExternalLinkConfig,
         logger: logging.Logger) -> list[ExternalLinkLog]:
     # timeout
-    timeout = aiohttp.ClientTimeout(total=timeout_seconds)
+    timeout = aiohttp.ClientTimeout(total=config.timeout)
     # semaphore
-    semaphore = asyncio.Semaphore(parallel_limit)
+    semaphore = asyncio.Semaphore(config.parallel_limit)
 
     # parallel requests
     async def _parallel_request(
@@ -236,7 +232,7 @@ async def _request_external_links(
             logger: logging.Logger) -> ExternalLinkLog:
         async with semaphore:
             response = await _request(session, index, link, logger)
-            await asyncio.sleep(request_interval)
+            await asyncio.sleep(config.request_interval)
             return response
 
     async with aiohttp.ClientSession(timeout=timeout) as session:
