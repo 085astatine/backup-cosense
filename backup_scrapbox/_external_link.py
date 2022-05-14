@@ -102,7 +102,7 @@ def save_external_links(
     random.shuffle(classified_links.new_links)
     logs = asyncio.run(_request_external_links(
             classified_links.new_links,
-            git_directory.joinpath('links'),
+            git_directory.joinpath(config.save_directory),
             config,
             logger))
     # merge logs

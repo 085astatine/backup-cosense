@@ -57,6 +57,7 @@ def jsonschema_git_config() -> dict[str, Any]:
 class ExternalLinkConfig:
     enabled: bool = False
     log_directory: str = 'log'
+    save_directory: str = 'links'
     parallel_limit: int = 5
     request_interval: float = 1.0
     timeout: float = 30.0
@@ -70,6 +71,7 @@ def jsonschema_external_link_config() -> dict[str, Any]:
         'properties': {
             'enabled': {'type': 'boolean'},
             'log_directory': {'type': 'string'},
+            'save_directory': {'type': 'string'},
             'parallel_limit': {
                 'type': 'integer',
                 'minimum': 1,
