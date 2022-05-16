@@ -12,6 +12,7 @@ import aiohttp
 import dacite
 from ._backup import Backup, ExternalLink, Location, jsonschema_location
 from ._config import ExternalLinkConfig
+from ._git import CommitTarget
 from ._json import load_json, save_json
 
 
@@ -86,7 +87,7 @@ def save_external_links(
         git_directory: pathlib.Path,
         *,
         config: Optional[ExternalLinkConfig] = None,
-        logger: Optional[logging.Logger] = None) -> None:
+        logger: Optional[logging.Logger] = None) -> CommitTarget:
     config = config or ExternalLinkConfig()
     logger = logger or logging.getLogger(__name__)
     # log directory
@@ -129,6 +130,15 @@ def save_external_links(
             save_path,
             [dataclasses.asdict(log) for log in logs],
             schema=jsonschema_external_link_logs())
+    # commit target
+    return CommitTarget(
+            added=set(
+                    git_directory.joinpath(log.file_path) for log in logs
+                    if log.file_path is not None),
+            deleted=set(
+                    git_directory.joinpath(link.file_path)
+                    for link in classified_links.deleted_links
+                    if link.file_path is not None))
 
 
 @dataclasses.dataclass
