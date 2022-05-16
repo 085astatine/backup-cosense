@@ -46,7 +46,13 @@ class ExternalLinkLog:
 def jsonschema_external_link_log() -> dict[str, Any]:
     schema = {
         'type': 'object',
-        'required': ['url', 'response'],
+        'required': [
+            'url',
+            'locations',
+            'access_timestamp',
+            'response',
+            'file_path',
+        ],
         'additionalProperties': False,
         'properties': {
             'url': {'type': 'string'},
