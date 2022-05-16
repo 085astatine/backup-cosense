@@ -193,7 +193,7 @@ class _LinkLogPair:
 class _ClassifiedExternalLinks:
     new_links: list[ExternalLink]
     logs: list[ExternalLinkLog]
-    deleted_links: list[str]
+    deleted_links: list[ExternalLinkLog]
 
 
 def _classify_external_links(
@@ -210,14 +210,14 @@ def _classify_external_links(
     # classify
     new_links: list[ExternalLink] = []
     logs: list[ExternalLinkLog] = []
-    deleted_links: list[str] = []
+    deleted_links: list[ExternalLinkLog] = []
     for pair in pairs.values():
         if pair.log is None:
             if pair.link is not None:
                 new_links.append(pair.link)
         else:
             if pair.link is None:
-                deleted_links.append(pair.log.url)
+                deleted_links.append(pair.log)
             else:
                 # replace locations
                 log = copy.copy(pair.log)
