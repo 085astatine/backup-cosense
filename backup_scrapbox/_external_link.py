@@ -83,6 +83,10 @@ def save_external_links(
     logger = logger or logging.getLogger(__name__)
     # log directory
     log_directory = pathlib.Path(config.log_directory)
+    # save directory
+    save_directory = _SaveDirectory(
+            root_directory=git_directory,
+            links_directory=config.save_directory)
     # load previous log
     previous_log_file = _ExternalLinkLogsFile.find_latest(
             log_directory,
@@ -102,7 +106,7 @@ def save_external_links(
     random.shuffle(classified_links.new_links)
     logs = asyncio.run(_request_external_links(
             classified_links.new_links,
-            git_directory.joinpath(config.save_directory),
+            save_directory,
             config,
             logger))
     # merge logs
@@ -217,9 +221,20 @@ def _classify_external_links(
             deleted_links)
 
 
+@dataclasses.dataclass
+class _SaveDirectory:
+    root_directory: pathlib.Path
+    links_directory: str
+
+    def file_path(self, url: str) -> pathlib.Path:
+        return (self.root_directory
+                .joinpath(self.links_directory)
+                .joinpath(re.sub(r'https?://', '', url)))
+
+
 async def _request_external_links(
         links: list[ExternalLink],
-        save_directory: pathlib.Path,
+        save_directory: _SaveDirectory,
         config: ExternalLinkConfig,
         logger: logging.Logger) -> list[ExternalLinkLog]:
     # timeout
@@ -258,7 +273,7 @@ async def _request(
         session: aiohttp.ClientSession,
         index: int,
         link: ExternalLink,
-        save_directory: pathlib.Path,
+        save_directory: _SaveDirectory,
         content_types: list[re.Pattern[str]],
         logger: logging.Logger) -> ExternalLinkLog:
     logger.debug(f'request({index}): url={link.url}')
@@ -280,7 +295,7 @@ async def _request(
                         f'request({index}):'
                         f' save content ({response_log.content_type})')
                 # save
-                save_path = _save_path(save_directory, link.url)
+                save_path = save_directory.file_path(link.url)
                 logger.debug(
                         f'request({index}):'
                         f' save to "{save_path.as_posix()}"')
@@ -301,7 +316,3 @@ async def _request(
                 locations=link.locations,
                 access_timestamp=access_timestamp,
                 response='error')
-
-
-def _save_path(directory: pathlib.Path, url: str) -> pathlib.Path:
-    return directory.joinpath(re.sub(r'https?://', '', url))
