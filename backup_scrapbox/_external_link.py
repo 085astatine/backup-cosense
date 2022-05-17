@@ -160,7 +160,7 @@ class _ExternalLinkLogsFile:
         return f'external_link_{timestamp}.json'
 
     @classmethod
-    def find(cls, directory: pathlib.Path) -> list[_ExternalLinkLogsFile]:
+    def find_all(cls, directory: pathlib.Path) -> list[_ExternalLinkLogsFile]:
         log_files: list[_ExternalLinkLogsFile] = []
         # check if the path is directory
         if not directory.is_dir():
@@ -188,7 +188,7 @@ class _ExternalLinkLogsFile:
             *,
             current: Optional[int] = None) -> Optional[_ExternalLinkLogsFile]:
         return next(
-                (log_file for log_file in reversed(cls.find(directory))
+                (log_file for log_file in reversed(cls.find_all(directory))
                  if current is None or current > log_file.timestamp),
                 None)
 
