@@ -160,6 +160,16 @@ class _ExternalLinkLogsFile:
         return f'external_link_{timestamp}.json'
 
     @classmethod
+    def find(
+            cls,
+            directory: pathlib.Path,
+            timestamp: int) -> Optional[_ExternalLinkLogsFile]:
+        path = directory.joinpath(cls.filename(timestamp))
+        if path.exists():
+            return cls(path=path, timestamp=timestamp)
+        return None
+
+    @classmethod
     def find_all(cls, directory: pathlib.Path) -> list[_ExternalLinkLogsFile]:
         log_files: list[_ExternalLinkLogsFile] = []
         # check if the path is directory
