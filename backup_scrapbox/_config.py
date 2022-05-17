@@ -55,11 +55,13 @@ def jsonschema_git_config() -> dict[str, Any]:
 
 @dataclasses.dataclass(frozen=True)
 class ExternalLinkConfig:
+    # pylint: disable=too-many-instance-attributes
     enabled: bool = False
     log_directory: str = 'log'
     save_directory: str = 'links'
     parallel_limit: int = 5
     request_interval: float = 1.0
+    request_headers: dict[str, str] = dataclasses.field(default_factory=dict)
     timeout: float = 30.0
     content_types: list[str] = dataclasses.field(default_factory=list)
 
@@ -79,6 +81,12 @@ def jsonschema_external_link_config() -> dict[str, Any]:
             'request_interval': {
                 'type': 'number',
                 'exclusiveMinimum': 0.0,
+            },
+            'request_headers': {
+                'type': 'object',
+                'additionalProperties': {
+                    'type': 'string',
+                },
             },
             'timeout': {
                 'type': 'number',

@@ -280,7 +280,9 @@ async def _request_external_links(
             await asyncio.sleep(config.request_interval)
             return response
 
-    async with aiohttp.ClientSession(timeout=timeout) as session:
+    async with aiohttp.ClientSession(
+            timeout=timeout,
+            headers=config.request_headers) as session:
         tasks = [
                 _parallel_request(session, i, link)
                 for i, link in enumerate(links)]
