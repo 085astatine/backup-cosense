@@ -101,7 +101,7 @@ def save_external_links(
     # save directory
     save_directory = _SaveDirectory(
             root_directory=git_directory,
-            links_directory=config.save_directory)
+            links_directory_name=config.save_directory)
     # load previous log
     previous_log_file = _ExternalLinkLogsFile.find_latest(
             log_directory,
@@ -258,12 +258,15 @@ def _classify_external_links(
 @dataclasses.dataclass
 class _SaveDirectory:
     root_directory: pathlib.Path
-    links_directory: str
+    links_directory: pathlib.Path = dataclasses.field(init=False)
+    links_directory_name: dataclasses.InitVar[str]
+
+    def __post_init__(self, links_directory_name: str) -> None:
+        self.links_directory = self.root_directory.joinpath(
+                links_directory_name)
 
     def file_path(self, url: str) -> pathlib.Path:
-        return (self.root_directory
-                .joinpath(self.links_directory)
-                .joinpath(re.sub(r'https?://', '', url)))
+        return self.links_directory.joinpath(re.sub(r'https?://', '', url))
 
 
 async def _request_external_links(
