@@ -43,6 +43,12 @@ class ExternalLinkLog:
     response: Literal['error'] | ResponseLog
     file_path: Optional[str]
 
+    @property
+    def link(self) -> ExternalLink:
+        return ExternalLink(
+                url=self.url,
+                locations=self.locations)
+
 
 def jsonschema_external_link_log() -> dict[str, Any]:
     schema = {
