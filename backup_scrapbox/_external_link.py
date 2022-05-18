@@ -41,7 +41,7 @@ class ExternalLinkLog:
     locations: list[Location]
     access_timestamp: int
     response: Literal['error'] | ResponseLog
-    file_path: Optional[str]
+    is_saved: bool
 
     @property
     def link(self) -> ExternalLink:
@@ -58,7 +58,7 @@ def jsonschema_external_link_log() -> dict[str, Any]:
             'locations',
             'access_timestamp',
             'response',
-            'file_path',
+            'is_saved',
         ],
         'additionalProperties': False,
         'properties': {
@@ -74,7 +74,7 @@ def jsonschema_external_link_log() -> dict[str, Any]:
                     jsonschema_response_log(),
                 ],
             },
-            'file_path': {'type': ['null', 'string']},
+            'is_saved': {'type': 'boolean'},
         },
     }
     return schema
@@ -139,12 +139,12 @@ def save_external_links(
     # commit target
     return CommitTarget(
             added=set(
-                    git_directory.joinpath(log.file_path) for log in logs
-                    if log.file_path is not None),
+                    save_directory.file_path(log.url) for log in logs
+                    if log.is_saved),
             deleted=set(
-                    git_directory.joinpath(link.file_path)
+                    save_directory.file_path(link.url)
                     for link in classified_links.deleted_links
-                    if link.file_path is not None))
+                    if link.is_saved))
 
 
 @dataclasses.dataclass
@@ -323,7 +323,7 @@ async def _request(
                     status_code=response.status,
                     content_type=response.headers.get('content-type'))
             logger.debug(f'request({index}): response={response_log}')
-            file_path: Optional[str] = None
+            is_saved = False
             # check content type
             if (response_log.content_type is not None
                     and any(content_type.match(response_log.content_type)
@@ -340,16 +340,13 @@ async def _request(
                     save_path.parent.mkdir(parents=True)
                 with save_path.open(mode='bw') as file:
                     file.write(await response.read())
-                file_path = (
-                        save_path
-                        .relative_to(save_directory.root_directory)
-                        .as_posix())
+                is_saved = True
             return ExternalLinkLog(
                 url=link.url,
                 locations=link.locations,
                 access_timestamp=access_timestamp,
                 response=response_log,
-                file_path=file_path)
+                is_saved=is_saved)
     except (asyncio.TimeoutError, aiohttp.ClientError) as error:
         logger.debug(f'request({index}): '
                      f'error={error.__class__.__name__}({error})')
@@ -358,4 +355,4 @@ async def _request(
                 locations=link.locations,
                 access_timestamp=access_timestamp,
                 response='error',
-                file_path=None)
+                is_saved=False)
