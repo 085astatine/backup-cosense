@@ -158,7 +158,7 @@ def save_external_links(
                 f' "{previous_log_file.path.as_posix()}"')
         previous_logs = previous_log_file.load() or []
     # load previous saved list
-    previous_saved_list = _load_saved_list(save_directory)
+    previous_saved_list = _load_saved_list(save_directory, logger)
     # classify
     classified_links = _classify_external_links(
             backup.external_links(),
@@ -184,7 +184,7 @@ def save_external_links(
             [dataclasses.asdict(log) for log in logs],
             schema=jsonschema_external_link_logs())
     # save list.json
-    _save_saved_list(save_directory, config.content_types, logs)
+    _save_saved_list(save_directory, config.content_types, logs, logger)
     # commit target
     return CommitTarget(
             added=set(
@@ -429,9 +429,12 @@ async def _request(
 
 
 def _load_saved_list(
-        directory: _SaveDirectory) -> Optional[SavedExternalLinksInfo]:
+        directory: _SaveDirectory,
+        logger: logging.Logger) -> Optional[SavedExternalLinksInfo]:
+    file_path = directory.list_path()
+    logger.debug(f'load saved link list from {file_path.as_posix()}')
     data = load_json(
-            directory.list_path(),
+            file_path,
             schema=jsonschema_saved_external_links_info())
     if data is not None:
         return dacite.from_dict(data_class=SavedExternalLinksInfo, data=data)
@@ -441,11 +444,14 @@ def _load_saved_list(
 def _save_saved_list(
         directory: _SaveDirectory,
         content_types: list[str],
-        logs: list[ExternalLinkLog]) -> None:
+        logs: list[ExternalLinkLog],
+        logger: logging.Logger) -> None:
+    file_path = directory.list_path()
     saved_list = SavedExternalLinksInfo(
             content_types=sorted(content_types),
             urls=sorted(log.url for log in logs if log.is_saved))
+    logger.debug(f'save saved link list to {file_path.as_posix()}')
     save_json(
-            directory.list_path(),
+            file_path,
             dataclasses.asdict(saved_list),
             schema=jsonschema_saved_external_links_info())
