@@ -157,6 +157,8 @@ def save_external_links(
                 'load external links from'
                 f' "{previous_log_file.path.as_posix()}"')
         previous_logs = previous_log_file.load() or []
+    # load previous saved list
+    previous_saved_list = _load_saved_list(save_directory)
     # classify
     classified_links = _classify_external_links(
             backup.external_links(),
@@ -424,6 +426,16 @@ async def _request(
                         type=error.__class__.__name__,
                         message=str(error)),
                 is_saved=False)
+
+
+def _load_saved_list(
+        directory: _SaveDirectory) -> Optional[SavedExternalLinksInfo]:
+    data = load_json(
+            directory.list_path(),
+            schema=jsonschema_saved_external_links_info())
+    if data is not None:
+        return dacite.from_dict(data_class=SavedExternalLinksInfo, data=data)
+    return None
 
 
 def _save_saved_list(
