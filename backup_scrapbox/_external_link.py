@@ -40,7 +40,7 @@ class ExternalLinkLog:
     url: str
     locations: list[Location]
     access_timestamp: int
-    response: Literal['error'] | ResponseLog
+    response: Literal['error', 'excluded'] | ResponseLog
     is_saved: bool
 
     @property
@@ -70,7 +70,7 @@ def jsonschema_external_link_log() -> dict[str, Any]:
             },
             'response': {
                 'oneOf': [
-                    {'type': 'string', 'enum': ['error']},
+                    {'type': 'string', 'enum': ['error', 'excluded']},
                     jsonschema_response_log(),
                 ],
             },
@@ -312,6 +312,8 @@ async def _request_external_links(
     content_types = [
             re.compile(content_type)
             for content_type in config.content_types]
+    # excluded urls
+    excluded_urls = [re.compile(url) for url in config.excluded_urls]
 
     # parallel requests
     async def _parallel_request(
@@ -325,6 +327,7 @@ async def _request_external_links(
                     link,
                     save_directory,
                     content_types,
+                    excluded_urls,
                     logger)
             await asyncio.sleep(config.request_interval)
             return response
@@ -344,10 +347,20 @@ async def _request(
         link: ExternalLink,
         save_directory: _SaveDirectory,
         content_types: list[re.Pattern[str]],
+        excluded_urls: list[re.Pattern[str]],
         logger: logging.Logger) -> ExternalLinkLog:
     logger.debug(f'request({index}): url={link.url}')
     # access timestamp
     access_timestamp = int(time.time())
+    # check if the url is excluded
+    if any(url.match(link.url) is not None for url in excluded_urls):
+        logger.debug(f'request({index}): excluded url')
+        return ExternalLinkLog(
+                url=link.url,
+                locations=link.locations,
+                access_timestamp=0,
+                response='excluded',
+                is_saved=False)
     # request
     try:
         async with session.get(link.url) as response:

@@ -64,6 +64,7 @@ class ExternalLinkConfig:
     request_headers: dict[str, str] = dataclasses.field(default_factory=dict)
     timeout: float = 30.0
     content_types: list[str] = dataclasses.field(default_factory=list)
+    excluded_urls: list[str] = dataclasses.field(default_factory=list)
 
 
 def jsonschema_external_link_config() -> dict[str, Any]:
@@ -93,6 +94,10 @@ def jsonschema_external_link_config() -> dict[str, Any]:
                 'exclusiveMinimum': 0.0,
             },
             'content_types': {
+                'type': 'array',
+                'items': {'type': 'string'},
+            },
+            'excluded_urls': {
                 'type': 'array',
                 'items': {'type': 'string'},
             },
