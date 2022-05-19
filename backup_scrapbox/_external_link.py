@@ -88,6 +88,31 @@ def jsonschema_external_link_logs() -> dict[str, Any]:
     return schema
 
 
+@dataclasses.dataclass(frozen=True)
+class SavedExternalLinksInfo:
+    content_types: list[str]
+    urls: list[str]
+
+
+def jsonschema_saved_external_links_info() -> dict[str, Any]:
+    schema = {
+        'type': 'object',
+        'required': ['content_types', 'urls'],
+        'additionalProperties': False,
+        'properties': {
+            'content_types': {
+                'type': 'array',
+                'items': {'type': 'string'},
+            },
+            'urls': {
+                'type': 'array',
+                'items': {'type': 'string'},
+            },
+        },
+    }
+    return schema
+
+
 def save_external_links(
         backup: Backup,
         git_directory: pathlib.Path,
@@ -136,6 +161,8 @@ def save_external_links(
             save_path,
             [dataclasses.asdict(log) for log in logs],
             schema=jsonschema_external_link_logs())
+    # save list.json
+    _save_saved_list(save_directory, config.content_types, logs)
     # commit target
     return CommitTarget(
             added=set(
@@ -268,6 +295,9 @@ class _SaveDirectory:
     def file_path(self, url: str) -> pathlib.Path:
         return self.links_directory.joinpath(re.sub(r'https?://', '', url))
 
+    def list_path(self) -> pathlib.Path:
+        return self.links_directory.joinpath('list.json')
+
 
 async def _request_external_links(
         links: list[ExternalLink],
@@ -359,3 +389,16 @@ async def _request(
                 access_timestamp=access_timestamp,
                 response='error',
                 is_saved=False)
+
+
+def _save_saved_list(
+        directory: _SaveDirectory,
+        content_types: list[str],
+        logs: list[ExternalLinkLog]) -> None:
+    saved_list = SavedExternalLinksInfo(
+            content_types=sorted(content_types),
+            urls=sorted(log.url for log in logs if log.is_saved))
+    save_json(
+            directory.list_path(),
+            dataclasses.asdict(saved_list),
+            schema=jsonschema_saved_external_links_info())
