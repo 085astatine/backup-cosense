@@ -186,14 +186,7 @@ def save_external_links(
     # save list.json
     _save_saved_list(save_directory, config.content_types, logs, logger)
     # commit target
-    return CommitTarget(
-            added=set(
-                    save_directory.file_path(log.url) for log in logs
-                    if log.is_saved),
-            deleted=set(
-                    save_directory.file_path(link.url)
-                    for link in classified_links.deleted_links
-                    if link.is_saved))
+    return _commit_target(save_directory, logs, previous_saved_list)
 
 
 @dataclasses.dataclass
@@ -455,3 +448,31 @@ def _save_saved_list(
             file_path,
             dataclasses.asdict(saved_list),
             schema=jsonschema_saved_external_links_info())
+
+
+def _commit_target(
+        directory: _SaveDirectory,
+        logs: list[ExternalLinkLog],
+        previous_list: Optional[SavedExternalLinksInfo]) -> CommitTarget:
+    # saved files
+    saved_files = set(
+            directory.file_path(log.url) for log in logs
+            if log.is_saved)
+    previous_saved_files: set[pathlib.Path] = set()
+    if previous_list is not None:
+        previous_saved_files.update(
+                directory.file_path(url) for url in previous_list.urls)
+    # added / updated / deleted
+    added = saved_files - previous_saved_files
+    updated = saved_files & previous_saved_files
+    deleted = previous_saved_files - saved_files
+    # list.json
+    list_path = directory.list_path()
+    if list_path.exists():
+        updated.add(list_path)
+    else:
+        added.add(list_path)
+    return CommitTarget(
+            added=added,
+            updated=updated,
+            deleted=deleted)
