@@ -35,12 +35,31 @@ def jsonschema_response_log() -> dict[str, Any]:
     return schema
 
 
+@dataclasses.dataclass(frozen=True)
+class RequestError:
+    type: str
+    message: str
+
+
+def jsonschema_request_error() -> dict[str, Any]:
+    schema = {
+        'type': 'object',
+        'required': ['type', 'message'],
+        'additionalProperties': False,
+        'properties': {
+            'type': {'type': 'string'},
+            'message': {'type': 'string'},
+        },
+    }
+    return schema
+
+
 @dataclasses.dataclass
 class ExternalLinkLog:
     url: str
     locations: list[Location]
     access_timestamp: int
-    response: Literal['error', 'excluded'] | ResponseLog
+    response: RequestError | ResponseLog | Literal['excluded']
     is_saved: bool
 
     @property
@@ -70,8 +89,9 @@ def jsonschema_external_link_log() -> dict[str, Any]:
             },
             'response': {
                 'oneOf': [
-                    {'type': 'string', 'enum': ['error', 'excluded']},
                     jsonschema_response_log(),
+                    jsonschema_request_error(),
+                    {'type': 'string', 'enum': ['excluded']},
                 ],
             },
             'is_saved': {'type': 'boolean'},
@@ -400,7 +420,9 @@ async def _request(
                 url=link.url,
                 locations=link.locations,
                 access_timestamp=access_timestamp,
-                response='error',
+                response=RequestError(
+                        type=error.__class__.__name__,
+                        message=str(error)),
                 is_saved=False)
 
 
