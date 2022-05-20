@@ -159,21 +159,41 @@ def save_external_links(
         previous_logs = previous_log_file.load() or []
     # load previous saved list
     previous_saved_list = _load_saved_list(save_directory, logger)
-    # request logs
-    logs = _request_logs(
-            backup.external_links(),
-            previous_logs,
-            save_directory,
-            config,
-            logger)
-    # save log
-    save_path = log_directory.joinpath(
-            _ExternalLinkLogsFile.filename(backup.timestamp))
-    logger.info(f'save external links to "{save_path.as_posix()}"')
-    save_json(
-            save_path,
-            [dataclasses.asdict(log) for log in logs],
-            schema=jsonschema_external_link_logs())
+    # check if log file exists
+    if ((log_file := _ExternalLinkLogsFile.find(
+            log_directory,
+            backup.timestamp)) is not None
+            and (logs := log_file.load()) is not None):
+        logger.info(f'load external links from "{log_file.path.as_posix()}"')
+        # links
+        links = _re_request_targets(
+                logs,
+                previous_saved_list.urls
+                if previous_saved_list is not None else [],
+                config.content_types)
+        # re-request
+        _request_logs(
+                links,
+                previous_logs,
+                save_directory,
+                config,
+                logger)
+    else:
+        # request logs
+        logs = _request_logs(
+                backup.external_links(),
+                previous_logs,
+                save_directory,
+                config,
+                logger)
+        # save log
+        save_path = log_directory.joinpath(
+                _ExternalLinkLogsFile.filename(backup.timestamp))
+        logger.info(f'save external links to "{save_path.as_posix()}"')
+        save_json(
+                save_path,
+                [dataclasses.asdict(log) for log in logs],
+                schema=jsonschema_external_link_logs())
     # save list.json
     _save_saved_list(save_directory, config.content_types, logs, logger)
     # commit target
@@ -436,6 +456,26 @@ async def _request(
                         type=error.__class__.__name__,
                         message=str(error)),
                 is_saved=False)
+
+
+def _re_request_targets(
+        logs: list[ExternalLinkLog],
+        saved_urls: list[str],
+        content_types: list[str]) -> list[ExternalLink]:
+    links: list[ExternalLink] = []
+    content_type_patterns = [
+            re.compile(content_type) for content_type in content_types]
+    for log in logs:
+        # check the urls is already saved
+        if log.url in saved_urls:
+            continue
+        match log.response:
+            case ResponseLog(content_type=content_type):
+                if (content_type is not None
+                        and any(pattern.match(content_type)
+                                for pattern in content_type_patterns)):
+                    links.append(log.link)
+    return links
 
 
 def _load_saved_list(
