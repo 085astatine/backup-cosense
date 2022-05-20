@@ -159,23 +159,14 @@ def save_external_links(
         previous_logs = previous_log_file.load() or []
     # load previous saved list
     previous_saved_list = _load_saved_list(save_directory, logger)
-    # classify
-    classified_links = _classify_external_links(
+    # request logs
+    logs = _request_logs(
             backup.external_links(),
-            previous_logs)
-    # request
-    logger.info(f'request {len(classified_links.new_links)} links')
-    random.shuffle(classified_links.new_links)
-    logs = asyncio.run(_request_external_links(
-            classified_links.new_links,
+            previous_logs,
             save_directory,
             config,
-            logger))
-    # merge logs
-    logs.extend(classified_links.logs)
-    # sort by URL
-    logs.sort(key=lambda log: log.url)
-    # save
+            logger)
+    # save log
     save_path = log_directory.joinpath(
             _ExternalLinkLogsFile.filename(backup.timestamp))
     logger.info(f'save external links to "{save_path.as_posix()}"')
@@ -187,6 +178,31 @@ def save_external_links(
     _save_saved_list(save_directory, config.content_types, logs, logger)
     # commit target
     return _commit_target(save_directory, logs, previous_saved_list)
+
+
+def _request_logs(
+        links: list[ExternalLink],
+        previous_logs: list[ExternalLinkLog],
+        save_directory: _SaveDirectory,
+        config: ExternalLinkConfig,
+        logger: logging.Logger) -> list[ExternalLinkLog]:
+    # classify links
+    classified_links = _classify_external_links(
+            links,
+            previous_logs)
+    # shuffle links
+    random.shuffle(classified_links.new_links)
+    # request
+    logs = asyncio.run(_request_external_links(
+            classified_links.new_links,
+            save_directory,
+            config,
+            logger))
+    # merge previous logs into this logs
+    logs.extend(classified_links.logs)
+    # sort by URL
+    logs.sort(key=lambda log: log.url)
+    return logs
 
 
 @dataclasses.dataclass
@@ -347,6 +363,7 @@ async def _request_external_links(
             await asyncio.sleep(config.request_interval)
             return response
 
+    logger.info(f'request {len(links)} links')
     async with aiohttp.ClientSession(
             timeout=timeout,
             headers=config.request_headers) as session:
