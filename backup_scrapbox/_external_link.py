@@ -150,13 +150,19 @@ def save_external_links(
     save_directory = _SaveDirectory(
             root_directory=git_directory,
             links_directory_name=config.save_directory)
+    # load previous saved list
+    previous_saved_list = _load_saved_list(save_directory, logger)
+    # check previous content_types
+    if (previous_saved_list is not None
+            and (set(previous_saved_list.content_types)
+                 != set(config.content_types))):
+        logger.info('request all links because content types are changed')
+        request_all = True
     # load previous log
     previous_logs = (
             log_directory.load_latest(timestamp=backup.timestamp) or []
             if not request_all
             else [])
-    # load previous saved list
-    previous_saved_list = _load_saved_list(save_directory, logger)
     # check if log file exists
     if (not request_all
             and (logs := log_directory.load(backup.timestamp)) is not None):
