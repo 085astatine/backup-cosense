@@ -150,19 +150,11 @@ def save_external_links(
             root_directory=git_directory,
             links_directory_name=config.save_directory)
     # load previous log
-    previous_log_file = log_directory.find_latest(timestamp=backup.timestamp)
-    previous_logs: list[ExternalLinkLog] = []
-    if previous_log_file is not None:
-        logger.info(
-                'load external links from'
-                f' "{previous_log_file.path.as_posix()}"')
-        previous_logs = previous_log_file.load() or []
+    previous_logs = log_directory.load_latest(timestamp=backup.timestamp) or []
     # load previous saved list
     previous_saved_list = _load_saved_list(save_directory, logger)
     # check if log file exists
-    if ((log_file := log_directory.find(backup.timestamp)) is not None
-            and (logs := log_file.load()) is not None):
-        logger.info(f'load external links from "{log_file.path.as_posix()}"')
+    if (logs := log_directory.load(backup.timestamp)) is not None:
         # links
         links = _re_request_targets(
                 logs,
@@ -291,6 +283,31 @@ class _LogsDirectory:
                 (file for file in reversed(self.find_all())
                  if timestamp is None or timestamp > file.timestamp),
                 None)
+
+    def load(
+            self,
+            timestamp: int) -> Optional[list[ExternalLinkLog]]:
+        file = self.find(timestamp)
+        if file is not None:
+            self._logger.info(f'load logs from "{file.path.as_posix()}"')
+            logs = file.load()
+            if logs is not None:
+                return logs
+        return None
+
+    def load_latest(
+            self,
+            *,
+            timestamp: Optional[int] = None
+    ) -> Optional[list[ExternalLinkLog]]:
+        file = self.find_latest(timestamp=timestamp)
+        if file is not None:
+            self._logger.info(
+                    f'load latest logs from "{file.path.as_posix()}"')
+            logs = file.load()
+            if logs is not None:
+                return logs
+        return None
 
 
 @dataclasses.dataclass
