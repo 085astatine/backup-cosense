@@ -355,6 +355,9 @@ async def _request_external_links(
         save_directory: _SaveDirectory,
         config: ExternalLinkConfig,
         logger: logging.Logger) -> list[ExternalLinkLog]:
+    # connector
+    connector = aiohttp.TCPConnector(
+            limit_per_host=config.parallel_limit_per_host)
     # timeout
     timeout = aiohttp.ClientTimeout(total=config.timeout)
     # semaphore
@@ -385,6 +388,7 @@ async def _request_external_links(
 
     logger.info(f'request {len(links)} links')
     async with aiohttp.ClientSession(
+            connector=connector,
             timeout=timeout,
             headers=config.request_headers) as session:
         tasks = [

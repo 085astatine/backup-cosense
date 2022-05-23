@@ -60,6 +60,7 @@ class ExternalLinkConfig:
     log_directory: str = 'log'
     save_directory: str = 'links'
     parallel_limit: int = 5
+    parallel_limit_per_host: int = 0
     request_interval: float = 1.0
     request_headers: dict[str, str] = dataclasses.field(default_factory=dict)
     timeout: float = 30.0
@@ -78,6 +79,10 @@ def jsonschema_external_link_config() -> dict[str, Any]:
             'parallel_limit': {
                 'type': 'integer',
                 'minimum': 1,
+            },
+            'parallel_limit_per_host': {
+                'type': 'integer',
+                'minimum': 0,
             },
             'request_interval': {
                 'type': 'number',
