@@ -37,17 +37,17 @@ def jsonschema_response_log() -> dict[str, Any]:
 
 @dataclasses.dataclass(frozen=True)
 class RequestError:
-    type: str
+    error_type: str
     message: str
 
 
 def jsonschema_request_error() -> dict[str, Any]:
     schema = {
         'type': 'object',
-        'required': ['type', 'message'],
+        'required': ['error_type', 'message'],
         'additionalProperties': False,
         'properties': {
-            'type': {'type': 'string'},
+            'error_type': {'type': 'string'},
             'message': {'type': 'string'},
         },
     }
@@ -505,7 +505,7 @@ async def _request(
                 locations=link.locations,
                 access_timestamp=access_timestamp,
                 response=RequestError(
-                        type=error.__class__.__name__,
+                        error_type=error.__class__.__name__,
                         message=str(error)),
                 is_saved=False)
 
