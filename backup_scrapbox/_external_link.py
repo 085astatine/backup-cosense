@@ -141,6 +141,7 @@ def save_external_links(
         logger: Optional[logging.Logger] = None) -> CommitTarget:
     config = config or ExternalLinkConfig()
     logger = logger or logging.getLogger(__name__)
+    request_all = config.allways_request_all_links
     # log directory
     log_directory = _LogsDirectory(
             pathlib.Path(config.log_directory),
@@ -150,11 +151,15 @@ def save_external_links(
             root_directory=git_directory,
             links_directory_name=config.save_directory)
     # load previous log
-    previous_logs = log_directory.load_latest(timestamp=backup.timestamp) or []
+    previous_logs = (
+            log_directory.load_latest(timestamp=backup.timestamp) or []
+            if not request_all
+            else [])
     # load previous saved list
     previous_saved_list = _load_saved_list(save_directory, logger)
     # check if log file exists
-    if (logs := log_directory.load(backup.timestamp)) is not None:
+    if (not request_all
+            and (logs := log_directory.load(backup.timestamp)) is not None):
         # links
         links = _re_request_targets(
                 logs,

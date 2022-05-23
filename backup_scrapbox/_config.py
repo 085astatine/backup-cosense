@@ -66,6 +66,7 @@ class ExternalLinkConfig:
     timeout: float = 30.0
     content_types: list[str] = dataclasses.field(default_factory=list)
     excluded_urls: list[str] = dataclasses.field(default_factory=list)
+    allways_request_all_links: bool = False
 
 
 def jsonschema_external_link_config() -> dict[str, Any]:
@@ -106,6 +107,7 @@ def jsonschema_external_link_config() -> dict[str, Any]:
                 'type': 'array',
                 'items': {'type': 'string'},
             },
+            'allways_request_all_links': {'type': 'boolean'},
         },
     }
     return schema
