@@ -148,7 +148,7 @@ def save_external_links(
             root_directory=git_directory,
             links_directory_name=config.save_directory)
     # load previous log
-    previous_log_file = _ExternalLinkLogsFile.find_latest(
+    previous_log_file = _LogsFile.find_latest(
             log_directory,
             current=backup.timestamp)
     previous_logs: list[ExternalLinkLog] = []
@@ -160,7 +160,7 @@ def save_external_links(
     # load previous saved list
     previous_saved_list = _load_saved_list(save_directory, logger)
     # check if log file exists
-    if ((log_file := _ExternalLinkLogsFile.find(
+    if ((log_file := _LogsFile.find(
             log_directory,
             backup.timestamp)) is not None
             and (logs := log_file.load()) is not None):
@@ -188,7 +188,7 @@ def save_external_links(
                 logger)
         # save log
         save_path = log_directory.joinpath(
-                _ExternalLinkLogsFile.filename(backup.timestamp))
+                _LogsFile.filename(backup.timestamp))
         logger.info(f'save external links to "{save_path.as_posix()}"')
         save_json(
                 save_path,
@@ -226,7 +226,7 @@ def _request_logs(
 
 
 @dataclasses.dataclass
-class _ExternalLinkLogsFile:
+class _LogsFile:
     path: pathlib.Path
     timestamp: int
 
@@ -247,15 +247,15 @@ class _ExternalLinkLogsFile:
     def find(
             cls,
             directory: pathlib.Path,
-            timestamp: int) -> Optional[_ExternalLinkLogsFile]:
+            timestamp: int) -> Optional[_LogsFile]:
         path = directory.joinpath(cls.filename(timestamp))
         if path.exists():
             return cls(path=path, timestamp=timestamp)
         return None
 
     @classmethod
-    def find_all(cls, directory: pathlib.Path) -> list[_ExternalLinkLogsFile]:
-        log_files: list[_ExternalLinkLogsFile] = []
+    def find_all(cls, directory: pathlib.Path) -> list[_LogsFile]:
+        log_files: list[_LogsFile] = []
         # check if the path is directory
         if not directory.is_dir():
             return log_files
@@ -280,7 +280,7 @@ class _ExternalLinkLogsFile:
             cls,
             directory: pathlib.Path,
             *,
-            current: Optional[int] = None) -> Optional[_ExternalLinkLogsFile]:
+            current: Optional[int] = None) -> Optional[_LogsFile]:
         return next(
                 (log_file for log_file in reversed(cls.find_all(directory))
                  if current is None or current > log_file.timestamp),
