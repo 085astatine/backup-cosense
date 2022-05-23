@@ -192,7 +192,11 @@ def save_external_links(
     # save list.json
     _save_saved_list(save_directory, config.content_types, logs, logger)
     # commit target
-    return _commit_target(save_directory, logs, previous_saved_list)
+    return _commit_target(
+            save_directory,
+            logs,
+            previous_saved_list,
+            logger)
 
 
 def _request_logs(
@@ -554,7 +558,8 @@ def _save_saved_list(
 def _commit_target(
         directory: _SaveDirectory,
         logs: list[ExternalLinkLog],
-        previous_list: Optional[SavedExternalLinksInfo]) -> CommitTarget:
+        previous_list: Optional[SavedExternalLinksInfo],
+        logger: logging.Logger) -> CommitTarget:
     # saved files
     saved_files = set(
             directory.file_path(log.url) for log in logs
@@ -576,7 +581,22 @@ def _commit_target(
     # remove deleted links
     for path in deleted:
         path.unlink()
+    # remove empty directory
+    _remove_empty_directory(directory.links_directory, logger)
     return CommitTarget(
             added=added,
             updated=updated,
             deleted=deleted)
+
+
+def _remove_empty_directory(
+        directory: pathlib.Path,
+        logger: logging.Logger) -> None:
+    if directory.is_dir():
+        # recursive
+        for child in directory.iterdir():
+            _remove_empty_directory(child, logger)
+        # check if empty
+        if not list(directory.iterdir()):
+            logger.debug(f'delete empty directory: "{directory}"')
+            directory.rmdir()
