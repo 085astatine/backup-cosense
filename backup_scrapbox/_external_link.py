@@ -142,15 +142,15 @@ def save_external_links(
     config = config or ExternalLinkConfig()
     logger = logger or logging.getLogger(__name__)
     # log directory
-    log_directory = pathlib.Path(config.log_directory)
+    log_directory = _LogsDirectory(
+            pathlib.Path(config.log_directory),
+            logger)
     # save directory
     save_directory = _SaveDirectory(
             root_directory=git_directory,
             links_directory_name=config.save_directory)
     # load previous log
-    previous_log_file = _LogsFile.find_latest(
-            log_directory,
-            current=backup.timestamp)
+    previous_log_file = log_directory.find_latest(timestamp=backup.timestamp)
     previous_logs: list[ExternalLinkLog] = []
     if previous_log_file is not None:
         logger.info(
@@ -160,9 +160,7 @@ def save_external_links(
     # load previous saved list
     previous_saved_list = _load_saved_list(save_directory, logger)
     # check if log file exists
-    if ((log_file := _LogsFile.find(
-            log_directory,
-            backup.timestamp)) is not None
+    if ((log_file := log_directory.find(backup.timestamp)) is not None
             and (logs := log_file.load()) is not None):
         logger.info(f'load external links from "{log_file.path.as_posix()}"')
         # links
@@ -187,8 +185,7 @@ def save_external_links(
                 config,
                 logger)
         # save log
-        save_path = log_directory.joinpath(
-                _LogsFile.filename(backup.timestamp))
+        save_path = log_directory.file_path(backup.timestamp)
         logger.info(f'save external links to "{save_path.as_posix()}"')
         save_json(
                 save_path,
@@ -240,27 +237,38 @@ class _LogsFile:
                 for log in logs]
 
     @classmethod
-    def filename(cls, timestamp: int) -> str:
+    def file_name(cls, timestamp: int) -> str:
         return f'external_link_{timestamp}.json'
 
-    @classmethod
-    def find(
-            cls,
+
+class _LogsDirectory:
+    def __init__(
+            self,
             directory: pathlib.Path,
+            logger: logging.Logger) -> None:
+        self._directory = directory
+        self._logger = logger
+
+    def file_path(
+            self,
+            timestamp: int) -> pathlib.Path:
+        return self._directory.joinpath(_LogsFile.file_name(timestamp))
+
+    def find(
+            self,
             timestamp: int) -> Optional[_LogsFile]:
-        path = directory.joinpath(cls.filename(timestamp))
+        path = self.file_path(timestamp)
         if path.exists():
-            return cls(path=path, timestamp=timestamp)
+            return _LogsFile(path=path, timestamp=timestamp)
         return None
 
-    @classmethod
-    def find_all(cls, directory: pathlib.Path) -> list[_LogsFile]:
-        log_files: list[_LogsFile] = []
+    def find_all(self) -> list[_LogsFile]:
+        files: list[_LogsFile] = []
         # check if the path is directory
-        if not directory.is_dir():
-            return log_files
+        if not self._directory.is_dir():
+            return files
         # find external_link_{timestamp}.json
-        for path in directory.iterdir():
+        for path in self._directory.iterdir():
             # check if the path is file
             if not path.is_file():
                 continue
@@ -268,22 +276,20 @@ class _LogsFile:
             if filename_match := re.match(
                     r'external_link_(?P<timestamp>\d+).json',
                     path.name):
-                log_files.append(cls(
+                files.append(_LogsFile(
                         path=path,
                         timestamp=int(filename_match.group('timestamp'))))
         # sort by old...new
-        log_files.sort(key=lambda log_file: log_file.timestamp)
-        return log_files
+        files.sort(key=lambda file: file.timestamp)
+        return files
 
-    @classmethod
     def find_latest(
-            cls,
-            directory: pathlib.Path,
+            self,
             *,
-            current: Optional[int] = None) -> Optional[_LogsFile]:
+            timestamp: Optional[int] = None) -> Optional[_LogsFile]:
         return next(
-                (log_file for log_file in reversed(cls.find_all(directory))
-                 if current is None or current > log_file.timestamp),
+                (file for file in reversed(self.find_all())
+                 if timestamp is None or timestamp > file.timestamp),
                 None)
 
 
