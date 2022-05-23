@@ -573,6 +573,9 @@ def _commit_target(
         updated.add(list_path)
     else:
         added.add(list_path)
+    # remove deleted links
+    for path in deleted:
+        path.unlink()
     return CommitTarget(
             added=added,
             updated=updated,
