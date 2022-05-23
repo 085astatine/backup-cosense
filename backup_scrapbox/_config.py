@@ -57,6 +57,7 @@ def jsonschema_git_config() -> dict[str, Any]:
 class ExternalLinkConfig:
     # pylint: disable=too-many-instance-attributes
     enabled: bool = False
+    use_git_lfs: bool = False
     log_directory: str = 'log'
     save_directory: str = 'links'
     parallel_limit: int = 5
@@ -75,6 +76,7 @@ def jsonschema_external_link_config() -> dict[str, Any]:
         'additionalProperties': False,
         'properties': {
             'enabled': {'type': 'boolean'},
+            'use_git_lfs': {'type': 'boolean'},
             'log_directory': {'type': 'string'},
             'save_directory': {'type': 'string'},
             'parallel_limit': {
