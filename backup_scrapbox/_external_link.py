@@ -196,6 +196,7 @@ def save_external_links(
             save_directory,
             logs,
             previous_saved_list,
+            config.use_git_lfs,
             logger)
 
 
@@ -393,6 +394,9 @@ class _SaveDirectory:
     def list_path(self) -> pathlib.Path:
         return self.links_directory.joinpath('list.json')
 
+    def gitattributes_path(self) -> pathlib.Path:
+        return self.links_directory.joinpath('.gitattributes')
+
 
 async def _request_external_links(
         links: list[ExternalLink],
@@ -559,6 +563,7 @@ def _commit_target(
         directory: _SaveDirectory,
         logs: list[ExternalLinkLog],
         previous_list: Optional[SavedExternalLinksInfo],
+        use_git_lfs: bool,
         logger: logging.Logger) -> CommitTarget:
     # saved files
     saved_files = set(
@@ -578,6 +583,12 @@ def _commit_target(
         updated.add(list_path)
     else:
         added.add(list_path)
+    # .gitattributes
+    if use_git_lfs:
+        gitattributes_path = directory.gitattributes_path()
+        if not gitattributes_path.exists():
+            write_gitattributes(gitattributes_path)
+            added.add(gitattributes_path)
     # remove deleted links
     for path in deleted:
         path.unlink()
@@ -600,3 +611,10 @@ def _remove_empty_directory(
         if not list(directory.iterdir()):
             logger.debug(f'delete empty directory: "{directory}"')
             directory.rmdir()
+
+
+def write_gitattributes(path: pathlib.Path) -> None:
+    with path.open(mode='w', encoding='utf-8') as file:
+        file.write('**/* filter=lfs diff=lfs merge=lfs -text\n')
+        file.write('.gitattributes !filter !diff !merge text\n')
+        file.write('list.json !filter !diff !merge text\n')
