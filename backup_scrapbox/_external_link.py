@@ -176,13 +176,8 @@ def save_external_links(
                 save_directory,
                 config,
                 logger)
-        # save log
-        save_path = log_directory.file_path(backup.timestamp)
-        logger.info(f'save external links to "{save_path.as_posix()}"')
-        save_json(
-                save_path,
-                [dataclasses.asdict(log) for log in logs],
-                schema=jsonschema_external_link_logs())
+        # save logs
+        log_directory.save(backup.timestamp, logs)
     # save list.json
     _save_saved_list(save_directory, config.content_types, logs, logger)
     # commit target
@@ -308,6 +303,17 @@ class _LogsDirectory:
             if logs is not None:
                 return logs
         return None
+
+    def save(
+            self,
+            timestamp: int,
+            logs: list[ExternalLinkLog]) -> None:
+        path = self.file_path(timestamp)
+        self._logger.info(f'save logs to "{path.as_posix()}"')
+        save_json(
+                path,
+                [dataclasses.asdict(log) for log in logs],
+                schema=jsonschema_external_link_logs())
 
 
 @dataclasses.dataclass
