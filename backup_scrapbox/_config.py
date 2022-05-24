@@ -55,11 +55,19 @@ def jsonschema_git_config() -> dict[str, Any]:
 
 @dataclasses.dataclass(frozen=True)
 class ExternalLinkConfig:
+    # pylint: disable=too-many-instance-attributes
     enabled: bool = False
+    use_git_lfs: bool = False
     log_directory: str = 'log'
+    save_directory: str = 'links'
     parallel_limit: int = 5
+    parallel_limit_per_host: int = 0
     request_interval: float = 1.0
+    request_headers: dict[str, str] = dataclasses.field(default_factory=dict)
     timeout: float = 30.0
+    content_types: list[str] = dataclasses.field(default_factory=list)
+    excluded_urls: list[str] = dataclasses.field(default_factory=list)
+    allways_request_all_links: bool = False
 
 
 def jsonschema_external_link_config() -> dict[str, Any]:
@@ -68,19 +76,40 @@ def jsonschema_external_link_config() -> dict[str, Any]:
         'additionalProperties': False,
         'properties': {
             'enabled': {'type': 'boolean'},
+            'use_git_lfs': {'type': 'boolean'},
             'log_directory': {'type': 'string'},
+            'save_directory': {'type': 'string'},
             'parallel_limit': {
                 'type': 'integer',
                 'minimum': 1,
+            },
+            'parallel_limit_per_host': {
+                'type': 'integer',
+                'minimum': 0,
             },
             'request_interval': {
                 'type': 'number',
                 'exclusiveMinimum': 0.0,
             },
+            'request_headers': {
+                'type': 'object',
+                'additionalProperties': {
+                    'type': 'string',
+                },
+            },
             'timeout': {
                 'type': 'number',
                 'exclusiveMinimum': 0.0,
             },
+            'content_types': {
+                'type': 'array',
+                'items': {'type': 'string'},
+            },
+            'excluded_urls': {
+                'type': 'array',
+                'items': {'type': 'string'},
+            },
+            'allways_request_all_links': {'type': 'boolean'},
         },
     }
     return schema

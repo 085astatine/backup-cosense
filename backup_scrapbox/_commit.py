@@ -3,6 +3,7 @@ import pathlib
 from typing import Optional
 from ._backup import Backup, BackupStorage, DownloadedBackup
 from ._config import Config
+from ._external_link import save_external_links
 from ._git import Commit, CommitTarget, Git
 from ._utility import format_timestamp
 
@@ -33,19 +34,27 @@ def commit_backups(
         # sort pages
         backup.sort_pages(config.git.page_order)
         # commit
-        commit_backup(git, backup, logger=logger)
+        commit_backup(config, backup, logger=logger)
 
 
 def commit_backup(
-        git: Git,
+        config: Config,
         backup: Backup,
         *,
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
+    git = Git(pathlib.Path(config.git.path), logger=logger)
     # load previous backup
     previous_backup = Backup.load(backup.project, git.path)
     # update backup json
     target = _update_backup_json(backup, previous_backup, logger)
+    # external link
+    if config.external_link.enabled:
+        target.update(save_external_links(
+                backup,
+                git.path,
+                config=config.external_link,
+                logger=logger))
     # commit message
     message = Commit.message(
             backup.project,
