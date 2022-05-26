@@ -13,7 +13,7 @@ def export_backups(
         config: Config,
         destination: pathlib.Path,
         logger: logging.Logger) -> None:
-    git = Git(pathlib.Path(config.git.path), logger=logger)
+    git = config.git.git(logger=logger)
     # check if the destination exists
     if not destination.exists():
         logger.error(

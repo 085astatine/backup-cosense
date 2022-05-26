@@ -13,7 +13,7 @@ def commit_backups(
         *,
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
-    git = Git(pathlib.Path(config.git.path), logger=logger)
+    git = config.git.git(logger=logger)
     storage = BackupStorage(pathlib.Path(config.scrapbox.save_directory))
     # check if the git repository exists
     if not git.exists():
@@ -43,7 +43,7 @@ def commit_backup(
         *,
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
-    git = Git(pathlib.Path(config.git.path), logger=logger)
+    git = config.git.git(logger=logger)
     # load previous backup
     previous_backup = Backup.load(backup.project, git.path)
     # update backup json
