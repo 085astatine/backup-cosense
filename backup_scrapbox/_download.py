@@ -7,7 +7,6 @@ from ._backup import (
     BackupJSON, BackupInfoJSON, BackupStorage, jsonschema_backup,
     jsonschema_backup_info)
 from ._config import Config
-from ._git import Git
 from ._json import request_json, save_json
 from ._utility import format_timestamp
 
@@ -98,7 +97,7 @@ def _backup_filter(
         config: Config,
         logger: logging.Logger) -> Callable[[BackupInfoJSON], bool]:
     # get the latest backup timestamp from the Git repository
-    git = Git(pathlib.Path(config.git.path), logger=logger)
+    git = config.git.git(logger=logger)
     latest_timestamp = git.latest_commit_timestamp()
     logger.info(f'latest backup: {format_timestamp(latest_timestamp)}')
     # backup storage
