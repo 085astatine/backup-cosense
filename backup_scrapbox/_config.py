@@ -6,6 +6,7 @@ import dacite
 import jsonschema
 import toml
 from ._backup import PageOrder
+from ._git import Git
 
 
 @dataclasses.dataclass(frozen=True)
@@ -34,6 +35,14 @@ class GitConfig:
     path: str
     branch: Optional[str] = None
     page_order: Optional[PageOrder] = None
+
+    def git(self,
+            *,
+            logger: Optional[logging.Logger] = None) -> Git:
+        return Git(
+                pathlib.Path(self.path),
+                branch=self.branch,
+                logger=logger)
 
 
 def jsonschema_git_config() -> dict[str, Any]:
