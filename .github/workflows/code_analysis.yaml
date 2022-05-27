@@ -1,0 +1,42 @@
+name: Code Analysis
+
+on: push
+
+jobs:
+  code_check:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version:
+          - '3.10'
+
+    steps:
+      # Checkout
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Setup Python
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Setup .venv
+      - name: Setup Poetry
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry install --no-interaction
+
+      # Mypy
+      - name: Mypy
+        run: poetry run mypy backup_scrapbox
+
+      # Pylint
+      - name: Pylint
+        run: poetry run pylint backup_scrapbox
+
+      # pycodestyle
+      - name: pycodestyle
+        run: poetry run pycodestyle backup_scrapbox
