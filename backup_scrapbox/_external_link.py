@@ -191,6 +191,9 @@ def save_external_links(
         log_directory.save(backup.timestamp, logs)
     # save list.json
     _save_saved_list(save_directory, config.content_types, logs, logger)
+    # clean logs
+    if config.keep_logs != 'all':
+        log_directory.clean(config.keep_logs)
     # commit target
     return _commit_target(
             save_directory,
@@ -330,6 +333,18 @@ class _LogsDirectory:
                 path,
                 [dataclasses.asdict(log) for log in logs],
                 schema=jsonschema_external_link_logs())
+
+    def clean(
+            self,
+            keep: int) -> None:
+        if keep >= 0:
+            targets = list(reversed(self.find_all()))[keep:]
+            self._logger.info(f'clean {len(targets)} log files')
+            for target in targets:
+                self._logger.info(f'delete log file: {target.path.as_posix()}')
+                target.path.unlink()
+        else:
+            self._logger.warning(f'skip clean: keep({keep}) must be >= 0')
 
 
 @dataclasses.dataclass
