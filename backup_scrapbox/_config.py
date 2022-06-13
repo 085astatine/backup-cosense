@@ -1,7 +1,7 @@
 import dataclasses
 import logging
 import pathlib
-from typing import Any, Optional, get_args
+from typing import Any, Literal, Optional, get_args
 import dacite
 import jsonschema
 import toml
@@ -77,6 +77,7 @@ class ExternalLinkConfig:
     content_types: list[str] = dataclasses.field(default_factory=list)
     excluded_urls: list[str] = dataclasses.field(default_factory=list)
     allways_request_all_links: bool = False
+    keep_logs: int | Literal['all'] = 'all'
 
 
 def jsonschema_external_link_config() -> dict[str, Any]:
@@ -119,6 +120,12 @@ def jsonschema_external_link_config() -> dict[str, Any]:
                 'items': {'type': 'string'},
             },
             'allways_request_all_links': {'type': 'boolean'},
+            'keep_logs': {
+                'oneOf': [
+                    {'type': 'integer', 'minimum': 0},
+                    {'type': 'string', 'enum': ['all']},
+                ],
+            },
         },
     }
     return schema
