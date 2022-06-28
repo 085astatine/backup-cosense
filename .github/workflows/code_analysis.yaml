@@ -3,7 +3,7 @@ name: Code Analysis
 on: push
 
 jobs:
-  code_check:
+  code_analysis:
     runs-on: ubuntu-latest
 
     strategy:
