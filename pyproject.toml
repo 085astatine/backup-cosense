@@ -31,7 +31,7 @@ warn_redundant_casts = true
 disable = [
     "missing-module-docstring",  # C0114
     "missing-class-docstring",  # C0115
-    "missing-function-docstring",  #C0116
+    "missing-function-docstring",  # C0116
     "consider-using-f-string",  # C0209
     "logging-fstring-interpolation",  # W1203
 ]
