@@ -34,12 +34,32 @@ def jsonschema_backup_info() -> dict[str, Any]:
     return schema
 
 
+class BackupPageLineJSON(TypedDict):
+    text: str
+    created: int
+    updated: int
+
+
+def jsonschema_backup_page_line() -> dict[str, Any]:
+    schema = {
+      'type': 'object',
+      'requred': ['text', 'created', 'updated'],
+      'additionalProperties': False,
+      'properties': {
+        'text': {'type': 'string'},
+        'created': {'type': 'integer'},
+        'updated': {'type': 'integer'},
+      },
+    }
+    return schema
+
+
 class BackupPageJSON(TypedDict):
     title: str
     created: int
     updated: int
     id: str
-    lines: list[str]
+    lines: list[str] | list[BackupPageLineJSON]
     linksLc: list[str]
 
 
@@ -54,8 +74,16 @@ def jsonschema_backup_page() -> dict[str, Any]:
         'updated': {'type': 'integer'},
         'id': {'type': 'string'},
         'lines': {
-          'type': 'array',
-          'items': {'type': 'string'},
+          'oneOf': [
+            {
+              'type': 'array',
+              'items': {'type': 'string'},
+            },
+            {
+              'type': 'array',
+              'items': jsonschema_backup_page_line(),
+            },
+          ],
         },
         'linksLc': {
           'type': 'array',
