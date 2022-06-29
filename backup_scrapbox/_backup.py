@@ -34,13 +34,42 @@ def jsonschema_backup_info() -> dict[str, Any]:
     return schema
 
 
+class BackupPageLineJSON(TypedDict):
+    text: str
+    created: int
+    updated: int
+
+
+def jsonschema_backup_page_line() -> dict[str, Any]:
+    schema = {
+      'type': 'object',
+      'requred': ['text', 'created', 'updated'],
+      'additionalProperties': False,
+      'properties': {
+        'text': {'type': 'string'},
+        'created': {'type': 'integer'},
+        'updated': {'type': 'integer'},
+      },
+    }
+    return schema
+
+
 class BackupPageJSON(TypedDict):
     title: str
     created: int
     updated: int
     id: str
-    lines: list[str]
+    lines: list[str] | list[BackupPageLineJSON]
     linksLc: list[str]
+
+
+def page_lines(page: BackupPageJSON) -> Generator[str, None, None]:
+    for line in page['lines']:
+        match line:
+            case str():
+                yield line
+            case {'text': text}:
+                yield text
 
 
 def jsonschema_backup_page() -> dict[str, Any]:
@@ -54,8 +83,16 @@ def jsonschema_backup_page() -> dict[str, Any]:
         'updated': {'type': 'integer'},
         'id': {'type': 'string'},
         'lines': {
-          'type': 'array',
-          'items': {'type': 'string'},
+          'oneOf': [
+            {
+              'type': 'array',
+              'items': {'type': 'string'},
+            },
+            {
+              'type': 'array',
+              'items': jsonschema_backup_page_line(),
+            },
+          ],
         },
         'linksLc': {
           'type': 'array',
@@ -380,7 +417,7 @@ def _filter_code(
     # code block
     code_block_indent_level: Optional[int] = None
     # iterate lines
-    for i, line in enumerate(page['lines']):
+    for i, line in enumerate(page_lines(page)):
         # in code block
         if code_block_indent_level is not None:
             indent_match = indent.match(line)
