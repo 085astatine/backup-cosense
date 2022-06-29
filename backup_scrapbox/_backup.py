@@ -63,6 +63,15 @@ class BackupPageJSON(TypedDict):
     linksLc: list[str]
 
 
+def page_lines(page: BackupPageJSON) -> Generator[str, None, None]:
+    for line in page['lines']:
+        match line:
+            case str():
+                yield line
+            case {'text': text}:
+                yield text
+
+
 def jsonschema_backup_page() -> dict[str, Any]:
     schema = {
       'type': 'object',
@@ -408,7 +417,7 @@ def _filter_code(
     # code block
     code_block_indent_level: Optional[int] = None
     # iterate lines
-    for i, line in enumerate(page['lines']):
+    for i, line in enumerate(page_lines(page)):
         # in code block
         if code_block_indent_level is not None:
             indent_match = indent.match(line)
