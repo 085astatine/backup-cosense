@@ -196,10 +196,10 @@ def save_external_links(
         log_directory.clean(config.keep_logs)
     # commit target
     return _commit_target(
+            config,
             save_directory,
             logs,
             previous_saved_list,
-            config.use_git_lfs,
             logger)
 
 
@@ -580,10 +580,10 @@ def _save_saved_list(
 
 
 def _commit_target(
+        config: ExternalLinkConfig,
         directory: _SaveDirectory,
         logs: list[ExternalLinkLog],
         previous_list: Optional[SavedExternalLinksInfo],
-        use_git_lfs: bool,
         logger: logging.Logger) -> CommitTarget:
     # saved files
     saved_files = set(
@@ -596,7 +596,9 @@ def _commit_target(
     # added / updated / deleted
     added = saved_files - previous_saved_files
     updated = saved_files & previous_saved_files
-    deleted = previous_saved_files - saved_files
+    deleted: set[pathlib.Path] = set()
+    if not config.keep_deleted_links:
+        deleted.update(previous_saved_files - saved_files)
     # list.json
     list_path = directory.list_path()
     if list_path.exists():
@@ -604,7 +606,7 @@ def _commit_target(
     else:
         added.add(list_path)
     # .gitattributes
-    if use_git_lfs:
+    if config.use_git_lfs:
         gitattributes_path = directory.gitattributes_path()
         if not gitattributes_path.exists():
             write_gitattributes(gitattributes_path)
