@@ -78,6 +78,7 @@ class ExternalLinkConfig:
     excluded_urls: list[str] = dataclasses.field(default_factory=list)
     allways_request_all_links: bool = False
     keep_logs: int | Literal['all'] = 'all'
+    keep_deleted_links: bool = False
 
 
 def jsonschema_external_link_config() -> dict[str, Any]:
@@ -126,6 +127,7 @@ def jsonschema_external_link_config() -> dict[str, Any]:
                     {'type': 'string', 'enum': ['all']},
                 ],
             },
+            'keep_deleted_links': {'type': 'boolean'},
         },
     }
     return schema
