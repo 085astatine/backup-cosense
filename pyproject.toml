@@ -7,19 +7,19 @@ license = ""
 
 [tool.poetry.dependencies]
 python = "^3.10"
-aiohttp = "^3.8.1"
-dacite = "^1.6.0"
-jsonschema = "^4.6.0"
-requests = "^2.28.0"
+aiohttp = "^3.8.3"
+dacite = "^1.8.0"
+jsonschema = "^4.17.3"
+requests = "^2.28.2"
 toml = "^0.10.2"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.961"
-pycodestyle = "^2.8.0"
-pylint = "^2.14.3"
-types-jsonschema = "^4.6.0"
-types-requests = "^2.28.0"
-types-toml = "^0.10.7"
+pycodestyle = "^2.10.0"
+pylint = "^2.16.1"
+types-jsonschema = "^4.17.0"
+types-requests = "^2.28.11"
+types-toml = "^0.10.8"
 
 [tool.mypy]
 check_untyped_defs = true
