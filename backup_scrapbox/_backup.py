@@ -210,9 +210,8 @@ class Backup:
 
     def internal_links(self) -> list[InternalLink]:
         # page
-        pages = dict(
-                (_normalize_page_title(page), page)
-                for page in self.page_titles())
+        pages = {_normalize_page_title(page): page
+                 for page in self.page_titles()}
         # links
         links: list[InternalLink] = []
         for page in self._backup['pages']:

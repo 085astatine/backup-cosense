@@ -364,8 +364,7 @@ def _classify_external_links(
         links: list[ExternalLink],
         previous_logs: list[ExternalLinkLog]) -> _ClassifiedExternalLinks:
     # link & log pair
-    pairs: dict[str, _LinkLogPair] = dict(
-            (link.url, _LinkLogPair(link=link)) for link in links)
+    pairs = {link.url: _LinkLogPair(link=link) for link in links}
     for log in previous_logs:
         if log.url in pairs:
             pairs[log.url].log = log
