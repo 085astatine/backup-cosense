@@ -128,7 +128,7 @@ def jsonschema_backup() -> dict[str, Any]:
     return schema
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(order=True)
 class Location:
     title: str
     line: int
@@ -247,7 +247,10 @@ class Backup:
                         links.append(ExternalLink(
                                 url=url,
                                 locations=[location]))
+        # sort
         links.sort(key=lambda link: link.url)
+        for link in links:
+            link.locations.sort()
         return links
 
     def sort_pages(
