@@ -34,10 +34,7 @@ def backup_scrapbox(
     # download backup
     if option.target in (None, 'download'):
         logger.info('target: download')
-        download_backups(
-                config,
-                logger=logger,
-                request_interval=option.request_interval)
+        download_backups(config, logger=logger)
     # commit
     if option.target in (None, 'commit'):
         logger.info('target: commit')
@@ -56,13 +53,11 @@ def _argument_parser() -> argparse.ArgumentParser:
             help='default: download & commit')
     # default: download & commit
     _add_common_arguments(parser)
-    _add_download_arguments(parser)
     # download
     download_parser = sub_parsers.add_parser(
             'download',
             help='download backup from scrapbox.io')
     _add_common_arguments(download_parser)
-    _add_download_arguments(download_parser)
     # commit
     commit_parser = sub_parsers.add_parser(
             'commit',
@@ -92,17 +87,6 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
             dest='verbose',
             action='store_true',
             help='set log level to debug')
-
-
-def _add_download_arguments(parser: argparse.ArgumentParser) -> None:
-    # request interval
-    parser.add_argument(
-            '--request-interval',
-            dest='request_interval',
-            type=float,
-            default=3.0,
-            metavar='SECONDS',
-            help='request interval seconds (default %(default)s)')
 
 
 def _add_export_arguments(parser: argparse.ArgumentParser) -> None:

@@ -35,20 +35,19 @@ def jsonschema_backup_list() -> dict[str, Any]:
 def download_backups(
         config: Config,
         *,
-        logger: Optional[logging.Logger] = None,
-        request_interval: float = 3.0) -> None:
+        logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
     with _session(config) as session:
         # list
         backup_list = _request_backup_list(config, session, logger)
-        time.sleep(request_interval)
+        time.sleep(config.scrapbox.request_interval)
         if not backup_list:
             return
         # backup
         for info in filter(_backup_filter(config, logger), backup_list):
             # download
             _download_backup(config, session, info, logger)
-            time.sleep(request_interval)
+            time.sleep(config.scrapbox.request_interval)
 
 
 def _base_url(config: Config) -> str:
