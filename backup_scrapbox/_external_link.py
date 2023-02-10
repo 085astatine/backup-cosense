@@ -364,8 +364,7 @@ def _classify_external_links(
         links: list[ExternalLink],
         previous_logs: list[ExternalLinkLog]) -> _ClassifiedExternalLinks:
     # link & log pair
-    pairs: dict[str, _LinkLogPair] = dict(
-            (link.url, _LinkLogPair(link=link)) for link in links)
+    pairs = {link.url: _LinkLogPair(link=link) for link in links}
     for log in previous_logs:
         if log.url in pairs:
             pairs[log.url].log = log
@@ -586,9 +585,9 @@ def _commit_target(
         previous_list: Optional[SavedExternalLinksInfo],
         logger: logging.Logger) -> CommitTarget:
     # saved files
-    saved_files = set(
+    saved_files = {
             directory.file_path(log.url) for log in logs
-            if log.is_saved)
+            if log.is_saved}
     previous_saved_files: set[pathlib.Path] = set()
     if previous_list is not None:
         previous_saved_files.update(

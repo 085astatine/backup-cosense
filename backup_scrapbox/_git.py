@@ -78,9 +78,9 @@ class CommitTarget:
         self.validate()
 
     def normalize(self) -> None:
-        self.added = set(path.resolve() for path in self.added)
-        self.updated = set(path.resolve() for path in self.updated)
-        self.deleted = set(path.resolve() for path in self.deleted)
+        self.added = {path.resolve() for path in self.added}
+        self.updated = {path.resolve() for path in self.updated}
+        self.deleted = {path.resolve() for path in self.deleted}
 
     def validate(self) -> None:
         errors: list[str] = []
