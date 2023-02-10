@@ -585,9 +585,9 @@ def _commit_target(
         previous_list: Optional[SavedExternalLinksInfo],
         logger: logging.Logger) -> CommitTarget:
     # saved files
-    saved_files = set(
+    saved_files = {
             directory.file_path(log.url) for log in logs
-            if log.is_saved)
+            if log.is_saved}
     previous_saved_files: set[pathlib.Path] = set()
     if previous_list is not None:
         previous_saved_files.update(
