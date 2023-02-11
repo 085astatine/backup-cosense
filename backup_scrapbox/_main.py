@@ -47,27 +47,23 @@ def backup_scrapbox(
 
 def _argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
+    _add_common_arguments(parser)
     # sub parser
     sub_parsers = parser.add_subparsers(
             dest='target',
             help='default: download & commit')
-    # default: download & commit
-    _add_common_arguments(parser)
     # download
-    download_parser = sub_parsers.add_parser(
+    sub_parsers.add_parser(
             'download',
             help='download backup from scrapbox.io')
-    _add_common_arguments(download_parser)
     # commit
-    commit_parser = sub_parsers.add_parser(
+    sub_parsers.add_parser(
             'commit',
             help='commit to Git repository')
-    _add_common_arguments(commit_parser)
     # export
     export_parser = sub_parsers.add_parser(
             'export',
             help='export backups from Git repository')
-    _add_common_arguments(export_parser)
     _add_export_arguments(export_parser)
     return parser
 
