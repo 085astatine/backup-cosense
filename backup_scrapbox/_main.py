@@ -46,7 +46,7 @@ def backup_scrapbox(
 
 
 def _argument_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(prog=__package__)
     _add_common_arguments(parser)
     # sub parser
     sub_parsers = parser.add_subparsers(
