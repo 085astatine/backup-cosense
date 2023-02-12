@@ -51,7 +51,10 @@ def _argument_parser() -> argparse.ArgumentParser:
     # sub parser
     sub_parsers = parser.add_subparsers(
             dest='target',
-            help='default: download & commit')
+            title='command',
+            description=(
+                    'command to be executed '
+                    '(if not specified, download and commit are executed)'))
     # download
     sub_parsers.add_parser(
             'download',
