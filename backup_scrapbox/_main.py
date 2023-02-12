@@ -32,47 +32,41 @@ def backup_scrapbox(
     # main
     logger.info('backup-scrapbox')
     # download backup
-    if option.target in (None, 'download'):
-        logger.info('target: download')
-        download_backups(
-                config,
-                logger=logger,
-                request_interval=option.request_interval)
+    if option.command in (None, 'download'):
+        logger.info('command: download')
+        download_backups(config, logger=logger)
     # commit
-    if option.target in (None, 'commit'):
-        logger.info('target: commit')
+    if option.command in (None, 'commit'):
+        logger.info('command: commit')
         commit_backups(config, logger=logger)
     # export
-    if option.target == 'export':
-        logger.info('target: export')
+    if option.command == 'export':
+        logger.info('command: export')
         export_backups(config, option.destination, logger=logger)
 
 
 def _argument_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(prog=__package__)
+    _add_common_arguments(parser)
     # sub parser
     sub_parsers = parser.add_subparsers(
-            dest='target',
-            help='default: download & commit')
-    # default: download & commit
-    _add_common_arguments(parser)
-    _add_download_arguments(parser)
+            dest='command',
+            title='command',
+            description=(
+                    'command to be executed '
+                    '(if not specified, download and commit are executed)'))
     # download
-    download_parser = sub_parsers.add_parser(
+    sub_parsers.add_parser(
             'download',
             help='download backup from scrapbox.io')
-    _add_common_arguments(download_parser)
-    _add_download_arguments(download_parser)
     # commit
-    commit_parser = sub_parsers.add_parser(
+    sub_parsers.add_parser(
             'commit',
             help='commit to Git repository')
-    _add_common_arguments(commit_parser)
     # export
     export_parser = sub_parsers.add_parser(
             'export',
             help='export backups from Git repository')
-    _add_common_arguments(export_parser)
     _add_export_arguments(export_parser)
     return parser
 
@@ -92,17 +86,6 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
             dest='verbose',
             action='store_true',
             help='set log level to debug')
-
-
-def _add_download_arguments(parser: argparse.ArgumentParser) -> None:
-    # request interval
-    parser.add_argument(
-            '--request-interval',
-            dest='request_interval',
-            type=float,
-            default=3.0,
-            metavar='SECONDS',
-            help='request interval seconds (default %(default)s)')
 
 
 def _add_export_arguments(parser: argparse.ArgumentParser) -> None:

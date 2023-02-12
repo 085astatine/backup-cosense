@@ -14,6 +14,7 @@ class ScrapboxConfig:
     project: str
     session_id: str
     save_directory: str
+    request_interval: float = 3.0
 
 
 def jsonschema_scrapbox_config() -> dict[str, Any]:
@@ -25,6 +26,10 @@ def jsonschema_scrapbox_config() -> dict[str, Any]:
             'project': {'type': 'string'},
             'session_id': {'type': 'string'},
             'save_directory': {'type': 'string'},
+            'request_interval': {
+                'type': 'number',
+                'exclusiveMinimum': 0.0,
+            },
         },
     }
     return schema
