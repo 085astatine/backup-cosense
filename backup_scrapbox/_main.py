@@ -32,16 +32,16 @@ def backup_scrapbox(
     # main
     logger.info('backup-scrapbox')
     # download backup
-    if option.target in (None, 'download'):
-        logger.info('target: download')
+    if option.command in (None, 'download'):
+        logger.info('command: download')
         download_backups(config, logger=logger)
     # commit
-    if option.target in (None, 'commit'):
-        logger.info('target: commit')
+    if option.command in (None, 'commit'):
+        logger.info('command: commit')
         commit_backups(config, logger=logger)
     # export
-    if option.target == 'export':
-        logger.info('target: export')
+    if option.command == 'export':
+        logger.info('command: export')
         export_backups(config, option.destination, logger=logger)
 
 
@@ -50,7 +50,7 @@ def _argument_parser() -> argparse.ArgumentParser:
     _add_common_arguments(parser)
     # sub parser
     sub_parsers = parser.add_subparsers(
-            dest='target',
+            dest='command',
             title='command',
             description=(
                     'command to be executed '
