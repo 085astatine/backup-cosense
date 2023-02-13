@@ -79,7 +79,7 @@ def _export_json(
         output: pathlib.Path,
         schema: Optional[dict[str, Any]]) -> bool:
     # get from git
-    command = ['git', 'show', '-z', f'{commit_hash}:{file}']
+    command = ['git', 'show', f'{commit_hash}:{file}']
     try:
         process = git.execute(command)
     except subprocess.CalledProcessError:
