@@ -1,8 +1,8 @@
 import logging
 import pathlib
 import subprocess
-from typing import Optional
-from ._backup import BackupJSON, jsonschema_backup
+from typing import Any, Optional
+from ._backup import jsonschema_backup, jsonschema_backup_info
 from ._config import Config
 from ._git import Git, Commit
 from ._json import parse_json, save_json
@@ -44,23 +44,49 @@ def _export(
         commit: Commit,
         destination: pathlib.Path,
         logger: logging.Logger) -> None:
-    # get backup.json
-    command = ['git', 'show', '-z', f'{commit.hash}:{project}.json']
+    # save backup.json
+    backup_path = destination.joinpath(f'{commit.timestamp}.json')
+    if not _export_json(
+            git,
+            commit.hash,
+            f'{project}.json',
+            backup_path,
+            jsonschema_backup()):
+        logger.warning(f'skip commit: {commit.hash}')
+        return
+    logger.debug(f'save "{backup_path}"')
+    # save backup.info.json
+    info_path = destination.joinpath(f'{commit.timestamp}.info.json')
+    if _export_json(
+            git,
+            commit.hash,
+            f'{project}.info.json',
+            info_path,
+            jsonschema_backup_info()):
+        logger.debug(f'save "{info_path}"')
+    else:
+        # from commit message
+        info_json = commit.backup_info()
+        if info_json is not None:
+            save_json(info_path, info_json)
+            logger.debug(f'save "{info_path}"')
+
+
+def _export_json(
+        git: Git,
+        commit_hash: str,
+        file: str,
+        output: pathlib.Path,
+        schema: Optional[dict[str, Any]]) -> bool:
+    # get from git
+    command = ['git', 'show', f'{commit_hash}:{file}']
     try:
         process = git.execute(command)
     except subprocess.CalledProcessError:
-        logger.warning(f'skip commit: {commit.hash}')
-        return
-    backup_json: Optional[BackupJSON] = parse_json(
-            process.stdout,
-            schema=jsonschema_backup())
-    # save backup.json
-    backup_json_path = destination.joinpath(f'{commit.timestamp}.json')
-    save_json(backup_json_path, backup_json)
-    logger.debug(f'save "{backup_json_path}"')
-    # save backup.info.json
-    info_json_path = destination.joinpath(f'{commit.timestamp}.info.json')
-    info_json = commit.backup_info()
-    if info_json is not None:
-        logger.debug(f'save "{info_json_path}"')
-        save_json(info_json_path, info_json)
+        return False
+    # save
+    save_json(
+            output,
+            parse_json(process.stdout),
+            schema=schema)
+    return True
