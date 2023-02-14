@@ -49,6 +49,8 @@ class GitConfig:
         return Git(
                 pathlib.Path(self.path),
                 branch=self.branch,
+                user_name=self.user_name,
+                user_email=self.user_email,
                 logger=logger)
 
 

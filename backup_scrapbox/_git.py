@@ -110,9 +110,13 @@ class Git:
             path: pathlib.Path,
             *,
             branch: Optional[str] = None,
+            user_name: Optional[str] = None,
+            user_email: Optional[str] = None,
             logger: Optional[logging.Logger] = None) -> None:
         self._path = path
         self._branch = branch
+        self._user_name = user_name
+        self._user_email = user_email
         self._logger = logger or logging.getLogger(__name__)
 
     @property
