@@ -171,6 +171,21 @@ class Git:
                 logger=self._logger,
                 env=env)
 
+    def init(self) -> None:
+        # check if Git repository already exists
+        if self.exists():
+            self._logger.error(
+                    f'git repository "{self.path}" already exists')
+            return
+        # mkdir
+        if not self.path.exists():
+            self.path.mkdir(parents=True)
+        # git init
+        _execute_git_command(
+            ['git', 'init'],
+            self.path,
+            logger=self._logger)
+
     def ls_files(self) -> list[pathlib.Path]:
         process = self.execute(['git', 'ls-files', '-z'])
         return [self.path.joinpath(path)
