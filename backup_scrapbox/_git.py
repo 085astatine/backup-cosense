@@ -176,8 +176,13 @@ class Git:
             self.execute(['git', 'add', updated.as_posix()])
         for deleted in target.deleted:
             self.execute(['git', 'rm', '--cached', deleted.as_posix()])
-        # commit
-        command = ['git', 'commit', '--message', message]
+        # command
+        command: list[str] = ['git']
+        if self._user_name is not None:
+            command.extend(['-c', f'user.name={self._user_name}'])
+        if self._user_email is not None:
+            command.extend(['-c', f'user.email={self._user_email}'])
+        command.extend(['commit', '--message', message])
         if option is not None:
             command.extend(option)
         # set: commit date & author date
