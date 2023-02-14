@@ -127,7 +127,19 @@ class Git:
         return self._path
 
     def exists(self) -> bool:
-        return self.path.is_dir() and self.path.joinpath('.git').is_dir()
+        # check if path exists
+        if not self.path.is_dir():
+            return False
+        # check if path == `git rev-perse --show-toplevel`
+        try:
+            process = _execute_git_command(
+                    ['git', 'rev-parse', '--show-toplevel'],
+                    self.path,
+                    logger=self._logger)
+            toplevel = pathlib.Path(process.stdout.removesuffix('\n'))
+        except subprocess.CalledProcessError:
+            return False
+        return self.path.resolve() == toplevel
 
     def execute(
             self,
