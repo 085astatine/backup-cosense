@@ -103,6 +103,9 @@ class CommitTarget:
         self.validate()
         return self
 
+    def is_empty(self) -> bool:
+        return not (self.added or self.updated or self.deleted)
+
 
 class Git:
     def __init__(
@@ -183,6 +186,8 @@ class Git:
         if self._user_email is not None:
             command.extend(['-c', f'user.email={self._user_email}'])
         command.extend(['commit', '--message', message])
+        if target.is_empty():
+            command.append('--allow-empty')
         if option is not None:
             command.extend(option)
         # set: commit date & author date
