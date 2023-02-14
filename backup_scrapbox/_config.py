@@ -40,6 +40,8 @@ class GitConfig:
     path: str
     branch: Optional[str] = None
     page_order: Optional[PageOrder] = None
+    user_name: Optional[str] = None
+    user_email: Optional[str] = None
 
     def git(self,
             *,
@@ -61,6 +63,12 @@ def jsonschema_git_config() -> dict[str, Any]:
             'page_order': {
                 'type': ['string', 'null'],
                 'enum': [None, *get_args(PageOrder)],
+            },
+            'user_name': {
+                'type': ['string', 'null'],
+            },
+            'user_email': {
+                'type': ['string', 'null'],
             },
         },
     }
