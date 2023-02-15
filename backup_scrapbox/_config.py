@@ -36,12 +36,38 @@ def jsonschema_scrapbox_config() -> dict[str, Any]:
 
 
 @dataclasses.dataclass(frozen=True)
+class GitEmptyInitialCommitConfig:
+    message: str = 'Initial commit'
+    timestamp: (
+        Literal['oldest_backup', 'oldest_created_page']
+    ) = 'oldest_created_page'
+
+
+def jsonschema_git_empty_initial_commit_config() -> dict[str, Any]:
+    schema = {
+        'type': 'object',
+        'additionalProperties': False,
+        'properties': {
+            'message': {'type': 'string'},
+            'timestamp': {
+                'enum': [
+                    'oldest_backup',
+                    'oldest_created_page',
+                ],
+            },
+        },
+    }
+    return schema
+
+
+@dataclasses.dataclass(frozen=True)
 class GitConfig:
     path: str
     branch: Optional[str] = None
     page_order: Optional[PageOrder] = None
     user_name: Optional[str] = None
     user_email: Optional[str] = None
+    empty_initial_commit: Optional[GitEmptyInitialCommitConfig] = None
 
     def git(self,
             *,
@@ -72,6 +98,8 @@ def jsonschema_git_config() -> dict[str, Any]:
             'user_email': {
                 'type': ['string', 'null'],
             },
+            'empty_initial_commit':
+                jsonschema_git_empty_initial_commit_config(),
         },
     }
     return schema
