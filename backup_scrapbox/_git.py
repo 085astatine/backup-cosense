@@ -181,8 +181,11 @@ class Git:
         if not self.path.exists():
             self.path.mkdir(parents=True)
         # git init
+        command = ['git', 'init']
+        if self._branch is not None:
+            command.extend(['--initial-branch', self._branch])
         _execute_git_command(
-            ['git', 'init'],
+            command,
             self.path,
             logger=self._logger)
 
