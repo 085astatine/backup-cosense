@@ -154,7 +154,7 @@ class Git:
         # switch branch
         if self._branch is not None:
             branch = _execute_git_command(
-                    ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                    ['git', 'branch', '--show-current'],
                     self.path,
                     logger=self._logger).stdout.rstrip('\n')
             if branch != self._branch:
