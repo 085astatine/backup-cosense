@@ -135,7 +135,8 @@ class Git:
             process = _execute_git_command(
                     ['git', 'rev-parse', '--show-toplevel'],
                     self.path,
-                    logger=self._logger)
+                    logger=self._logger,
+                    ignore_error=True)
             toplevel = pathlib.Path(process.stdout.removesuffix('\n'))
         except subprocess.CalledProcessError:
             return False
@@ -145,6 +146,7 @@ class Git:
             self,
             command: list[str],
             *,
+            ignore_error: bool = False,
             env: Optional[dict[str, str]] = None
     ) -> subprocess.CompletedProcess:
         self._logger.debug(f'command: {command}')
@@ -169,6 +171,7 @@ class Git:
                 command,
                 self.path,
                 logger=self._logger,
+                ignore_error=ignore_error,
                 env=env)
 
     def init(self) -> None:
@@ -266,7 +269,12 @@ class Git:
                     f'git repository "{self.path}" does not exist')
             return None
         # git show -s --format=%ct
-        process = self.execute(['git', 'show', '-s', '--format=%ct'])
+        try:
+            process = self.execute(
+                ['git', 'show', '-s', '--format=%ct'],
+                ignore_error=True)
+        except subprocess.CalledProcessError:
+            return None
         timestamp = process.stdout.rstrip('\n')
         if timestamp.isdigit():
             return int(timestamp)
@@ -278,6 +286,7 @@ def _execute_git_command(
         repository: pathlib.Path,
         *,
         logger: Optional[logging.Logger] = None,
+        ignore_error: bool = False,
         env: Optional[dict[str, str]] = None) -> subprocess.CompletedProcess:
     logger = logger or logging.getLogger(__name__)
     try:
@@ -295,7 +304,10 @@ def _execute_git_command(
                 'command': error.cmd,
                 'stdout': error.stdout,
                 'stderr': error.stderr}
-        logger.error(f'{error.__class__.__name__}: {error_info}')
+        if ignore_error:
+            logger.debug(f'{error.__class__.__name__}: {error_info}')
+        else:
+            logger.error(f'{error.__class__.__name__}: {error_info}')
         raise error
     return process
 
