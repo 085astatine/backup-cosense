@@ -1,8 +1,9 @@
+import datetime
 import logging
 import pathlib
 from typing import Optional
 from ._backup import Backup, BackupStorage, DownloadedBackup
-from ._config import Config
+from ._config import Config, GitEmptyInitialCommitConfig
 from ._external_link import save_external_links
 from ._git import Commit, CommitTarget, Git
 from ._utility import format_timestamp
@@ -67,6 +68,10 @@ def commit_backup(
             timestamp=backup.timestamp)
 
 
+class InitialCommitError(Exception):
+    pass
+
+
 def _backup_targets(
         storage: BackupStorage,
         git: Git,
@@ -103,3 +108,47 @@ def _update_backup_json(
             added=next_files - previous_files,
             updated=next_files & previous_files,
             deleted=previous_files - next_files)
+
+
+def _initial_commit_timestamp(
+        config: GitEmptyInitialCommitConfig,
+        backups: list[DownloadedBackup]) -> int:
+    match config.timestamp:
+        case datetime.datetime():
+            return int(config.timestamp.timestamp())
+        case datetime.date():
+            # add time(00:00:00) to date
+            return int(datetime.datetime.combine(
+                    config.timestamp,
+                    datetime.time()).timestamp())
+        case 'oldest_backup':
+            timestamp = min(
+                    (backup.timestamp for backup in backups),
+                    default=None)
+            if timestamp is None:
+                raise InitialCommitError(
+                    'Since there is no backup, '
+                    'unable to define timestamp')
+            return timestamp
+        case 'oldest_created_page':
+            oldest_backup = min(
+                    backups,
+                    default=None,
+                    key=lambda backup: backup.timestamp)
+            if oldest_backup is None:
+                raise InitialCommitError(
+                    'Since there is no backup, '
+                    'unable to define timestamp')
+            backup = oldest_backup.load_backup()
+            if backup is None:
+                raise InitialCommitError(
+                    'Could not load oldest backup'
+                    f' "{oldest_backup.backup_path}"')
+            timestamp = min(
+                    (page['created'] for page in backup['pages']),
+                    default=None)
+            if timestamp is None:
+                raise InitialCommitError(
+                    'There is no page in oldest backup'
+                    f' "{oldest_backup.backup_path}"')
+            return timestamp
