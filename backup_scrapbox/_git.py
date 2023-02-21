@@ -174,6 +174,18 @@ class Git:
                 ignore_error=ignore_error,
                 env=env)
 
+    def branches(self) -> list[str]:
+        try:
+            process = _execute_git_command(
+                    ['git', 'branch', '--list'],
+                    self.path,
+                    ignore_error=True,
+                    logger=self._logger)
+            return [line.lstrip('* ') for line in process.stdout.splitlines()]
+        except subprocess.CalledProcessError:
+            pass
+        return []
+
     def init(self) -> None:
         # check if Git repository already exists
         if self.exists():
