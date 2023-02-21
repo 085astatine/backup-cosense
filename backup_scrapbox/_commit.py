@@ -45,6 +45,8 @@ def commit_backup(
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
     git = config.git.git(logger=logger)
+    # initial commit
+    _initial_commit(config, git, [backup])
     # load previous backup
     previous_backup = Backup.load(backup.project, git.path)
     # update backup json
@@ -108,6 +110,26 @@ def _update_backup_json(
             added=next_files - previous_files,
             updated=next_files & previous_files,
             deleted=previous_files - next_files)
+
+
+def _initial_commit(
+        config: Config,
+        git: Git,
+        backups: list[Backup]) -> None:
+    # empty initial commit is enabled
+    if config.git.empty_initial_commit is None:
+        return
+    # branch already exists
+    if config.git.branch in git.branches():
+        return
+    # commit
+    timestamp = _initial_commit_timestamp(
+            config.git.empty_initial_commit,
+            backups)
+    git.commit(
+            CommitTarget(),
+            config.git.empty_initial_commit.message,
+            timestamp=timestamp)
 
 
 def _initial_commit_timestamp(
