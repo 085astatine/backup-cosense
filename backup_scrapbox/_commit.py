@@ -112,7 +112,7 @@ def _update_backup_json(
 
 def _initial_commit_timestamp(
         config: GitEmptyInitialCommitConfig,
-        backups: list[DownloadedBackup]) -> int:
+        backups: list[Backup]) -> int:
     match config.timestamp:
         case datetime.datetime():
             return int(config.timestamp.timestamp())
@@ -131,24 +131,19 @@ def _initial_commit_timestamp(
                     'unable to define timestamp')
             return timestamp
         case 'oldest_created_page':
-            oldest_backup = min(
+            backup = min(
                     backups,
                     default=None,
                     key=lambda backup: backup.timestamp)
-            if oldest_backup is None:
+            if backup is None:
                 raise InitialCommitError(
                     'Since there is no backup, '
                     'unable to define timestamp')
-            backup = oldest_backup.load_backup()
-            if backup is None:
-                raise InitialCommitError(
-                    'Could not load oldest backup'
-                    f' "{oldest_backup.backup_path}"')
             timestamp = min(
-                    (page['created'] for page in backup['pages']),
+                    (page['created'] for page in backup.data['pages']),
                     default=None)
             if timestamp is None:
                 raise InitialCommitError(
                     'There is no page in oldest backup'
-                    f' "{oldest_backup.backup_path}"')
+                    f' ({format_timestamp(backup.timestamp)})')
             return timestamp
