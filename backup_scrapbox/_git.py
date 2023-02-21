@@ -217,6 +217,14 @@ class Git:
             *,
             option: Optional[list[str]] = None,
             timestamp: Optional[int] = None) -> None:
+        # create the orphan branch if the target branch does not exist
+        if self._branch is not None and self._branch not in self.branches():
+            self._logger.info(
+                    f'create orphan branch "{self._branch}" before commit')
+            _execute_git_command(
+                    ['git', 'switch', '--orphan', self._branch],
+                    self._path,
+                    logger=self._logger)
         # target
         for added in target.added:
             self.execute(['git', 'add', added.as_posix()])
