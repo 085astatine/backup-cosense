@@ -13,6 +13,7 @@ from typing import Optional
 import jsonschema
 from ._backup import BackupInfoJSON, jsonschema_backup_info
 from ._json import parse_json
+from .exceptions import CommitTargetError
 
 
 @dataclasses.dataclass
@@ -61,10 +62,6 @@ class Commit:
         if not body:
             return header
         return '\n'.join([header, '', *body])
-
-
-class CommitTargetError(Exception):
-    pass
 
 
 @dataclasses.dataclass
