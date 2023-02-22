@@ -76,13 +76,14 @@ def request_json(
         url: str,
         *,
         session: Optional[requests.Session] = None,
+        timeout: Optional[float] = None,
         schema: Optional[dict] = None,
         logger: Optional[logging.Logger] = None) -> Optional[Any]:
     logger = logger or logging.getLogger(__name__)
     # request
     logger.info(f'get request: {url}')
     with with_session(session) as session_:
-        response = session_.get(url)
+        response = session_.get(url, timeout=timeout)
         if not response.ok:
             logger.error(f'failed to get request "{url}"')
             return None

@@ -71,6 +71,7 @@ def _request_backup_list(
     response: Optional[BackupListJSON] = request_json(
             f'{_base_url(config)}/list',
             session=session,
+            timeout=config.scrapbox.request_timeout,
             schema=jsonschema_backup_list(),
             logger=logger)
     # failed to request
@@ -132,6 +133,7 @@ def _download_backup(
     backup: Optional[BackupJSON] = request_json(
             url,
             session=session,
+            timeout=config.scrapbox.request_timeout,
             schema=jsonschema_backup(),
             logger=logger)
     if backup is None:
