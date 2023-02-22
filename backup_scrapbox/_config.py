@@ -76,6 +76,7 @@ def jsonschema_git_empty_initial_commit_config() -> dict[str, Any]:
 @dataclasses.dataclass(frozen=True)
 class GitConfig:
     path: str
+    executable: Optional[str] = None
     branch: Optional[str] = None
     page_order: Optional[PageOrder] = None
     user_name: Optional[str] = None
@@ -100,6 +101,9 @@ def jsonschema_git_config() -> dict[str, Any]:
         'additionalProperties': False,
         'properties': {
             'path': {'type': 'string'},
+            'executable': {
+                'type': ['string', 'null'],
+            },
             'branch': {'type': 'string'},
             'page_order': {
                 'type': ['string', 'null'],
