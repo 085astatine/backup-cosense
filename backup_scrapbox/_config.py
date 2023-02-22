@@ -16,6 +16,7 @@ class ScrapboxConfig:
     session_id: str
     save_directory: str
     request_interval: float = 3.0
+    request_timeout: float = 10.0
 
 
 def jsonschema_scrapbox_config() -> dict[str, Any]:
@@ -28,6 +29,10 @@ def jsonschema_scrapbox_config() -> dict[str, Any]:
             'session_id': {'type': 'string'},
             'save_directory': {'type': 'string'},
             'request_interval': {
+                'type': 'number',
+                'exclusiveMinimum': 0.0,
+            },
+            'request_timeout': {
                 'type': 'number',
                 'exclusiveMinimum': 0.0,
             },
