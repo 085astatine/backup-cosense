@@ -88,6 +88,7 @@ class GitConfig:
             logger: Optional[logging.Logger] = None) -> Git:
         return Git(
                 pathlib.Path(self.path),
+                executable=self.executable,
                 branch=self.branch,
                 user_name=self.user_name,
                 user_email=self.user_email,
