@@ -16,10 +16,6 @@ def commit_backups(
     logger = logger or logging.getLogger(__name__)
     git = config.git.git(logger=logger)
     storage = BackupStorage(pathlib.Path(config.scrapbox.save_directory))
-    # check if the git repository exists
-    if not git.exists():
-        logger.error(f'git repository "{git.path}" does not exist')
-        return
     # backup targets
     backup_targets = _backup_targets(storage, git, logger)
     # commit
@@ -45,6 +41,10 @@ def commit_backup(
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
     git = config.git.git(logger=logger)
+    # git init
+    if not git.exists():
+        logger.info('create git repository "{git.path}"')
+        git.init()
     # initial commit
     _initial_commit(config, git, [backup])
     # load previous backup
