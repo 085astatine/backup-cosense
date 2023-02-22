@@ -1,4 +1,5 @@
 import dataclasses
+import datetime
 import logging
 import pathlib
 from typing import Any, Literal, Optional, get_args
@@ -36,10 +37,45 @@ def jsonschema_scrapbox_config() -> dict[str, Any]:
 
 
 @dataclasses.dataclass(frozen=True)
+class GitEmptyInitialCommitConfig:
+    message: str = 'Initial commit'
+    timestamp: (
+        Literal['oldest_backup', 'oldest_created_page']
+        | datetime.date
+        | datetime.datetime
+    ) = 'oldest_created_page'
+
+
+def jsonschema_git_empty_initial_commit_config() -> dict[str, Any]:
+    schema = {
+        'type': 'object',
+        'additionalProperties': False,
+        'properties': {
+            'message': {'type': 'string'},
+            'timestamp': {
+                'oneOf': [
+                    {
+                        'enum': [
+                            'oldest_backup',
+                            'oldest_created_page',
+                        ],
+                    },
+                    {'type': ['date', 'datetime']},
+                ],
+            },
+        },
+    }
+    return schema
+
+
+@dataclasses.dataclass(frozen=True)
 class GitConfig:
     path: str
     branch: Optional[str] = None
     page_order: Optional[PageOrder] = None
+    user_name: Optional[str] = None
+    user_email: Optional[str] = None
+    empty_initial_commit: Optional[GitEmptyInitialCommitConfig] = None
 
     def git(self,
             *,
@@ -47,6 +83,8 @@ class GitConfig:
         return Git(
                 pathlib.Path(self.path),
                 branch=self.branch,
+                user_name=self.user_name,
+                user_email=self.user_email,
                 logger=logger)
 
 
@@ -62,6 +100,14 @@ def jsonschema_git_config() -> dict[str, Any]:
                 'type': ['string', 'null'],
                 'enum': [None, *get_args(PageOrder)],
             },
+            'user_name': {
+                'type': ['string', 'null'],
+            },
+            'user_email': {
+                'type': ['string', 'null'],
+            },
+            'empty_initial_commit':
+                jsonschema_git_empty_initial_commit_config(),
         },
     }
     return schema
@@ -170,12 +216,32 @@ def load_config(
         loaded = toml.load(file)
     logger.debug(f'loaded toml: {repr(loaded)}')
     # JSON Schema validation
-    jsonschema.validate(
-            instance=loaded,
-            schema=jsonschema_config())
+    _validator().validate(instance=loaded)
     config = dacite.from_dict(
             data_class=Config,
             data=loaded,
             config=dacite.Config(strict=True))
     logger.debug(f'config: {repr(config)}')
     return config
+
+
+def _validator() -> jsonschema.protocols.Validator:
+    Validator = jsonschema.Draft202012Validator
+    type_checker = Validator.TYPE_CHECKER.redefine_many({
+            'date': _is_date,
+            'datetime': _is_datetime})
+    return jsonschema.validators.extend(
+        Validator,
+        type_checker=type_checker)(schema=jsonschema_config())
+
+
+def _is_date(
+        _checker: jsonschema.TypeChecker,
+        instance: Any) -> bool:
+    return isinstance(instance, datetime.date)
+
+
+def _is_datetime(
+        _checker: jsonschema.TypeChecker,
+        instance: Any) -> bool:
+    return isinstance(instance, datetime.datetime)

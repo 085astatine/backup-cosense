@@ -1,8 +1,9 @@
+import datetime
 import logging
 import pathlib
 from typing import Optional
 from ._backup import Backup, BackupStorage, DownloadedBackup
-from ._config import Config
+from ._config import Config, GitEmptyInitialCommitConfig
 from ._external_link import save_external_links
 from ._git import Commit, CommitTarget, Git
 from ._utility import format_timestamp
@@ -15,10 +16,6 @@ def commit_backups(
     logger = logger or logging.getLogger(__name__)
     git = config.git.git(logger=logger)
     storage = BackupStorage(pathlib.Path(config.scrapbox.save_directory))
-    # check if the git repository exists
-    if not git.exists():
-        logger.error(f'git repository "{git.path}" does not exist')
-        return
     # backup targets
     backup_targets = _backup_targets(storage, git, logger)
     # commit
@@ -44,6 +41,12 @@ def commit_backup(
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
     git = config.git.git(logger=logger)
+    # git init
+    if not git.exists():
+        logger.info('create git repository "{git.path}"')
+        git.init()
+    # initial commit
+    _initial_commit(config, git, [backup])
     # load previous backup
     previous_backup = Backup.load(backup.project, git.path)
     # update backup json
@@ -65,6 +68,10 @@ def commit_backup(
             target,
             message,
             timestamp=backup.timestamp)
+
+
+class InitialCommitError(Exception):
+    pass
 
 
 def _backup_targets(
@@ -103,3 +110,62 @@ def _update_backup_json(
             added=next_files - previous_files,
             updated=next_files & previous_files,
             deleted=previous_files - next_files)
+
+
+def _initial_commit(
+        config: Config,
+        git: Git,
+        backups: list[Backup]) -> None:
+    # empty initial commit is enabled
+    if config.git.empty_initial_commit is None:
+        return
+    # branch already exists
+    if config.git.branch in git.branches():
+        return
+    # commit
+    timestamp = _initial_commit_timestamp(
+            config.git.empty_initial_commit,
+            backups)
+    git.commit(
+            CommitTarget(),
+            config.git.empty_initial_commit.message,
+            timestamp=timestamp)
+
+
+def _initial_commit_timestamp(
+        config: GitEmptyInitialCommitConfig,
+        backups: list[Backup]) -> int:
+    match config.timestamp:
+        case datetime.datetime():
+            return int(config.timestamp.timestamp())
+        case datetime.date():
+            # add time(00:00:00) to date
+            return int(datetime.datetime.combine(
+                    config.timestamp,
+                    datetime.time()).timestamp())
+        case 'oldest_backup':
+            timestamp = min(
+                    (backup.timestamp for backup in backups),
+                    default=None)
+            if timestamp is None:
+                raise InitialCommitError(
+                    'Since there is no backup, '
+                    'unable to define timestamp')
+            return timestamp
+        case 'oldest_created_page':
+            backup = min(
+                    backups,
+                    default=None,
+                    key=lambda backup: backup.timestamp)
+            if backup is None:
+                raise InitialCommitError(
+                    'Since there is no backup, '
+                    'unable to define timestamp')
+            timestamp = min(
+                    (page['created'] for page in backup.data['pages']),
+                    default=None)
+            if timestamp is None:
+                raise InitialCommitError(
+                    'There is no page in oldest backup'
+                    f' ({format_timestamp(backup.timestamp)})')
+            return timestamp

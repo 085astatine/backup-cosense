@@ -103,6 +103,9 @@ class CommitTarget:
         self.validate()
         return self
 
+    def is_empty(self) -> bool:
+        return not (self.added or self.updated or self.deleted)
+
 
 class Git:
     def __init__(
@@ -110,9 +113,13 @@ class Git:
             path: pathlib.Path,
             *,
             branch: Optional[str] = None,
+            user_name: Optional[str] = None,
+            user_email: Optional[str] = None,
             logger: Optional[logging.Logger] = None) -> None:
         self._path = path
         self._branch = branch
+        self._user_name = user_name
+        self._user_email = user_email
         self._logger = logger or logging.getLogger(__name__)
 
     @property
@@ -120,12 +127,26 @@ class Git:
         return self._path
 
     def exists(self) -> bool:
-        return self.path.is_dir() and self.path.joinpath('.git').is_dir()
+        # check if path exists
+        if not self.path.is_dir():
+            return False
+        # check if path == `git rev-perse --show-toplevel`
+        try:
+            process = _execute_git_command(
+                    ['git', 'rev-parse', '--show-toplevel'],
+                    self.path,
+                    logger=self._logger,
+                    ignore_error=True)
+            toplevel = pathlib.Path(process.stdout.removesuffix('\n'))
+        except subprocess.CalledProcessError:
+            return False
+        return self.path.resolve() == toplevel
 
     def execute(
             self,
             command: list[str],
             *,
+            ignore_error: bool = False,
             env: Optional[dict[str, str]] = None
     ) -> subprocess.CompletedProcess:
         self._logger.debug(f'command: {command}')
@@ -135,7 +156,7 @@ class Git:
         # switch branch
         if self._branch is not None:
             branch = _execute_git_command(
-                    ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                    ['git', 'branch', '--show-current'],
                     self.path,
                     logger=self._logger).stdout.rstrip('\n')
             if branch != self._branch:
@@ -150,7 +171,38 @@ class Git:
                 command,
                 self.path,
                 logger=self._logger,
+                ignore_error=ignore_error,
                 env=env)
+
+    def branches(self) -> list[str]:
+        try:
+            process = _execute_git_command(
+                    ['git', 'branch', '--list'],
+                    self.path,
+                    ignore_error=True,
+                    logger=self._logger)
+            return [line.lstrip('* ') for line in process.stdout.splitlines()]
+        except subprocess.CalledProcessError:
+            pass
+        return []
+
+    def init(self) -> None:
+        # check if Git repository already exists
+        if self.exists():
+            self._logger.error(
+                    f'git repository "{self.path}" already exists')
+            return
+        # mkdir
+        if not self.path.exists():
+            self.path.mkdir(parents=True)
+        # git init
+        command = ['git', 'init']
+        if self._branch is not None:
+            command.extend(['--initial-branch', self._branch])
+        _execute_git_command(
+            command,
+            self.path,
+            logger=self._logger)
 
     def ls_files(self) -> list[pathlib.Path]:
         process = self.execute(['git', 'ls-files', '-z'])
@@ -165,6 +217,14 @@ class Git:
             *,
             option: Optional[list[str]] = None,
             timestamp: Optional[int] = None) -> None:
+        # create the orphan branch if the target branch does not exist
+        if self._branch is not None and self._branch not in self.branches():
+            self._logger.info(
+                    f'create orphan branch "{self._branch}" before commit')
+            _execute_git_command(
+                    ['git', 'switch', '--orphan', self._branch],
+                    self._path,
+                    logger=self._logger)
         # target
         for added in target.added:
             self.execute(['git', 'add', added.as_posix()])
@@ -172,8 +232,15 @@ class Git:
             self.execute(['git', 'add', updated.as_posix()])
         for deleted in target.deleted:
             self.execute(['git', 'rm', '--cached', deleted.as_posix()])
-        # commit
-        command = ['git', 'commit', '--message', message]
+        # command
+        command: list[str] = ['git']
+        if self._user_name is not None:
+            command.extend(['-c', f'user.name={self._user_name}'])
+        if self._user_email is not None:
+            command.extend(['-c', f'user.email={self._user_email}'])
+        command.extend(['commit', '--message', message])
+        if target.is_empty():
+            command.append('--allow-empty')
         if option is not None:
             command.extend(option)
         # set: commit date & author date
@@ -222,7 +289,12 @@ class Git:
                     f'git repository "{self.path}" does not exist')
             return None
         # git show -s --format=%ct
-        process = self.execute(['git', 'show', '-s', '--format=%ct'])
+        try:
+            process = self.execute(
+                ['git', 'show', '-s', '--format=%ct'],
+                ignore_error=True)
+        except subprocess.CalledProcessError:
+            return None
         timestamp = process.stdout.rstrip('\n')
         if timestamp.isdigit():
             return int(timestamp)
@@ -234,6 +306,7 @@ def _execute_git_command(
         repository: pathlib.Path,
         *,
         logger: Optional[logging.Logger] = None,
+        ignore_error: bool = False,
         env: Optional[dict[str, str]] = None) -> subprocess.CompletedProcess:
     logger = logger or logging.getLogger(__name__)
     try:
@@ -251,7 +324,10 @@ def _execute_git_command(
                 'command': error.cmd,
                 'stdout': error.stdout,
                 'stderr': error.stderr}
-        logger.error(f'{error.__class__.__name__}: {error_info}')
+        if ignore_error:
+            logger.debug(f'{error.__class__.__name__}: {error_info}')
+        else:
+            logger.error(f'{error.__class__.__name__}: {error_info}')
         raise error
     return process
 
