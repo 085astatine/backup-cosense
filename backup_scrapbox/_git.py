@@ -7,12 +7,14 @@ import logging
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import textwrap
 from typing import Optional
 import jsonschema
 from ._backup import BackupInfoJSON, jsonschema_backup_info
 from ._json import parse_json
+from .exceptions import CommitTargetError, GitNotFoundError
 
 
 @dataclasses.dataclass
@@ -63,10 +65,6 @@ class Commit:
         return '\n'.join([header, '', *body])
 
 
-class CommitTargetError(Exception):
-    pass
-
-
 @dataclasses.dataclass
 class CommitTarget:
     added: set[pathlib.Path] = dataclasses.field(default_factory=set)
@@ -112,11 +110,16 @@ class Git:
             self,
             path: pathlib.Path,
             *,
+            executable: Optional[str] = None,
             branch: Optional[str] = None,
             user_name: Optional[str] = None,
             user_email: Optional[str] = None,
             logger: Optional[logging.Logger] = None) -> None:
         self._path = path
+        self._executable = (
+                executable
+                if executable is not None
+                else _find_executable())
         self._branch = branch
         self._user_name = user_name
         self._user_email = user_email
@@ -133,7 +136,7 @@ class Git:
         # check if path == `git rev-perse --show-toplevel`
         try:
             process = _execute_git_command(
-                    ['git', 'rev-parse', '--show-toplevel'],
+                    [self._executable, 'rev-parse', '--show-toplevel'],
                     self.path,
                     logger=self._logger,
                     ignore_error=True)
@@ -156,7 +159,7 @@ class Git:
         # switch branch
         if self._branch is not None:
             branch = _execute_git_command(
-                    ['git', 'branch', '--show-current'],
+                    [self._executable, 'branch', '--show-current'],
                     self.path,
                     logger=self._logger).stdout.rstrip('\n')
             if branch != self._branch:
@@ -164,7 +167,7 @@ class Git:
                         'switch git branch'
                         f' from "{branch}" to "{self._branch}"')
                 _execute_git_command(
-                        ['git', 'switch', self._branch],
+                        [self._executable, 'switch', self._branch],
                         self.path,
                         logger=self._logger)
         return _execute_git_command(
@@ -177,7 +180,7 @@ class Git:
     def branches(self) -> list[str]:
         try:
             process = _execute_git_command(
-                    ['git', 'branch', '--list'],
+                    [self._executable, 'branch', '--list'],
                     self.path,
                     ignore_error=True,
                     logger=self._logger)
@@ -196,7 +199,7 @@ class Git:
         if not self.path.exists():
             self.path.mkdir(parents=True)
         # git init
-        command = ['git', 'init']
+        command = [self._executable, 'init']
         if self._branch is not None:
             command.extend(['--initial-branch', self._branch])
         _execute_git_command(
@@ -205,7 +208,7 @@ class Git:
             logger=self._logger)
 
     def ls_files(self) -> list[pathlib.Path]:
-        process = self.execute(['git', 'ls-files', '-z'])
+        process = self.execute([self._executable, 'ls-files', '-z'])
         return [self.path.joinpath(path)
                 for path in process.stdout.split('\0')
                 if path]
@@ -222,18 +225,22 @@ class Git:
             self._logger.info(
                     f'create orphan branch "{self._branch}" before commit')
             _execute_git_command(
-                    ['git', 'switch', '--orphan', self._branch],
+                    [self._executable, 'switch', '--orphan', self._branch],
                     self._path,
                     logger=self._logger)
         # target
         for added in target.added:
-            self.execute(['git', 'add', added.as_posix()])
+            self.execute([self._executable, 'add', added.as_posix()])
         for updated in target.updated:
-            self.execute(['git', 'add', updated.as_posix()])
+            self.execute([self._executable, 'add', updated.as_posix()])
         for deleted in target.deleted:
-            self.execute(['git', 'rm', '--cached', deleted.as_posix()])
+            self.execute([
+                    self._executable,
+                    'rm',
+                    '--cached',
+                    deleted.as_posix()])
         # command
-        command: list[str] = ['git']
+        command: list[str] = [self._executable]
         if self._user_name is not None:
             command.extend(['-c', f'user.name={self._user_name}'])
         if self._user_email is not None:
@@ -262,7 +269,7 @@ class Git:
                 'body:',
                 '%b'])
         # git log
-        command = ['git', 'log', '-z', f'--format={log_format}']
+        command = [self._executable, 'log', '-z', f'--format={log_format}']
         if option is not None:
             command.extend(option)
         process = self.execute(command)
@@ -291,7 +298,7 @@ class Git:
         # git show -s --format=%ct
         try:
             process = self.execute(
-                ['git', 'show', '-s', '--format=%ct'],
+                [self._executable, 'show', '-s', '--format=%ct'],
                 ignore_error=True)
         except subprocess.CalledProcessError:
             return None
@@ -299,6 +306,13 @@ class Git:
         if timestamp.isdigit():
             return int(timestamp)
         return None
+
+
+def _find_executable() -> str:
+    executable = shutil.which('git')
+    if executable is None:
+        raise GitNotFoundError('git executable not found in PATH')
+    return executable
 
 
 def _execute_git_command(

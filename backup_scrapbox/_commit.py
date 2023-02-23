@@ -7,6 +7,7 @@ from ._config import Config, GitEmptyInitialCommitConfig
 from ._external_link import save_external_links
 from ._git import Commit, CommitTarget, Git
 from ._utility import format_timestamp
+from .exceptions import InitialCommitError
 
 
 def commit_backups(
@@ -68,10 +69,6 @@ def commit_backup(
             target,
             message,
             timestamp=backup.timestamp)
-
-
-class InitialCommitError(Exception):
-    pass
 
 
 def _backup_targets(
