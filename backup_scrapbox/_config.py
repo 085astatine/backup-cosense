@@ -94,6 +94,7 @@ class GitConfig:
                 branch=self.branch,
                 user_name=self.user_name,
                 user_email=self.user_email,
+                staging_step_size=self.staging_step_size,
                 logger=logger)
 
 

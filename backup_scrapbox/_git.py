@@ -10,7 +10,7 @@ import re
 import shutil
 import subprocess
 import textwrap
-from typing import Optional
+from typing import Iterator, Optional
 import jsonschema
 from ._backup import BackupInfoJSON, jsonschema_backup_info
 from ._json import parse_json
@@ -114,6 +114,7 @@ class Git:
             branch: Optional[str] = None,
             user_name: Optional[str] = None,
             user_email: Optional[str] = None,
+            staging_step_size: int = 1,
             logger: Optional[logging.Logger] = None) -> None:
         self._path = path
         self._executable = (
@@ -123,6 +124,7 @@ class Git:
         self._branch = branch
         self._user_name = user_name
         self._user_email = user_email
+        self._staging_step_size = staging_step_size
         self._logger = logger or logging.getLogger(__name__)
 
     @property
@@ -229,16 +231,12 @@ class Git:
                     self._path,
                     logger=self._logger)
         # target
-        for added in target.added:
-            self.execute([self._executable, 'add', added.as_posix()])
-        for updated in target.updated:
-            self.execute([self._executable, 'add', updated.as_posix()])
-        for deleted in target.deleted:
-            self.execute([
-                    self._executable,
-                    'rm',
-                    '--cached',
-                    deleted.as_posix()])
+        for added in _into_steps(target.added, self._staging_step_size):
+            self.execute([self._executable, 'add', *added])
+        for updated in _into_steps(target.updated, self._staging_step_size):
+            self.execute([self._executable, 'add', *updated])
+        for deleted in _into_steps(target.deleted, self._staging_step_size):
+            self.execute([self._executable, 'rm', '--cached', *deleted])
         # command
         command: list[str] = [self._executable]
         if self._user_name is not None:
@@ -344,6 +342,19 @@ def _execute_git_command(
             logger.error(f'{error.__class__.__name__}: {error_info}')
         raise error
     return process
+
+
+def _into_steps(
+        paths: set[pathlib.Path],
+        step_size: int) -> Iterator[list[str]]:
+    chunk: list[str] = []
+    for path in paths:
+        chunk.append(path.as_posix())
+        if len(chunk) >= step_size:
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk
 
 
 def _log_to_commit(log: str) -> Optional[Commit]:
