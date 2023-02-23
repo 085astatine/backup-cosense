@@ -75,6 +75,7 @@ def jsonschema_git_empty_initial_commit_config() -> dict[str, Any]:
 
 @dataclasses.dataclass(frozen=True)
 class GitConfig:
+    # pylint: disable=too-many-instance-attributes
     path: str
     executable: Optional[str] = None
     branch: Optional[str] = None
@@ -82,6 +83,7 @@ class GitConfig:
     user_name: Optional[str] = None
     user_email: Optional[str] = None
     empty_initial_commit: Optional[GitEmptyInitialCommitConfig] = None
+    staging_step_size: int = 1
 
     def git(self,
             *,
@@ -118,6 +120,10 @@ def jsonschema_git_config() -> dict[str, Any]:
             },
             'empty_initial_commit':
                 jsonschema_git_empty_initial_commit_config(),
+            'staging_step_size': {
+                'type': 'integer',
+                'minimum': 1,
+            }
         },
     }
     return schema
