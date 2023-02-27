@@ -2,7 +2,7 @@ import datetime
 import logging
 import pathlib
 from typing import Optional
-from ._backup import Backup, BackupStorage, DownloadedBackup
+from ._backup import Backup, BackupJSONs, BackupStorage
 from ._config import Config, GitEmptyInitialCommitConfig
 from ._external_link import save_external_links
 from ._git import Commit, CommitTarget, Git
@@ -74,7 +74,7 @@ def commit_backup(
 def _backup_targets(
         storage: BackupStorage,
         git: Git,
-        logger: logging.Logger) -> list[DownloadedBackup]:
+        logger: logging.Logger) -> list[BackupJSONs]:
     # get latest backup timestamp
     latest = git.latest_commit_timestamp()
     logger.info(f'latest backup: {format_timestamp(latest)}')
