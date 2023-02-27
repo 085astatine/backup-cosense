@@ -255,13 +255,7 @@ class Backup:
     def sort_pages(
             self,
             order: Optional[PageOrder] = None) -> None:
-        match order:
-            case None | 'as-is':
-                pass
-            case 'created-asc':
-                self._backup['pages'].sort(key=lambda page: page['created'])
-            case 'created-desc':
-                self._backup['pages'].sort(key=lambda page: - page['created'])
+        _sort_pages(self._backup['pages'], order)
 
     def save_files(self) -> list[pathlib.Path]:
         files: list[pathlib.Path] = []
@@ -393,6 +387,18 @@ class BackupStorage:
                     info_path=info_path if info_path.exists() else None))
         # sort by old...new
         return sorted(backups, key=lambda backup: backup.timestamp)
+
+
+def _sort_pages(
+        pages: list[BackupPageJSON],
+        order: Optional[PageOrder]) -> None:
+    match order:
+        case None | 'as-is':
+            pass
+        case 'created-asc':
+            pages.sort(key=lambda page: page['created'])
+        case 'created-desc':
+            pages.sort(key=lambda page: - page['created'])
 
 
 def _escape_filename(text: str) -> str:
