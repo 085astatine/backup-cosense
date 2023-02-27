@@ -172,11 +172,16 @@ class Backup:
             project: str,
             directory: pathlib.Path,
             backup: BackupJSON,
-            info: Optional[BackupInfoJSON]) -> None:
+            info: Optional[BackupInfoJSON],
+            *,
+            page_order: Optional[PageOrder] = None) -> None:
         self._project = project
         self._directory = directory
         self._backup = backup
         self._info = info
+        self._page_order = page_order
+        # sort pages
+        _sort_pages(self._backup['pages'], self._page_order)
         # JSON Schema validation
         jsonschema.validate(
                 instance=self._backup,
@@ -253,11 +258,6 @@ class Backup:
             link.locations.sort()
         return links
 
-    def sort_pages(
-            self,
-            order: Optional[PageOrder] = None) -> None:
-        _sort_pages(self._backup['pages'], order)
-
     def save_files(self) -> list[pathlib.Path]:
         files: list[pathlib.Path] = []
         # {project}.json
@@ -301,7 +301,11 @@ class Backup:
     def load(
             cls,
             project: str,
-            directory: pathlib.Path) -> Optional[Backup]:
+            directory: pathlib.Path,
+            *,
+            page_order: Optional[PageOrder] = None,
+            logger: Optional[logging.Logger] = None) -> Optional[Backup]:
+        logger = logger or logging.getLogger(__name__)
         # {project}.json
         backup_path = directory.joinpath(f'{_escape_filename(project)}.json')
         backup: Optional[BackupJSON] = load_json(
@@ -314,11 +318,16 @@ class Backup:
         info: Optional[BackupInfoJSON] = load_json(
                 info_path,
                 schema=jsonschema_backup_info())
+        # check if pages are sorted
+        if _is_sorted_pages(backup['pages'], page_order) is False:
+            logger.warn(
+                    f'loaded backup pages are not sorted by {page_order}')
         return cls(
                 project,
                 directory,
                 backup,
-                info)
+                info,
+                page_order=page_order)
 
 
 @dataclasses.dataclass
@@ -342,7 +351,9 @@ class BackupJSONs:
     def load(
             self,
             project: str,
-            directory: pathlib.Path) -> Optional[Backup]:
+            directory: pathlib.Path,
+            *,
+            page_order: Optional[PageOrder] = None) -> Optional[Backup]:
         backup = self.load_backup()
         info = self.load_info()
         if backup is None:
@@ -351,7 +362,8 @@ class BackupJSONs:
                 project,
                 directory,
                 backup,
-                info)
+                info,
+                page_order=page_order)
 
 
 class BackupStorage:

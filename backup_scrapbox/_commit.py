@@ -23,14 +23,15 @@ def commit_backups(
     for target in backup_targets:
         logger.info(f'commit {format_timestamp(target.timestamp)}')
         # load backup
-        backup = target.load(config.scrapbox.project, git.path)
+        backup = target.load(
+                config.scrapbox.project,
+                git.path,
+                page_order=config.git.page_order)
         if backup is None:
             logger.info(
                     'failed to load backup'
                     f' {format_timestamp(target.timestamp)}')
             continue
-        # sort pages
-        backup.sort_pages(config.git.page_order)
         # commit
         commit_backup(config, backup, logger=logger)
 
@@ -49,7 +50,11 @@ def commit_backup(
     # initial commit
     _initial_commit(config, git, [backup])
     # load previous backup
-    previous_backup = Backup.load(backup.project, git.path)
+    previous_backup = Backup.load(
+            backup.project,
+            git.path,
+            page_order=config.git.page_order,
+            logger=logger)
     # update backup json
     target = _update_backup_json(backup, previous_backup, logger)
     # external link
