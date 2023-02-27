@@ -1,5 +1,6 @@
 from __future__ import annotations
 import dataclasses
+import itertools
 import logging
 import pathlib
 import re
@@ -399,6 +400,20 @@ def _sort_pages(
             pages.sort(key=lambda page: page['created'])
         case 'created-desc':
             pages.sort(key=lambda page: - page['created'])
+
+
+def _is_sorted_pages(
+        pages: list[BackupPageJSON],
+        order: Optional[PageOrder]) -> Optional[bool]:
+    if order is None or order == 'as-is':
+        return None
+    # sort shallow copied pages
+    sorted_pages = pages[:]
+    _sort_pages(sorted_pages, order)
+    # compare the id of each page
+    return all(
+            id(x) == id(y)
+            for x, y in itertools.zip_longest(pages, sorted_pages))
 
 
 def _escape_filename(text: str) -> str:
