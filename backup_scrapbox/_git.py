@@ -147,6 +147,37 @@ class Git:
             return False
         return self.path.resolve() == toplevel
 
+    def switch(
+            self,
+            *,
+            allow_orphan: bool = False) -> None:
+        # branch is not selected
+        if self._branch is None:
+            return
+        # current branch
+        branch = _execute_git_command(
+                [self._executable, 'branch', '--show-current'],
+                self.path,
+                logger=self._logger).stdout.rstrip('\n')
+        if branch == self._branch:
+            return
+        # switch
+        if allow_orphan and self._branch not in self.branches():
+            # create orphan branch
+            self._logger.info(
+                    f'create orphan branch "{self._branch}" before commit')
+            _execute_git_command(
+                    [self._executable, 'switch', '--orphan', self._branch],
+                    self._path,
+                    logger=self._logger)
+        else:
+            self._logger.info(
+                    f'switch git branch from "{branch}" to "{self._branch}"')
+            _execute_git_command(
+                [self._executable, 'switch', self._branch],
+                self.path,
+                logger=self._logger)
+
     def execute(
             self,
             command: list[str],
@@ -159,19 +190,8 @@ class Git:
         if not self.exists():
             self._logger.error(f'git repository "{self.path}" does not exist')
         # switch branch
-        if self._branch is not None:
-            branch = _execute_git_command(
-                    [self._executable, 'branch', '--show-current'],
-                    self.path,
-                    logger=self._logger).stdout.rstrip('\n')
-            if branch != self._branch:
-                self._logger.info(
-                        'switch git branch'
-                        f' from "{branch}" to "{self._branch}"')
-                _execute_git_command(
-                        [self._executable, 'switch', self._branch],
-                        self.path,
-                        logger=self._logger)
+        self.switch()
+        # execute command
         return _execute_git_command(
                 command,
                 self.path,
@@ -223,13 +243,7 @@ class Git:
             option: Optional[list[str]] = None,
             timestamp: Optional[int] = None) -> None:
         # create the orphan branch if the target branch does not exist
-        if self._branch is not None and self._branch not in self.branches():
-            self._logger.info(
-                    f'create orphan branch "{self._branch}" before commit')
-            _execute_git_command(
-                    [self._executable, 'switch', '--orphan', self._branch],
-                    self._path,
-                    logger=self._logger)
+        self.switch(allow_orphan=True)
         # target
         for added in _into_steps(target.added, self._staging_step_size):
             self.execute([self._executable, 'add', *added])
