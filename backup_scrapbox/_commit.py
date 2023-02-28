@@ -76,6 +76,61 @@ def commit_backup(
             timestamp=backup.timestamp)
 
 
+def staging_backup(
+        config: Config,
+        data: BackupJSONs,
+        *,
+        backup: Optional[Backup] = None,
+        logger: Optional[logging.Logger] = None) -> Optional[CommitTarget]:
+    logger = logger or logging.getLogger(__name__)
+    # git switch
+    git = config.git.git(logger=logger)
+    if git.exists():
+        git.switch(allow_orphan=True)
+    # load backup repository
+    if backup is None:
+        backup = Backup.load(
+                config.scrapbox.project,
+                git.path,
+                page_order=config.git.page_order,
+                logger=logger)
+    # load json
+    backup_json = data.load_backup()
+    info_json = data.load_info()
+    if backup_json is None:
+        logger.error('failure to load "{data.backup_path}"')
+        return None
+    # update backup
+    if backup is None:
+        # initial update
+        backup = Backup(
+                config.scrapbox.project,
+                git.path,
+                backup_json,
+                info_json,
+                page_order=config.git.page_order)
+        backup.save(logger=logger)
+        commit_target = CommitTarget(updated=set(backup.save_files()))
+    else:
+        # update
+        update_diff = backup.update(
+                backup_json,
+                info_json,
+                logger=logger)
+        commit_target = CommitTarget(
+                added=set(update_diff.added),
+                updated=set(update_diff.updated),
+                deleted=set(update_diff.removed))
+    # external links
+    if config.external_link.enabled:
+        commit_target.update(save_external_links(
+                backup,
+                git.path,
+                config=config.external_link,
+                logger=logger))
+    return commit_target
+
+
 def _backup_targets(
         storage: BackupStorage,
         git: Git,
