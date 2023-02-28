@@ -166,6 +166,13 @@ class ExternalLink:
     locations: list[Location]
 
 
+@dataclasses.dataclass
+class UpdateDiff:
+    added: list[pathlib.Path]
+    updated: list[pathlib.Path]
+    removed: list[pathlib.Path]
+
+
 class Backup:
     def __init__(
             self,
@@ -257,6 +264,73 @@ class Backup:
         for link in links:
             link.locations.sort()
         return links
+
+    def update(
+            self,
+            backup: BackupJSON,
+            info: Optional[BackupInfoJSON],
+            *,
+            logger: Optional[logging.Logger] = None) -> UpdateDiff:
+        logger = logger or logging.getLogger(__name__)
+        added: list[pathlib.Path] = []
+        updated: list[pathlib.Path] = []
+        removed: list[pathlib.Path] = []
+        # sort pages
+        _sort_pages(backup['pages'], self._page_order)
+        # backup
+        backup_path = self.directory.joinpath(
+                f'{_escape_filename(self.project)}.json')
+        if backup != self._backup:
+            logger.debug(f'update "{backup_path.as_posix()}"')
+            save_json(backup_path, backup)
+            updated.append(backup_path)
+        # info
+        info_path = backup_path.with_suffix('.info.json')
+        if info != self._info:
+            if info is None:
+                logger.debug(f'remove "{backup_path.as_posix()}"')
+                info_path.unlink()
+                removed.append(info_path)
+            elif self._info is None:
+                logger.debug(f'add "{backup_path.as_posix()}"')
+                save_json(info_path, info)
+                added.append(info_path)
+            else:
+                logger.debug(f'update "{backup_path.as_posix()}"')
+                save_json(info_path, info)
+                updated.append(info_path)
+        # previous pages
+        previous_pages = {
+                _escape_filename(page['title']): page
+                for page in self._backup['pages']}
+        # add/update pages
+        page_directory = self.directory.joinpath('pages')
+        for page in backup['pages']:
+            title = _escape_filename(page['title'])
+            page_path = page_directory.joinpath(f'{title}.json')
+            if title in previous_pages:
+                if page != previous_pages[title]:
+                    # update page
+                    logger.debug(f'update "{page_path.as_posix()}"')
+                    save_json(page_path, page)
+                    updated.append(page_path)
+                # remove from dict to detect deleted pages
+                del previous_pages[title]
+            else:
+                # add new page
+                logger.debug(f'add "{page_path.as_posix()}"')
+                save_json(page_path, page)
+                added.append(page_path)
+        # remove deleted pages
+        for title in previous_pages.keys():
+            page_path = page_directory.joinpath(f'{title}.json')
+            logger.debug(f'remove "{page_path.as_posix()}"')
+            page_path.unlink()
+            removed.append(page_path)
+        # update self
+        self._backup = backup
+        self._info = info
+        return UpdateDiff(added, updated, removed)
 
     def save_files(self) -> list[pathlib.Path]:
         files: list[pathlib.Path] = []
