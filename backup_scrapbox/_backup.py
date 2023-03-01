@@ -422,23 +422,6 @@ class BackupJSONs:
                 self.info_path,
                 schema=jsonschema_backup_info())
 
-    def load(
-            self,
-            project: str,
-            directory: pathlib.Path,
-            *,
-            page_order: Optional[PageOrder] = None) -> Optional[Backup]:
-        backup = self.load_backup()
-        info = self.load_info()
-        if backup is None:
-            return None
-        return Backup(
-                project,
-                directory,
-                backup,
-                info,
-                page_order=page_order)
-
 
 class BackupStorage:
     def __init__(self, directory: pathlib.Path) -> None:
