@@ -281,22 +281,22 @@ class Backup:
         backup_path = self.directory.joinpath(
                 f'{_escape_filename(self.project)}.json')
         if backup != self._backup:
-            logger.debug(f'update "{backup_path.as_posix()}"')
+            logger.debug(f'update "{backup_path}"')
             save_json(backup_path, backup)
             updated.append(backup_path)
         # info
         info_path = backup_path.with_suffix('.info.json')
         if info != self._info:
             if info is None:
-                logger.debug(f'remove "{backup_path.as_posix()}"')
+                logger.debug(f'remove "{backup_path}"')
                 info_path.unlink()
                 removed.append(info_path)
             elif self._info is None:
-                logger.debug(f'add "{backup_path.as_posix()}"')
+                logger.debug(f'add "{backup_path}"')
                 save_json(info_path, info)
                 added.append(info_path)
             else:
-                logger.debug(f'update "{backup_path.as_posix()}"')
+                logger.debug(f'update "{backup_path}"')
                 save_json(info_path, info)
                 updated.append(info_path)
         # previous pages
@@ -311,20 +311,20 @@ class Backup:
             if title in previous_pages:
                 if page != previous_pages[title]:
                     # update page
-                    logger.debug(f'update "{page_path.as_posix()}"')
+                    logger.debug(f'update "{page_path}"')
                     save_json(page_path, page)
                     updated.append(page_path)
                 # remove from dict to detect deleted pages
                 del previous_pages[title]
             else:
                 # add new page
-                logger.debug(f'add "{page_path.as_posix()}"')
+                logger.debug(f'add "{page_path}"')
                 save_json(page_path, page)
                 added.append(page_path)
         # remove deleted pages
         for title in previous_pages.keys():
             page_path = page_directory.joinpath(f'{title}.json')
-            logger.debug(f'remove "{page_path.as_posix()}"')
+            logger.debug(f'remove "{page_path}"')
             page_path.unlink()
             removed.append(page_path)
         # update self
@@ -356,19 +356,19 @@ class Backup:
         # {project}.json
         backup_path = self.directory.joinpath(
                 f'{_escape_filename(self.project)}.json')
-        logger.debug(f'save "{backup_path.as_posix()}"')
+        logger.debug(f'save "{backup_path}"')
         save_json(backup_path, self._backup)
         # {project}.info.json
         if self._info is not None:
             info_path = backup_path.with_suffix('.info.json')
-            logger.debug(f'save "{info_path.as_posix()}"')
+            logger.debug(f'save "{info_path}"')
             save_json(info_path, self._info)
         # pages
         page_directory = self.directory.joinpath('pages')
         for page in self._backup['pages']:
             page_path = page_directory.joinpath(
                     f'{_escape_filename(page["title"])}.json')
-            logger.debug(f'save "{page_path.as_posix()}"')
+            logger.debug(f'save "{page_path}"')
             save_json(page_path, page)
 
     @classmethod

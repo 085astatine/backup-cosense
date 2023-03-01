@@ -228,7 +228,7 @@ def load_config(
         logger: Optional[logging.Logger] = None) -> Config:
     logger = logger or logging.getLogger(__name__)
     # load TOML
-    logger.info(f'load config from "{path.as_posix()}"')
+    logger.info(f'load config from "{path}"')
     with path.open(encoding='utf-8') as file:
         loaded = toml.load(file)
     logger.debug(f'loaded toml: {repr(loaded)}')

@@ -88,8 +88,7 @@ class CommitTarget:
                 2):
             for path in getattr(self, set1) & getattr(self, set2):
                 errors.append(
-                        f'"{path.as_posix()}" exists'
-                        f' in both "{set1}" and "{set2}"')
+                        f'"{path}" exists in both "{set1}" and "{set2}"')
         # raise error
         if errors:
             raise CommitTargetError(''.join(errors))

@@ -17,7 +17,7 @@ def export_backups(
     # check if the destination exists
     if not destination.exists():
         logger.error(
-                f'export directory "{destination.as_posix()}" does not exist')
+                f'export directory "{destination}" does not exist')
         return
     # commits
     commits = git.commits()

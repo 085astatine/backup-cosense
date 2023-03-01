@@ -303,7 +303,7 @@ class _LogsDirectory:
             timestamp: int) -> Optional[list[ExternalLinkLog]]:
         file = self.find(timestamp)
         if file is not None:
-            self._logger.info(f'load logs from "{file.path.as_posix()}"')
+            self._logger.info(f'load logs from "{file.path}"')
             logs = file.load()
             if logs is not None:
                 return logs
@@ -317,7 +317,7 @@ class _LogsDirectory:
         file = self.find_latest(timestamp=timestamp)
         if file is not None:
             self._logger.info(
-                    f'load latest logs from "{file.path.as_posix()}"')
+                    f'load latest logs from "{file.path}"')
             logs = file.load()
             if logs is not None:
                 return logs
@@ -328,7 +328,7 @@ class _LogsDirectory:
             timestamp: int,
             logs: list[ExternalLinkLog]) -> None:
         path = self.file_path(timestamp)
-        self._logger.info(f'save logs to "{path.as_posix()}"')
+        self._logger.info(f'save logs to "{path}"')
         save_json(
                 path,
                 [dataclasses.asdict(log) for log in logs],
@@ -341,7 +341,7 @@ class _LogsDirectory:
             targets = list(reversed(self.find_all()))[keep:]
             self._logger.info(f'clean {len(targets)} log files')
             for target in targets:
-                self._logger.info(f'delete log file: {target.path.as_posix()}')
+                self._logger.info(f'delete log file: {target.path}')
                 target.path.unlink()
         else:
             self._logger.warning(f'skip clean: keep({keep}) must be >= 0')
@@ -504,7 +504,7 @@ async def _request(
                 save_path = config.save_directory.file_path(link.url)
                 logger.debug(
                         f'request({index}):'
-                        f' save to "{save_path.as_posix()}"')
+                        f' save to "{save_path}"')
                 if not save_path.parent.exists():
                     save_path.parent.mkdir(parents=True)
                 with save_path.open(mode='bw') as file:
@@ -553,7 +553,7 @@ def _load_saved_list(
         directory: _SaveDirectory,
         logger: logging.Logger) -> Optional[SavedExternalLinksInfo]:
     file_path = directory.list_path()
-    logger.debug(f'load saved link list from {file_path.as_posix()}')
+    logger.debug(f'load saved link list from {file_path}')
     data = load_json(
             file_path,
             schema=jsonschema_saved_external_links_info())
@@ -571,7 +571,7 @@ def _save_saved_list(
     saved_list = SavedExternalLinksInfo(
             content_types=sorted(content_types),
             urls=sorted(log.url for log in logs if log.is_saved))
-    logger.debug(f'save saved link list to {file_path.as_posix()}')
+    logger.debug(f'save saved link list to {file_path}')
     save_json(
             file_path,
             dataclasses.asdict(saved_list),
