@@ -75,6 +75,7 @@ def jsonschema_git_empty_initial_commit_config() -> dict[str, Any]:
 
 @dataclasses.dataclass(frozen=True)
 class GitConfig:
+    # pylint: disable=too-many-instance-attributes
     path: str
     executable: Optional[str] = None
     branch: Optional[str] = None
@@ -82,6 +83,7 @@ class GitConfig:
     user_name: Optional[str] = None
     user_email: Optional[str] = None
     empty_initial_commit: Optional[GitEmptyInitialCommitConfig] = None
+    staging_step_size: int = 1
 
     def git(self,
             *,
@@ -92,6 +94,7 @@ class GitConfig:
                 branch=self.branch,
                 user_name=self.user_name,
                 user_email=self.user_email,
+                staging_step_size=self.staging_step_size,
                 logger=logger)
 
 
@@ -118,6 +121,10 @@ def jsonschema_git_config() -> dict[str, Any]:
             },
             'empty_initial_commit':
                 jsonschema_git_empty_initial_commit_config(),
+            'staging_step_size': {
+                'type': 'integer',
+                'minimum': 1,
+            }
         },
     }
     return schema
@@ -221,7 +228,7 @@ def load_config(
         logger: Optional[logging.Logger] = None) -> Config:
     logger = logger or logging.getLogger(__name__)
     # load TOML
-    logger.info(f'load config from "{path.as_posix()}"')
+    logger.info(f'load config from "{path}"')
     with path.open(encoding='utf-8') as file:
         loaded = toml.load(file)
     logger.debug(f'loaded toml: {repr(loaded)}')

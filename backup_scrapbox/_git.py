@@ -10,7 +10,7 @@ import re
 import shutil
 import subprocess
 import textwrap
-from typing import Optional
+from typing import Iterator, Optional
 import jsonschema
 from ._backup import BackupInfoJSON, jsonschema_backup_info
 from ._json import parse_json
@@ -88,8 +88,7 @@ class CommitTarget:
                 2):
             for path in getattr(self, set1) & getattr(self, set2):
                 errors.append(
-                        f'"{path.as_posix()}" exists'
-                        f' in both "{set1}" and "{set2}"')
+                        f'"{path}" exists in both "{set1}" and "{set2}"')
         # raise error
         if errors:
             raise CommitTargetError(''.join(errors))
@@ -114,6 +113,7 @@ class Git:
             branch: Optional[str] = None,
             user_name: Optional[str] = None,
             user_email: Optional[str] = None,
+            staging_step_size: int = 1,
             logger: Optional[logging.Logger] = None) -> None:
         self._path = path
         self._executable = (
@@ -123,6 +123,7 @@ class Git:
         self._branch = branch
         self._user_name = user_name
         self._user_email = user_email
+        self._staging_step_size = staging_step_size
         self._logger = logger or logging.getLogger(__name__)
 
     @property
@@ -145,6 +146,37 @@ class Git:
             return False
         return self.path.resolve() == toplevel
 
+    def switch(
+            self,
+            *,
+            allow_orphan: bool = False) -> None:
+        # branch is not selected
+        if self._branch is None:
+            return
+        # current branch
+        branch = _execute_git_command(
+                [self._executable, 'branch', '--show-current'],
+                self.path,
+                logger=self._logger).stdout.rstrip('\n')
+        if branch == self._branch:
+            return
+        # switch
+        if allow_orphan and self._branch not in self.branches():
+            # create orphan branch
+            self._logger.info(
+                    f'create orphan branch "{self._branch}" before commit')
+            _execute_git_command(
+                    [self._executable, 'switch', '--orphan', self._branch],
+                    self._path,
+                    logger=self._logger)
+        else:
+            self._logger.info(
+                    f'switch git branch from "{branch}" to "{self._branch}"')
+            _execute_git_command(
+                [self._executable, 'switch', self._branch],
+                self.path,
+                logger=self._logger)
+
     def execute(
             self,
             command: list[str],
@@ -157,19 +189,8 @@ class Git:
         if not self.exists():
             self._logger.error(f'git repository "{self.path}" does not exist')
         # switch branch
-        if self._branch is not None:
-            branch = _execute_git_command(
-                    [self._executable, 'branch', '--show-current'],
-                    self.path,
-                    logger=self._logger).stdout.rstrip('\n')
-            if branch != self._branch:
-                self._logger.info(
-                        'switch git branch'
-                        f' from "{branch}" to "{self._branch}"')
-                _execute_git_command(
-                        [self._executable, 'switch', self._branch],
-                        self.path,
-                        logger=self._logger)
+        self.switch()
+        # execute command
         return _execute_git_command(
                 command,
                 self.path,
@@ -221,24 +242,14 @@ class Git:
             option: Optional[list[str]] = None,
             timestamp: Optional[int] = None) -> None:
         # create the orphan branch if the target branch does not exist
-        if self._branch is not None and self._branch not in self.branches():
-            self._logger.info(
-                    f'create orphan branch "{self._branch}" before commit')
-            _execute_git_command(
-                    [self._executable, 'switch', '--orphan', self._branch],
-                    self._path,
-                    logger=self._logger)
+        self.switch(allow_orphan=True)
         # target
-        for added in target.added:
-            self.execute([self._executable, 'add', added.as_posix()])
-        for updated in target.updated:
-            self.execute([self._executable, 'add', updated.as_posix()])
-        for deleted in target.deleted:
-            self.execute([
-                    self._executable,
-                    'rm',
-                    '--cached',
-                    deleted.as_posix()])
+        for added in _into_steps(target.added, self._staging_step_size):
+            self.execute([self._executable, 'add', *added])
+        for updated in _into_steps(target.updated, self._staging_step_size):
+            self.execute([self._executable, 'add', *updated])
+        for deleted in _into_steps(target.deleted, self._staging_step_size):
+            self.execute([self._executable, 'rm', '--cached', *deleted])
         # command
         command: list[str] = [self._executable]
         if self._user_name is not None:
@@ -344,6 +355,19 @@ def _execute_git_command(
             logger.error(f'{error.__class__.__name__}: {error_info}')
         raise error
     return process
+
+
+def _into_steps(
+        paths: set[pathlib.Path],
+        step_size: int) -> Iterator[list[str]]:
+    chunk: list[str] = []
+    for path in paths:
+        chunk.append(path.as_posix())
+        if len(chunk) >= step_size:
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk
 
 
 def _log_to_commit(log: str) -> Optional[Commit]:

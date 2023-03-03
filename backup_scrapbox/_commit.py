@@ -2,7 +2,7 @@ import datetime
 import logging
 import pathlib
 from typing import Optional
-from ._backup import Backup, BackupStorage, DownloadedBackup
+from ._backup import Backup, BackupJSONs, BackupStorage
 from ._config import Config, GitEmptyInitialCommitConfig
 from ._external_link import save_external_links
 from ._git import Commit, CommitTarget, Git
@@ -17,64 +17,126 @@ def commit_backups(
     logger = logger or logging.getLogger(__name__)
     git = config.git.git(logger=logger)
     storage = BackupStorage(pathlib.Path(config.scrapbox.save_directory))
+    backup: Optional[Backup] = None
+    # git switch
+    if git.exists():
+        git.switch(allow_orphan=True)
     # backup targets
     backup_targets = _backup_targets(storage, git, logger)
     # commit
     for target in backup_targets:
         logger.info(f'commit {format_timestamp(target.timestamp)}')
-        # load backup
-        backup = target.load(config.scrapbox.project, git.path)
+        # load backup repository
         if backup is None:
-            logger.info(
-                    'failed to load backup'
-                    f' {format_timestamp(target.timestamp)}')
-            continue
-        # sort pages
-        backup.sort_pages(config.git.page_order)
+            backup = Backup.load(
+                    config.scrapbox.project,
+                    git.path,
+                    page_order=config.git.page_order,
+                    logger=logger)
         # commit
-        commit_backup(config, backup, logger=logger)
+        commit_backup(
+                config,
+                target,
+                backup=backup,
+                logger=logger)
 
 
 def commit_backup(
         config: Config,
-        backup: Backup,
+        data: BackupJSONs,
         *,
+        backup: Optional[Backup] = None,
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
     git = config.git.git(logger=logger)
     # git init
     if not git.exists():
-        logger.info('create git repository "{git.path}"')
+        logger.info(f'create git repository "{git.path}"')
         git.init()
+    # git switch
+    git.switch(allow_orphan=True)
     # initial commit
-    _initial_commit(config, git, [backup])
-    # load previous backup
-    previous_backup = Backup.load(backup.project, git.path)
-    # update backup json
-    target = _update_backup_json(backup, previous_backup, logger)
-    # external link
+    _initial_commit(config, git, [data])
+    # staging
+    commit_target = staging_backup(
+            config,
+            data,
+            backup=backup,
+            logger=logger)
+    if commit_target is None:
+        logger.error('failed to staging')
+        return
+    # commit message
+    message = Commit.message(
+            config.scrapbox.project,
+            data.timestamp,
+            data.load_info())
+    # commit
+    git.commit(
+            commit_target,
+            message,
+            timestamp=data.timestamp)
+
+
+def staging_backup(
+        config: Config,
+        data: BackupJSONs,
+        *,
+        backup: Optional[Backup] = None,
+        logger: Optional[logging.Logger] = None) -> Optional[CommitTarget]:
+    logger = logger or logging.getLogger(__name__)
+    # git switch
+    git = config.git.git(logger=logger)
+    if git.exists():
+        git.switch(allow_orphan=True)
+    # load backup repository
+    if backup is None:
+        backup = Backup.load(
+                config.scrapbox.project,
+                git.path,
+                page_order=config.git.page_order,
+                logger=logger)
+    # load json
+    backup_json = data.load_backup()
+    info_json = data.load_info()
+    if backup_json is None:
+        logger.error('failure to load "{data.backup_path}"')
+        return None
+    # update backup
+    if backup is None:
+        # initial update
+        backup = Backup(
+                config.scrapbox.project,
+                git.path,
+                backup_json,
+                info_json,
+                page_order=config.git.page_order)
+        backup.save(logger=logger)
+        commit_target = CommitTarget(updated=set(backup.save_files()))
+    else:
+        # update
+        update_diff = backup.update(
+                backup_json,
+                info_json,
+                logger=logger)
+        commit_target = CommitTarget(
+                added=set(update_diff.added),
+                updated=set(update_diff.updated),
+                deleted=set(update_diff.removed))
+    # external links
     if config.external_link.enabled:
-        target.update(save_external_links(
+        commit_target.update(save_external_links(
                 backup,
                 git.path,
                 config=config.external_link,
                 logger=logger))
-    # commit message
-    message = Commit.message(
-            backup.project,
-            backup.timestamp,
-            backup.info)
-    # commit
-    git.commit(
-            target,
-            message,
-            timestamp=backup.timestamp)
+    return commit_target
 
 
 def _backup_targets(
         storage: BackupStorage,
         git: Git,
-        logger: logging.Logger) -> list[DownloadedBackup]:
+        logger: logging.Logger) -> list[BackupJSONs]:
     # get latest backup timestamp
     latest = git.latest_commit_timestamp()
     logger.info(f'latest backup: {format_timestamp(latest)}')
@@ -85,34 +147,10 @@ def _backup_targets(
     return targets
 
 
-def _update_backup_json(
-        backup: Backup,
-        previous_backup: Optional[Backup],
-        logger: logging.Logger) -> CommitTarget:
-    # previous files
-    previous_files = set(
-            previous_backup.save_files()
-            if previous_backup is not None
-            else [])
-    # clear previous files
-    for previous_file in previous_files:
-        logger.debug(f'remove "{previous_file.as_posix()}"')
-        previous_file.unlink()
-    # next files
-    next_files = set(backup.save_files())
-    # copy next files
-    backup.save(logger=logger)
-    # commit target
-    return CommitTarget(
-            added=next_files - previous_files,
-            updated=next_files & previous_files,
-            deleted=previous_files - next_files)
-
-
 def _initial_commit(
         config: Config,
         git: Git,
-        backups: list[Backup]) -> None:
+        backups: list[BackupJSONs]) -> None:
     # empty initial commit is enabled
     if config.git.empty_initial_commit is None:
         return
@@ -131,7 +169,7 @@ def _initial_commit(
 
 def _initial_commit_timestamp(
         config: GitEmptyInitialCommitConfig,
-        backups: list[Backup]) -> int:
+        backups: list[BackupJSONs]) -> int:
     match config.timestamp:
         case datetime.datetime():
             return int(config.timestamp.timestamp())
@@ -150,6 +188,7 @@ def _initial_commit_timestamp(
                     'unable to define timestamp')
             return timestamp
         case 'oldest_created_page':
+            # select oldest data
             backup = min(
                     backups,
                     default=None,
@@ -158,8 +197,15 @@ def _initial_commit_timestamp(
                 raise InitialCommitError(
                     'Since there is no backup, '
                     'unable to define timestamp')
+            # load json
+            backup_data = backup.load_backup()
+            if backup_data is None:
+                raise InitialCommitError(
+                    'Could not load oldest backup'
+                    f' "{backup.backup_path}"')
+            # oldest created page
             timestamp = min(
-                    (page['created'] for page in backup.data['pages']),
+                    (page['created'] for page in backup_data['pages']),
                     default=None)
             if timestamp is None:
                 raise InitialCommitError(

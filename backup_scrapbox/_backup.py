@@ -1,5 +1,6 @@
 from __future__ import annotations
 import dataclasses
+import itertools
 import logging
 import pathlib
 import re
@@ -165,17 +166,29 @@ class ExternalLink:
     locations: list[Location]
 
 
+@dataclasses.dataclass
+class UpdateDiff:
+    added: list[pathlib.Path]
+    updated: list[pathlib.Path]
+    removed: list[pathlib.Path]
+
+
 class Backup:
     def __init__(
             self,
             project: str,
             directory: pathlib.Path,
             backup: BackupJSON,
-            info: Optional[BackupInfoJSON]) -> None:
+            info: Optional[BackupInfoJSON],
+            *,
+            page_order: Optional[PageOrder] = None) -> None:
         self._project = project
         self._directory = directory
         self._backup = backup
         self._info = info
+        self._page_order = page_order
+        # sort pages
+        _sort_pages(self._backup['pages'], self._page_order)
         # JSON Schema validation
         jsonschema.validate(
                 instance=self._backup,
@@ -252,16 +265,72 @@ class Backup:
             link.locations.sort()
         return links
 
-    def sort_pages(
+    def update(
             self,
-            order: Optional[PageOrder] = None) -> None:
-        match order:
-            case None | 'as-is':
-                pass
-            case 'created-asc':
-                self._backup['pages'].sort(key=lambda page: page['created'])
-            case 'created-desc':
-                self._backup['pages'].sort(key=lambda page: - page['created'])
+            backup: BackupJSON,
+            info: Optional[BackupInfoJSON],
+            *,
+            logger: Optional[logging.Logger] = None) -> UpdateDiff:
+        logger = logger or logging.getLogger(__name__)
+        added: list[pathlib.Path] = []
+        updated: list[pathlib.Path] = []
+        removed: list[pathlib.Path] = []
+        # sort pages
+        _sort_pages(backup['pages'], self._page_order)
+        # backup
+        backup_path = self.directory.joinpath(
+                f'{_escape_filename(self.project)}.json')
+        if backup != self._backup:
+            logger.debug(f'update "{backup_path}"')
+            save_json(backup_path, backup)
+            updated.append(backup_path)
+        # info
+        info_path = backup_path.with_suffix('.info.json')
+        if info != self._info:
+            if info is None:
+                logger.debug(f'remove "{backup_path}"')
+                info_path.unlink()
+                removed.append(info_path)
+            elif self._info is None:
+                logger.debug(f'add "{backup_path}"')
+                save_json(info_path, info)
+                added.append(info_path)
+            else:
+                logger.debug(f'update "{backup_path}"')
+                save_json(info_path, info)
+                updated.append(info_path)
+        # previous pages
+        previous_pages = {
+                _escape_filename(page['title']): page
+                for page in self._backup['pages']}
+        # add/update pages
+        page_directory = self.directory.joinpath('pages')
+        for page in backup['pages']:
+            title = _escape_filename(page['title'])
+            page_path = page_directory.joinpath(f'{title}.json')
+            if title in previous_pages:
+                if page != previous_pages[title]:
+                    # update page
+                    logger.debug(f'update "{page_path}"')
+                    save_json(page_path, page)
+                    updated.append(page_path)
+                # remove from dict to detect deleted pages
+                del previous_pages[title]
+            else:
+                # add new page
+                logger.debug(f'add "{page_path}"')
+                save_json(page_path, page)
+                added.append(page_path)
+        # remove deleted pages
+        for title in previous_pages.keys():
+            page_path = page_directory.joinpath(f'{title}.json')
+            logger.debug(f'remove "{page_path}"')
+            page_path.unlink()
+            removed.append(page_path)
+        # update self
+        self._backup = backup
+        self._info = info
+        return UpdateDiff(added, updated, removed)
 
     def save_files(self) -> list[pathlib.Path]:
         files: list[pathlib.Path] = []
@@ -287,26 +356,30 @@ class Backup:
         # {project}.json
         backup_path = self.directory.joinpath(
                 f'{_escape_filename(self.project)}.json')
-        logger.debug(f'save "{backup_path.as_posix()}"')
+        logger.debug(f'save "{backup_path}"')
         save_json(backup_path, self._backup)
         # {project}.info.json
         if self._info is not None:
             info_path = backup_path.with_suffix('.info.json')
-            logger.debug(f'save "{info_path.as_posix()}"')
+            logger.debug(f'save "{info_path}"')
             save_json(info_path, self._info)
         # pages
         page_directory = self.directory.joinpath('pages')
         for page in self._backup['pages']:
             page_path = page_directory.joinpath(
                     f'{_escape_filename(page["title"])}.json')
-            logger.debug(f'save "{page_path.as_posix()}"')
+            logger.debug(f'save "{page_path}"')
             save_json(page_path, page)
 
     @classmethod
     def load(
             cls,
             project: str,
-            directory: pathlib.Path) -> Optional[Backup]:
+            directory: pathlib.Path,
+            *,
+            page_order: Optional[PageOrder] = None,
+            logger: Optional[logging.Logger] = None) -> Optional[Backup]:
+        logger = logger or logging.getLogger(__name__)
         # {project}.json
         backup_path = directory.joinpath(f'{_escape_filename(project)}.json')
         backup: Optional[BackupJSON] = load_json(
@@ -319,15 +392,20 @@ class Backup:
         info: Optional[BackupInfoJSON] = load_json(
                 info_path,
                 schema=jsonschema_backup_info())
+        # check if pages are sorted
+        if _is_sorted_pages(backup['pages'], page_order) is False:
+            logger.warn(
+                    f'loaded backup pages are not sorted by {page_order}')
         return cls(
                 project,
                 directory,
                 backup,
-                info)
+                info,
+                page_order=page_order)
 
 
 @dataclasses.dataclass
-class DownloadedBackup:
+class BackupJSONs:
     timestamp: int
     backup_path: pathlib.Path
     info_path: Optional[pathlib.Path]
@@ -344,20 +422,6 @@ class DownloadedBackup:
                 self.info_path,
                 schema=jsonschema_backup_info())
 
-    def load(
-            self,
-            project: str,
-            directory: pathlib.Path) -> Optional[Backup]:
-        backup = self.load_backup()
-        info = self.load_info()
-        if backup is None:
-            return None
-        return Backup(
-                project,
-                directory,
-                backup,
-                info)
-
 
 class BackupStorage:
     def __init__(self, directory: pathlib.Path) -> None:
@@ -372,8 +436,8 @@ class BackupStorage:
     def exists(self, timestamp: int) -> bool:
         return self.backup_path(timestamp).exists()
 
-    def backups(self) -> list[DownloadedBackup]:
-        backups: list[DownloadedBackup] = []
+    def backups(self) -> list[BackupJSONs]:
+        backups: list[BackupJSONs] = []
         for path in self._directory.iterdir():
             # check if the path is file
             if not path.is_file():
@@ -387,12 +451,38 @@ class BackupStorage:
             timestamp = int(filename_match.group('timestamp'))
             # info path
             info_path = self.info_path(timestamp)
-            backups.append(DownloadedBackup(
+            backups.append(BackupJSONs(
                     timestamp=timestamp,
                     backup_path=path,
                     info_path=info_path if info_path.exists() else None))
         # sort by old...new
         return sorted(backups, key=lambda backup: backup.timestamp)
+
+
+def _sort_pages(
+        pages: list[BackupPageJSON],
+        order: Optional[PageOrder]) -> None:
+    match order:
+        case None | 'as-is':
+            pass
+        case 'created-asc':
+            pages.sort(key=lambda page: page['created'])
+        case 'created-desc':
+            pages.sort(key=lambda page: - page['created'])
+
+
+def _is_sorted_pages(
+        pages: list[BackupPageJSON],
+        order: Optional[PageOrder]) -> Optional[bool]:
+    if order is None or order == 'as-is':
+        return None
+    # sort shallow copied pages
+    sorted_pages = pages[:]
+    _sort_pages(sorted_pages, order)
+    # compare the id of each page
+    return all(
+            id(x) == id(y)
+            for x, y in itertools.zip_longest(pages, sorted_pages))
 
 
 def _escape_filename(text: str) -> str:
