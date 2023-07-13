@@ -123,6 +123,8 @@ def jsonschema_backup() -> dict[str, Any]:
         'exported': {'type': 'integer'},
         'users': {
           'type': 'array',
+          # item type is unknown
+          'maxItems': 0,
           'items': {'type': 'string'},
         },
         'pages': {
