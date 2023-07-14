@@ -50,6 +50,7 @@ def jsonschema_backup_page_line() -> dict[str, Any]:
         'text': {'type': 'string'},
         'created': {'type': 'integer'},
         'updated': {'type': 'integer'},
+        'userId': {'type': 'string'},
       },
     }
     return schema
@@ -120,6 +121,12 @@ def jsonschema_backup() -> dict[str, Any]:
         'name': {'type': 'string'},
         'displayName': {'type': 'string'},
         'exported': {'type': 'integer'},
+        'users': {
+          'type': 'array',
+          # item type is unknown
+          'maxItems': 0,
+          'items': {'type': 'string'},
+        },
         'pages': {
           'type': 'array',
           'items': jsonschema_backup_page(),
