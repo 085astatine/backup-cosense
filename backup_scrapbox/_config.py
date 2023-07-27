@@ -17,6 +17,7 @@ class ScrapboxConfig:
     save_directory: str
     request_interval: float = 3.0
     request_timeout: float = 10.0
+    backup_start_date: Optional[datetime.date | datetime.datetime] = None
 
 
 def jsonschema_scrapbox_config() -> dict[str, Any]:
@@ -36,6 +37,7 @@ def jsonschema_scrapbox_config() -> dict[str, Any]:
                 'type': 'number',
                 'exclusiveMinimum': 0.0,
             },
+            'backup_start_date': {'type': ['date', 'datetime']},
         },
     }
     return schema
