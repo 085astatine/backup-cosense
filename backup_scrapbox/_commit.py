@@ -173,11 +173,6 @@ def _initial_commit_timestamp(
     match config.timestamp:
         case datetime.datetime():
             return int(config.timestamp.timestamp())
-        case datetime.date():
-            # add time(00:00:00) to date
-            return int(datetime.datetime.combine(
-                    config.timestamp,
-                    datetime.time()).timestamp())
         case 'oldest_backup':
             timestamp = min(
                     (backup.timestamp for backup in backups),
