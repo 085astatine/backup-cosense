@@ -96,6 +96,11 @@ def _request_backup_list(
 def _backup_filter(
         config: Config,
         logger: logging.Logger) -> Callable[[BackupInfoJSON], bool]:
+    # backup start date
+    start_timestamp = (
+            config.scrapbox.backup_start_date.timestamp()
+            if config.scrapbox.backup_start_date is not None
+            else None)
     # get the latest backup timestamp from the Git repository
     git = config.git.git(logger=logger)
     latest_timestamp = git.latest_commit_timestamp()
@@ -108,6 +113,11 @@ def _backup_filter(
         if storage.exists(timestamp):
             logger.debug(
                     f'skip {format_timestamp(timestamp)}: already downloaded')
+            return False
+        if start_timestamp is not None and start_timestamp > timestamp:
+            logger.debug(
+                    f'skil {format_timestamp(timestamp)}: '
+                    'older than backup start date')
             return False
         if latest_timestamp is None:
             return True
