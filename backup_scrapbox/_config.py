@@ -260,7 +260,8 @@ def _validator() -> jsonschema.protocols.Validator:
 def _is_date(
         _checker: jsonschema.TypeChecker,
         instance: Any) -> bool:
-    return isinstance(instance, datetime.date)
+    return (isinstance(instance, datetime.date)
+            and not isinstance(instance, datetime.datetime))
 
 
 def _is_datetime(
