@@ -1,6 +1,8 @@
 import dataclasses
 import datetime
+import functools
 import logging
+import operator
 import pathlib
 from typing import Any, Literal, Optional, get_args
 import dacite
@@ -17,6 +19,7 @@ class ScrapboxConfig:
     save_directory: str
     request_interval: float = 3.0
     request_timeout: float = 10.0
+    backup_start_date: Optional[datetime.datetime] = None
 
 
 def jsonschema_scrapbox_config() -> dict[str, Any]:
@@ -36,6 +39,7 @@ def jsonschema_scrapbox_config() -> dict[str, Any]:
                 'type': 'number',
                 'exclusiveMinimum': 0.0,
             },
+            'backup_start_date': {'type': ['date', 'datetime']},
         },
     }
     return schema
@@ -46,7 +50,6 @@ class GitEmptyInitialCommitConfig:
     message: str = 'Initial commit'
     timestamp: (
         Literal['oldest_backup', 'oldest_created_page']
-        | datetime.date
         | datetime.datetime
     ) = 'oldest_created_page'
 
@@ -234,6 +237,8 @@ def load_config(
     logger.debug(f'loaded toml: {repr(loaded)}')
     # JSON Schema validation
     _validator().validate(instance=loaded)
+    # to dataclass
+    _preprocess_to_dataclass(loaded)
     config = dacite.from_dict(
             data_class=Config,
             data=loaded,
@@ -255,10 +260,36 @@ def _validator() -> jsonschema.protocols.Validator:
 def _is_date(
         _checker: jsonschema.TypeChecker,
         instance: Any) -> bool:
-    return isinstance(instance, datetime.date)
+    return (isinstance(instance, datetime.date)
+            and not isinstance(instance, datetime.datetime))
 
 
 def _is_datetime(
         _checker: jsonschema.TypeChecker,
         instance: Any) -> bool:
     return isinstance(instance, datetime.datetime)
+
+
+def _preprocess_to_dataclass(data: dict) -> None:
+    # scrapbox.backup_start_date
+    _date_to_datetime(data, ['scrapbox', 'backup_start_date'])
+    # git.empty_initial_commit.timestamp
+    _date_to_datetime(data, ['git', 'empty_initial_commit', 'timestamp'])
+
+
+def _date_to_datetime(data: dict, keys: list[str]) -> None:
+    if not keys:
+        return
+    try:
+        parent = functools.reduce(operator.getitem, keys[:-1], data)
+        value = parent[keys[-1]]
+        match value:
+            case datetime.datetime():
+                pass
+            case datetime.date():
+                # add time(00:00:00) to date
+                parent[keys[-1]] = datetime.datetime.combine(
+                        value,
+                        datetime.time())
+    except KeyError:
+        pass

@@ -16,13 +16,12 @@ def commit_backups(
         logger: Optional[logging.Logger] = None) -> None:
     logger = logger or logging.getLogger(__name__)
     git = config.git.git(logger=logger)
-    storage = BackupStorage(pathlib.Path(config.scrapbox.save_directory))
     backup: Optional[Backup] = None
     # git switch
     if git.exists():
         git.switch(allow_orphan=True)
     # backup targets
-    backup_targets = _backup_targets(storage, git, logger)
+    backup_targets = _backup_targets(config, git, logger)
     # commit
     for target in backup_targets:
         logger.info(f'commit {format_timestamp(target.timestamp)}')
@@ -134,16 +133,26 @@ def staging_backup(
 
 
 def _backup_targets(
-        storage: BackupStorage,
+        config: Config,
         git: Git,
         logger: logging.Logger) -> list[BackupJSONs]:
+    # backup start date
+    backup_start = (
+            int(config.scrapbox.backup_start_date.timestamp())
+            if config.scrapbox.backup_start_date is not None
+            else None)
     # get latest backup timestamp
-    latest = git.latest_commit_timestamp()
-    logger.info(f'latest backup: {format_timestamp(latest)}')
+    latest_commit = git.latest_commit_timestamp()
+    logger.info(f'latest backup: {format_timestamp(latest_commit)}')
+    # threshold timestamp
+    threshold = max(
+            (x for x in [backup_start, latest_commit] if x is not None),
+            default=None)
     # find backup
+    storage = BackupStorage(pathlib.Path(config.scrapbox.save_directory))
     targets = [
             backup for backup in storage.backups()
-            if latest is None or latest < backup.timestamp]
+            if threshold is None or threshold < backup.timestamp]
     return targets
 
 
@@ -173,11 +182,6 @@ def _initial_commit_timestamp(
     match config.timestamp:
         case datetime.datetime():
             return int(config.timestamp.timestamp())
-        case datetime.date():
-            # add time(00:00:00) to date
-            return int(datetime.datetime.combine(
-                    config.timestamp,
-                    datetime.time()).timestamp())
         case 'oldest_backup':
             timestamp = min(
                     (backup.timestamp for backup in backups),
