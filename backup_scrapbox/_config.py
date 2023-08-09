@@ -13,10 +13,29 @@ from ._git import Git
 
 
 @dataclasses.dataclass(frozen=True)
+class ScrapboxSaveDirectoryConfig:
+    name: str
+    subdirectory: bool = False
+
+
+def jsonschema_scrapbox_save_directory_config() -> dict[str, Any]:
+    schema = {
+        'type': 'object',
+        'required': ['name'],
+        'additionalProperties': False,
+        'properties': {
+            'name': {'type': 'string'},
+            'subdirectory': {'type': 'boolean'},
+        },
+    }
+    return schema
+
+
+@dataclasses.dataclass(frozen=True)
 class ScrapboxConfig:
     project: str
     session_id: str
-    save_directory: str
+    save_directory: ScrapboxSaveDirectoryConfig
     request_interval: float = 3.0
     request_timeout: float = 10.0
     backup_start_date: Optional[datetime.datetime] = None
@@ -30,7 +49,12 @@ def jsonschema_scrapbox_config() -> dict[str, Any]:
         'properties': {
             'project': {'type': 'string'},
             'session_id': {'type': 'string'},
-            'save_directory': {'type': 'string'},
+            'save_directory': {
+                'oneOf': [
+                    {'type': 'string'},
+                    jsonschema_scrapbox_save_directory_config(),
+                ],
+            },
             'request_interval': {
                 'type': 'number',
                 'exclusiveMinimum': 0.0,
@@ -271,6 +295,11 @@ def _is_datetime(
 
 
 def _preprocess_to_dataclass(data: dict) -> None:
+    # scrapbox.save_directory
+    _update_value(
+            data,
+            ['scrapbox', 'save_directory'],
+            _to_save_directory)
     # scrapbox.backup_start_date
     _update_value(
             data,
@@ -294,6 +323,12 @@ def _update_value(
         parent[keys[-1]] = converter(parent[keys[-1]])
     except KeyError:
         pass
+
+
+def _to_save_directory(value: str | dict) -> dict:
+    if isinstance(value, str):
+        return {'name': value}
+    return value
 
 
 def _date_to_datetime(
