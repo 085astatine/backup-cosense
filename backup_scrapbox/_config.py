@@ -4,7 +4,7 @@ import functools
 import logging
 import operator
 import pathlib
-from typing import Any, Literal, Optional, get_args
+from typing import Any, Callable, Literal, Optional, get_args
 import dacite
 import jsonschema
 import toml
@@ -272,24 +272,37 @@ def _is_datetime(
 
 def _preprocess_to_dataclass(data: dict) -> None:
     # scrapbox.backup_start_date
-    _date_to_datetime(data, ['scrapbox', 'backup_start_date'])
+    _update_value(
+            data,
+            ['scrapbox', 'backup_start_date'],
+            _date_to_datetime)
     # git.empty_initial_commit.timestamp
-    _date_to_datetime(data, ['git', 'empty_initial_commit', 'timestamp'])
+    _update_value(
+            data,
+            ['git', 'empty_initial_commit', 'timestamp'],
+            _date_to_datetime)
 
 
-def _date_to_datetime(data: dict, keys: list[str]) -> None:
+def _update_value(
+        data: dict,
+        keys: list[str],
+        converter: Callable[[Any], Any]) -> None:
     if not keys:
         return
     try:
         parent = functools.reduce(operator.getitem, keys[:-1], data)
-        value = parent[keys[-1]]
-        match value:
-            case datetime.datetime():
-                pass
-            case datetime.date():
-                # add time(00:00:00) to date
-                parent[keys[-1]] = datetime.datetime.combine(
-                        value,
-                        datetime.time())
+        parent[keys[-1]] = converter(parent[keys[-1]])
     except KeyError:
         pass
+
+
+def _date_to_datetime(
+        value: datetime.date | datetime.datetime) -> datetime.datetime:
+    match value:
+        case datetime.datetime():
+            return value
+        case datetime.date():
+            # add time(00:00:00) to date
+            return datetime.datetime.combine(
+                    value,
+                    datetime.time())
