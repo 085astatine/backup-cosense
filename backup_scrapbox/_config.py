@@ -8,7 +8,7 @@ from typing import Any, Callable, Literal, Optional, get_args
 import dacite
 import jsonschema
 import toml
-from ._backup import PageOrder
+from ._backup import BackupStorage, PageOrder
 from ._git import Git
 
 
@@ -16,6 +16,9 @@ from ._git import Git
 class ScrapboxSaveDirectoryConfig:
     name: str
     subdirectory: bool = False
+
+    def storage(self) -> BackupStorage:
+        return BackupStorage(pathlib.Path(self.name))
 
 
 def jsonschema_scrapbox_save_directory_config() -> dict[str, Any]:

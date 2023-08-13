@@ -1,11 +1,9 @@
 import logging
-import pathlib
 import time
 from typing import Any, Callable, Optional, TypedDict
 import requests
 from ._backup import (
-    BackupJSON, BackupInfoJSON, BackupStorage, jsonschema_backup,
-    jsonschema_backup_info)
+    BackupJSON, BackupInfoJSON, jsonschema_backup, jsonschema_backup_info)
 from ._config import Config
 from ._json import request_json, save_json
 from ._utility import format_timestamp
@@ -106,7 +104,7 @@ def _backup_filter(
     latest_timestamp = git.latest_commit_timestamp()
     logger.info(f'latest backup: {format_timestamp(latest_timestamp)}')
     # backup storage
-    storage = BackupStorage(pathlib.Path(config.scrapbox.save_directory.name))
+    storage = config.scrapbox.save_directory.storage()
 
     def backup_filter(backup: BackupInfoJSON) -> bool:
         timestamp = backup['backuped']
@@ -149,7 +147,7 @@ def _download_backup(
     if backup is None:
         return
     # save
-    storage = BackupStorage(pathlib.Path(config.scrapbox.save_directory.name))
+    storage = config.scrapbox.save_directory.storage()
     # save backup
     backup_path = storage.backup_path(timestamp)
     logger.info(f'save "{backup_path}"')

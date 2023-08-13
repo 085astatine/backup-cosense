@@ -1,8 +1,7 @@
 import datetime
 import logging
-import pathlib
 from typing import Optional
-from ._backup import Backup, BackupJSONs, BackupStorage
+from ._backup import Backup, BackupJSONs
 from ._config import Config, GitEmptyInitialCommitConfig
 from ._external_link import save_external_links
 from ._git import Commit, CommitTarget, Git
@@ -149,7 +148,7 @@ def _backup_targets(
             (x for x in [backup_start, latest_commit] if x is not None),
             default=None)
     # find backup
-    storage = BackupStorage(pathlib.Path(config.scrapbox.save_directory.name))
+    storage = config.scrapbox.save_directory.storage()
     targets = [
             backup for backup in storage.backups()
             if threshold is None or threshold < backup.timestamp]
