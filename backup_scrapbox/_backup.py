@@ -431,18 +431,22 @@ class BackupJSONs:
 
 
 class BackupStorage:
-    def __init__(self, directory: pathlib.Path) -> None:
-        self._directory = directory
+    def __init__(self, path: pathlib.Path) -> None:
+        self._path = path
+
+    @property
+    def path(self) -> pathlib.Path:
+        return self._path
 
     def backup_path(self, timestamp: int) -> pathlib.Path:
-        return self._directory.joinpath(f'{timestamp}.json')
+        return self.path.joinpath(f'{timestamp}.json')
 
     def info_path(self, timestamp: int) -> pathlib.Path:
-        return self._directory.joinpath(f'{timestamp}.info.json')
+        return self.path.joinpath(f'{timestamp}.info.json')
 
     def backups(self) -> list[BackupJSONs]:
         backups: list[BackupJSONs] = []
-        for path in self._directory.iterdir():
+        for path in self._path.iterdir():
             # check if the path is file
             if not path.is_file():
                 continue
