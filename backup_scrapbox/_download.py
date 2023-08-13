@@ -108,7 +108,7 @@ def _backup_filter(
 
     def backup_filter(backup: BackupInfoJSON) -> bool:
         timestamp = backup['backuped']
-        if storage.exists(timestamp):
+        if storage.backup_path(timestamp).exists():
             logger.debug(
                     f'skip {format_timestamp(timestamp)}: already downloaded')
             return False

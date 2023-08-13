@@ -440,9 +440,6 @@ class BackupStorage:
     def info_path(self, timestamp: int) -> pathlib.Path:
         return self._directory.joinpath(f'{timestamp}.info.json')
 
-    def exists(self, timestamp: int) -> bool:
-        return self.backup_path(timestamp).exists()
-
     def backups(self) -> list[BackupJSONs]:
         backups: list[BackupJSONs] = []
         for path in self._directory.iterdir():
