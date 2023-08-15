@@ -2,7 +2,7 @@ import argparse
 import logging
 import pathlib
 from typing import Optional
-from ._config import Config, load_config
+from ._config import Config, ScrapboxSaveDirectoryConfig, load_config
 from ._download import download_backups
 from ._commit import commit_backups
 from ._export import export_backups
@@ -42,7 +42,9 @@ def backup_scrapbox(
     # export
     if option.command == 'export':
         logger.info('command: export')
-        export_backups(config, option.destination, logger=logger)
+        destination = ScrapboxSaveDirectoryConfig(
+                name=option.destination).storage()
+        export_backups(config, destination, logger=logger)
 
 
 def _argument_parser() -> argparse.ArgumentParser:
@@ -93,7 +95,6 @@ def _add_export_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
             '-d', '--destination',
             dest='destination',
-            type=pathlib.Path,
             required=True,
             metavar='DIR',
             help='directory to export backups')

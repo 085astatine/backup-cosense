@@ -2,7 +2,7 @@ import logging
 import pathlib
 import subprocess
 from typing import Any, Optional
-from ._backup import jsonschema_backup, jsonschema_backup_info
+from ._backup import BackupStorage, jsonschema_backup, jsonschema_backup_info
 from ._config import Config
 from ._git import Git, Commit
 from ._json import parse_json, save_json
@@ -11,13 +11,13 @@ from ._utility import format_timestamp
 
 def export_backups(
         config: Config,
-        destination: pathlib.Path,
+        destination: BackupStorage,
         logger: logging.Logger) -> None:
     git = config.git.git(logger=logger)
     # check if the destination exists
-    if not destination.exists():
+    if not destination.path.exists():
         logger.error(
-                f'export directory "{destination}" does not exist')
+                f'export directory "{destination.path}" does not exist')
         return
     # commits
     commits = git.commits()
@@ -42,10 +42,10 @@ def _export(
         project: str,
         git: Git,
         commit: Commit,
-        destination: pathlib.Path,
+        destination: BackupStorage,
         logger: logging.Logger) -> None:
     # save backup.json
-    backup_path = destination.joinpath(f'{commit.timestamp}.json')
+    backup_path = destination.backup_path(commit.timestamp)
     if not _export_json(
             git,
             commit.hash,
@@ -56,7 +56,7 @@ def _export(
         return
     logger.debug(f'save "{backup_path}"')
     # save backup.info.json
-    info_path = destination.joinpath(f'{commit.timestamp}.info.json')
+    info_path = destination.info_path(commit.timestamp)
     if _export_json(
             git,
             commit.hash,
