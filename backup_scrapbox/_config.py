@@ -18,7 +18,9 @@ class ScrapboxSaveDirectoryConfig:
     subdirectory: bool = False
 
     def storage(self) -> BackupStorage:
-        return BackupStorage(pathlib.Path(self.name))
+        return BackupStorage(
+                pathlib.Path(self.name),
+                subdirectory=self.subdirectory)
 
 
 def jsonschema_scrapbox_save_directory_config() -> dict[str, Any]:
