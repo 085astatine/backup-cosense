@@ -43,7 +43,8 @@ def backup_scrapbox(
     if option.command == 'export':
         logger.info('command: export')
         destination = ScrapboxSaveDirectoryConfig(
-                name=option.destination).storage()
+                name=option.destination,
+                subdirectory=option.subdirectory).storage()
         export_backups(config, destination, logger=logger)
 
 
@@ -98,3 +99,9 @@ def _add_export_arguments(parser: argparse.ArgumentParser) -> None:
             required=True,
             metavar='DIR',
             help='directory to export backups')
+    # subdirectory
+    parser.add_argument(
+            '--subdirectory',
+            dest='subdirectory',
+            action='store_true',
+            help='create subdirectories on export')
