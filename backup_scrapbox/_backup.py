@@ -2,6 +2,7 @@ from __future__ import annotations
 import dataclasses
 import itertools
 import logging
+import math
 import pathlib
 import re
 from typing import Any, Generator, Literal, Optional, Tuple, TypedDict
@@ -431,37 +432,37 @@ class BackupJSONs:
 
 
 class BackupStorage:
-    def __init__(self, directory: pathlib.Path) -> None:
-        self._directory = directory
+    def __init__(
+            self,
+            path: pathlib.Path,
+            *,
+            subdirectory: bool = False) -> None:
+        self._path = path
+        self._subdirectory = subdirectory
+
+    @property
+    def path(self) -> pathlib.Path:
+        return self._path
 
     def backup_path(self, timestamp: int) -> pathlib.Path:
-        return self._directory.joinpath(f'{timestamp}.json')
+        directory = _backup_directory(
+                self._path,
+                self._subdirectory,
+                timestamp)
+        return directory.joinpath(f'{timestamp}.json')
 
     def info_path(self, timestamp: int) -> pathlib.Path:
-        return self._directory.joinpath(f'{timestamp}.info.json')
-
-    def exists(self, timestamp: int) -> bool:
-        return self.backup_path(timestamp).exists()
+        directory = _backup_directory(
+                self._path,
+                self._subdirectory,
+                timestamp)
+        return directory.joinpath(f'{timestamp}.info.json')
 
     def backups(self) -> list[BackupJSONs]:
-        backups: list[BackupJSONs] = []
-        for path in self._directory.iterdir():
-            # check if the path is file
-            if not path.is_file():
-                continue
-            # check if the filename is '{timestamp}.json'
-            filename_match = re.match(
-                    r'^(?P<timestamp>\d+)\.json$',
-                    path.name)
-            if filename_match is None:
-                continue
-            timestamp = int(filename_match.group('timestamp'))
-            # info path
-            info_path = self.info_path(timestamp)
-            backups.append(BackupJSONs(
-                    timestamp=timestamp,
-                    backup_path=path,
-                    info_path=info_path if info_path.exists() else None))
+        backups = (
+            _search_subdirectory(self._path)
+            if self._subdirectory
+            else _search_backup(self._path))
         # sort by old...new
         return sorted(backups, key=lambda backup: backup.timestamp)
 
@@ -539,3 +540,54 @@ def _filter_code(
         # code snippets
         line = code_snippets.sub(' ', line)
         yield line, Location(title=title, line=i)
+
+
+def _backup_directory(
+        path: pathlib.Path,
+        subdirectory: bool,
+        timestamp: int) -> pathlib.Path:
+    if subdirectory:
+        return path.joinpath(str(math.floor(timestamp / 1.0e+7)))
+    return path
+
+
+def _search_backup(
+        directory: pathlib.Path) -> list[BackupJSONs]:
+    # search '{timestamp}.json' & '{timestamp}.info.json'
+    backups: list[BackupJSONs] = []
+    # check if the path is directory
+    if directory.is_dir():
+        for path in directory.iterdir():
+            # check if the path is file
+            if not path.is_file():
+                continue
+            # check if the filename is '{timestamp}.json'
+            filename_match = re.match(
+                    r'^(?P<timestamp>\d+)\.json$',
+                    path.name)
+            if filename_match is None:
+                continue
+            timestamp = int(filename_match.group('timestamp'))
+            # info path
+            info_path = directory.joinpath(f'{timestamp}.info.json')
+            backups.append(BackupJSONs(
+                    timestamp=timestamp,
+                    backup_path=path,
+                    info_path=info_path if info_path.exists() else None))
+    return backups
+
+
+def _search_subdirectory(
+        directory: pathlib.Path) -> list[BackupJSONs]:
+    # search directory '{timestamp / 1.0e+7}'
+    backups: list[BackupJSONs] = []
+    # check if the path is directory
+    if directory.is_dir():
+        for path in directory.iterdir():
+            # check if the path is directory
+            if not path.is_dir():
+                continue
+            # check if the directory name is 'timestamp / 1.0e+7'
+            if re.match(r'[0-9]+', path.name):
+                backups.extend(_search_backup(path))
+    return backups

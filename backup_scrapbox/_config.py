@@ -4,19 +4,43 @@ import functools
 import logging
 import operator
 import pathlib
-from typing import Any, Literal, Optional, get_args
+from typing import Any, Callable, Literal, Optional, get_args
 import dacite
 import jsonschema
 import toml
-from ._backup import PageOrder
+from ._backup import BackupStorage, PageOrder
 from ._git import Git
+
+
+@dataclasses.dataclass(frozen=True)
+class ScrapboxSaveDirectoryConfig:
+    name: str
+    subdirectory: bool = False
+
+    def storage(self) -> BackupStorage:
+        return BackupStorage(
+                pathlib.Path(self.name),
+                subdirectory=self.subdirectory)
+
+
+def jsonschema_scrapbox_save_directory_config() -> dict[str, Any]:
+    schema = {
+        'type': 'object',
+        'required': ['name'],
+        'additionalProperties': False,
+        'properties': {
+            'name': {'type': 'string'},
+            'subdirectory': {'type': 'boolean'},
+        },
+    }
+    return schema
 
 
 @dataclasses.dataclass(frozen=True)
 class ScrapboxConfig:
     project: str
     session_id: str
-    save_directory: str
+    save_directory: ScrapboxSaveDirectoryConfig
     request_interval: float = 3.0
     request_timeout: float = 10.0
     backup_start_date: Optional[datetime.datetime] = None
@@ -30,7 +54,12 @@ def jsonschema_scrapbox_config() -> dict[str, Any]:
         'properties': {
             'project': {'type': 'string'},
             'session_id': {'type': 'string'},
-            'save_directory': {'type': 'string'},
+            'save_directory': {
+                'oneOf': [
+                    {'type': 'string'},
+                    jsonschema_scrapbox_save_directory_config(),
+                ],
+            },
             'request_interval': {
                 'type': 'number',
                 'exclusiveMinimum': 0.0,
@@ -271,25 +300,49 @@ def _is_datetime(
 
 
 def _preprocess_to_dataclass(data: dict) -> None:
+    # scrapbox.save_directory
+    _update_value(
+            data,
+            ['scrapbox', 'save_directory'],
+            _to_save_directory)
     # scrapbox.backup_start_date
-    _date_to_datetime(data, ['scrapbox', 'backup_start_date'])
+    _update_value(
+            data,
+            ['scrapbox', 'backup_start_date'],
+            _date_to_datetime)
     # git.empty_initial_commit.timestamp
-    _date_to_datetime(data, ['git', 'empty_initial_commit', 'timestamp'])
+    _update_value(
+            data,
+            ['git', 'empty_initial_commit', 'timestamp'],
+            _date_to_datetime)
 
 
-def _date_to_datetime(data: dict, keys: list[str]) -> None:
+def _update_value(
+        data: dict,
+        keys: list[str],
+        converter: Callable[[Any], Any]) -> None:
     if not keys:
         return
     try:
         parent = functools.reduce(operator.getitem, keys[:-1], data)
-        value = parent[keys[-1]]
-        match value:
-            case datetime.datetime():
-                pass
-            case datetime.date():
-                # add time(00:00:00) to date
-                parent[keys[-1]] = datetime.datetime.combine(
-                        value,
-                        datetime.time())
+        parent[keys[-1]] = converter(parent[keys[-1]])
     except KeyError:
         pass
+
+
+def _to_save_directory(value: str | dict) -> dict:
+    if isinstance(value, str):
+        return {'name': value}
+    return value
+
+
+def _date_to_datetime(
+        value: datetime.date | datetime.datetime) -> datetime.datetime:
+    match value:
+        case datetime.datetime():
+            return value
+        case datetime.date():
+            # add time(00:00:00) to date
+            return datetime.datetime.combine(
+                    value,
+                    datetime.time())
