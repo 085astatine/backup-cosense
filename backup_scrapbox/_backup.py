@@ -36,6 +36,28 @@ def jsonschema_backup_info() -> dict[str, Any]:
     return schema
 
 
+class UserJSON(TypedDict):
+    id: str
+    name: str
+    displayName: str
+    email: str
+
+
+def jsonschema_user() -> dict[str, Any]:
+    schema = {
+      'type': 'object',
+      'required': ['id', 'name', 'displayName', 'email'],
+      'additionalProperties': False,
+      'properties': {
+        'id': {'type': 'string'},
+        'name': {'type': 'string'},
+        'displayName': {'type': 'string'},
+        'email': {'type': 'string'},
+      },
+    }
+    return schema
+
+
 class BackupPageLineJSON(TypedDict):
     text: str
     created: int
@@ -110,6 +132,7 @@ class BackupJSON(TypedDict):
     name: str
     displayName: str
     exported: int
+    users: list[UserJSON]
     pages: list[BackupPageJSON]
 
 
@@ -124,9 +147,7 @@ def jsonschema_backup() -> dict[str, Any]:
         'exported': {'type': 'integer'},
         'users': {
           'type': 'array',
-          # item type is unknown
-          'maxItems': 0,
-          'items': {'type': 'string'},
+          'items': jsonschema_user(),
         },
         'pages': {
           'type': 'array',
