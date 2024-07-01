@@ -183,6 +183,7 @@ class UpdateDiff:
 
 class Backup:
     def __init__(
+            # pylint: disable=too-many-arguments
             self,
             project: str,
             directory: pathlib.Path,
