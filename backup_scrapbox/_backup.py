@@ -84,6 +84,7 @@ class BackupPageJSON(TypedDict):
     created: int
     updated: int
     id: str
+    views: Optional[int]
     lines: list[str] | list[BackupPageLineJSON]
     linksLc: list[str]
 
@@ -107,6 +108,7 @@ def jsonschema_backup_page() -> dict[str, Any]:
         'created': {'type': 'integer'},
         'updated': {'type': 'integer'},
         'id': {'type': 'string'},
+        'views': {'type': 'integer'},
         'lines': {
           'oneOf': [
             {
