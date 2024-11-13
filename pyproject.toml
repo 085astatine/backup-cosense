@@ -14,7 +14,7 @@ jsonschema = "^4.23.0"
 requests = "^2.32.3"
 toml = "^0.10.2"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 mypy = "^1.11.2"
 pycodestyle = "^2.12.1"
 pylint = "^3.3.1"
