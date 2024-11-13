@@ -10,6 +10,7 @@ import time
 from typing import Any, Literal, Optional
 import aiohttp
 import dacite
+import multidict
 from ._backup import Backup, ExternalLink, Location, jsonschema_location
 from ._config import ExternalLinkConfig
 from ._git import CommitTarget
@@ -449,10 +450,11 @@ async def _request_external_links(
             return response
 
     logger.info(f'request {len(links)} links')
+
     async with aiohttp.ClientSession(
             connector=connector,
             timeout=timeout,
-            headers=config.request_headers) as session:
+            headers=_request_headers(config)) as session:
         tasks = [
                 _parallel_request(session, i, link)
                 for i, link in enumerate(links)]
@@ -527,6 +529,17 @@ async def _request(
                         error_type=error.__class__.__name__,
                         message=str(error)),
                 is_saved=False)
+
+
+def _request_headers(config: ExternalLinkConfig) -> multidict.CIMultiDict:
+    headers: multidict.CIMultiDict = multidict.CIMultiDict()
+    # config.user_agent
+    if config.user_agent is not None:
+        headers['User-Agent'] = config.user_agent.user_agent()
+    # config.request_headers
+    for key, value in config.request_headers.items():
+        headers[key] = value
+    return headers
 
 
 def _re_request_targets(
