@@ -37,6 +37,10 @@ disable = [
     "logging-fstring-interpolation",  # W1203
 ]
 
+[[tool.mypy.overrides]]
+module = ['fake_useragent']
+ignore_missing_imports = true
+
 [tool.pylint.logging]
 logging-format-style = 'new'
 
