@@ -6,6 +6,7 @@ import operator
 import pathlib
 from typing import Any, Callable, Literal, Optional, get_args
 import dacite
+import fake_useragent
 import jsonschema
 import toml
 from ._backup import BackupStorage, PageOrder
@@ -163,6 +164,50 @@ def jsonschema_git_config() -> dict[str, Any]:
 
 
 @dataclasses.dataclass(frozen=True)
+class FakeUserAgentConfig:
+    os: Optional[Literal['windows', 'macos', 'linux']] = None
+    browser: Optional[Literal['chrome', 'firefox', 'safari', 'edge']] = None
+    platform: Optional[Literal['pc', 'mobile', 'tablet']] = None
+
+    def user_agent(self) -> str:
+        generator = fake_useragent.UserAgent(
+                os=(self.os
+                    if self.os is not None
+                    else ['windows', 'macos', 'linux']),
+                browsers=(
+                        self.browser
+                        if self.browser is not None
+                        else ['chrome', 'firefox', 'safari', 'edge']),
+                platforms=(
+                        self.platform
+                        if self.platform is not None
+                        else ['pc', 'mobile', 'tablet']))
+        return generator.random
+
+
+def jsonschema_fake_user_agent_config() -> dict[str, Any]:
+    schema = {
+        'type': 'object',
+        'additionalProperties': False,
+        'properties': {
+            'os': {
+                'type': ['string', 'null'],
+                'enum': [None, 'windows', 'macos', 'linux'],
+            },
+            'browser': {
+                'type': ['string', 'null'],
+                'enum': [None, 'chrome', 'firefox', 'safari', 'edge'],
+            },
+            'platform': {
+                'type': ['string', 'null'],
+                'enum': [None, 'pc', 'mobile', 'tablet'],
+            },
+        },
+    }
+    return schema
+
+
+@dataclasses.dataclass(frozen=True)
 class ExternalLinkConfig:
     # pylint: disable=too-many-instance-attributes
     enabled: bool = False
@@ -172,6 +217,7 @@ class ExternalLinkConfig:
     parallel_limit: int = 5
     parallel_limit_per_host: int = 0
     request_interval: float = 1.0
+    user_agent: Optional[FakeUserAgentConfig] = None
     request_headers: dict[str, str] = dataclasses.field(default_factory=dict)
     timeout: float = 30.0
     content_types: list[str] = dataclasses.field(default_factory=list)
@@ -202,6 +248,7 @@ def jsonschema_external_link_config() -> dict[str, Any]:
                 'type': 'number',
                 'exclusiveMinimum': 0.0,
             },
+            'user_agent': jsonschema_fake_user_agent_config(),
             'request_headers': {
                 'type': 'object',
                 'additionalProperties': {

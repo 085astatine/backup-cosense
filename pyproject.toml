@@ -9,11 +9,12 @@ license = ""
 python = "^3.12"
 aiohttp = "^3.10.10"
 dacite = "^1.8.1"
+fake-useragent = "^1.5.1"
 jsonschema = "^4.23.0"
 requests = "^2.32.3"
 toml = "^0.10.2"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 mypy = "^1.11.2"
 pycodestyle = "^2.12.1"
 pylint = "^3.3.1"
@@ -35,6 +36,10 @@ disable = [
     "consider-using-f-string",  # C0209
     "logging-fstring-interpolation",  # W1203
 ]
+
+[[tool.mypy.overrides]]
+module = ['fake_useragent']
+ignore_missing_imports = true
 
 [tool.pylint.logging]
 logging-format-style = 'new'
