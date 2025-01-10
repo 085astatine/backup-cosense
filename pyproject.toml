@@ -7,7 +7,7 @@ license = ""
 
 [tool.poetry.dependencies]
 python = "^3.12"
-aiohttp = "^3.10.10"
+aiohttp = "^3.11.11"
 dacite = "^1.8.1"
 fake-useragent = "^1.5.1"
 jsonschema = "^4.23.0"
@@ -15,9 +15,9 @@ requests = "^2.32.3"
 toml = "^0.10.2"
 
 [tool.poetry.group.dev.dependencies]
-mypy = "^1.11.2"
+mypy = "^1.14.1"
 pycodestyle = "^2.12.1"
-pylint = "^3.3.1"
+pylint = "^3.3.3"
 types-jsonschema = "^4.23.0"
 types-requests = "^2.32.0"
 types-toml = "^0.10.8"
