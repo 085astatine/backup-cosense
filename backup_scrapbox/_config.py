@@ -5,10 +5,12 @@ import logging
 import operator
 import pathlib
 from typing import Any, Callable, Literal, Optional, get_args
+
 import dacite
 import fake_useragent
 import jsonschema
 import toml
+
 from ._backup import BackupStorage, PageOrder
 from ._git import Git
 

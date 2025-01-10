@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import dataclasses
 import itertools
 import logging
@@ -6,9 +7,10 @@ import math
 import pathlib
 import re
 from typing import Any, Generator, Literal, Optional, Tuple, TypedDict
-import jsonschema
-from ._json import load_json, save_json
 
+import jsonschema
+
+from ._json import load_json, save_json
 
 PageOrder = Literal["as-is", "created-asc", "created-desc"]
 InternalLinkType = Literal["page", "word"]

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import dataclasses
 import datetime
 import itertools
@@ -11,7 +12,9 @@ import shutil
 import subprocess
 import textwrap
 from typing import Iterator, Optional
+
 import jsonschema
+
 from ._backup import BackupInfoJSON, jsonschema_backup_info
 from ._json import parse_json
 from .exceptions import CommitTargetError, GitNotFoundError

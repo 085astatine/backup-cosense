@@ -2,9 +2,10 @@ import logging
 import pathlib
 import subprocess
 from typing import Any, Optional
+
 from ._backup import BackupStorage, jsonschema_backup, jsonschema_backup_info
 from ._config import Config
-from ._git import Git, Commit
+from ._git import Commit, Git
 from ._json import parse_json, save_json
 from ._utility import format_timestamp
 

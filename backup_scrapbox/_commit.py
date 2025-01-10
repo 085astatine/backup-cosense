@@ -1,6 +1,7 @@
 import datetime
 import logging
 from typing import Optional
+
 from ._backup import Backup, BackupJSONs
 from ._config import Config, GitEmptyInitialCommitConfig
 from ._external_link import save_external_links

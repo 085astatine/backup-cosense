@@ -1,10 +1,12 @@
 import logging
 import time
 from typing import Any, Callable, Optional, TypedDict
+
 import requests
+
 from ._backup import (
-    BackupJSON,
     BackupInfoJSON,
+    BackupJSON,
     jsonschema_backup,
     jsonschema_backup_info,
 )

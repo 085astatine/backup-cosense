@@ -2,9 +2,10 @@ import argparse
 import logging
 import pathlib
 from typing import Optional
+
+from ._commit import commit_backups
 from ._config import Config, ScrapboxSaveDirectoryConfig, load_config
 from ._download import download_backups
-from ._commit import commit_backups
 from ._export import export_backups
 
 
