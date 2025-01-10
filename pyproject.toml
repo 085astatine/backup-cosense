@@ -16,12 +16,16 @@ toml = "^0.10.2"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"
+isort = "^5.13.2"
 mypy = "^1.14.1"
 pycodestyle = "^2.12.1"
 pylint = "^3.3.3"
 types-jsonschema = "^4.23.0"
 types-requests = "^2.32.0"
 types-toml = "^0.10.8"
+
+[tool.isort]
+profile = "black"
 
 [tool.mypy]
 check_untyped_defs = true
