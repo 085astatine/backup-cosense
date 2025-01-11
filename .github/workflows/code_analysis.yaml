@@ -37,6 +37,10 @@ jobs:
       - name: Pylint
         run: poetry run pylint backup_scrapbox
 
-      # pycodestyle
-      - name: pycodestyle
-        run: poetry run pycodestyle backup_scrapbox
+      # Black
+      - name: Black
+        run: poetry run black --check backup_scrapbox
+
+      # isort
+      - name: isort
+        run: poetry run isort --check backup_scrapbox
