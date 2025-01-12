@@ -63,11 +63,13 @@ def _base_url(config: Config) -> str:
 
 def _session(config: Config) -> requests.Session:
     session = requests.Session()
-    session.cookies.set(
-        "connect.sid",
-        config.scrapbox.session_id,
-        domain="scrapbox.io",
-    )
+    domains = ["scrapbox.io", "cosen.se"]
+    for domain in domains:
+        session.cookies.set(
+            "connect.sid",
+            config.scrapbox.session_id,
+            domain=domain,
+        )
     return session
 
 
