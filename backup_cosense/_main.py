@@ -4,12 +4,12 @@ import pathlib
 from typing import Optional
 
 from ._commit import commit_backups
-from ._config import Config, ScrapboxSaveDirectoryConfig, load_config
+from ._config import Config, CosenseSaveDirectoryConfig, load_config
 from ._download import download_backups
 from ._export import export_backups
 
 
-def backup_scrapbox(
+def backup_cosense(
     *,
     args: Optional[list[str]] = None,
     config: Optional[Config] = None,
@@ -17,7 +17,7 @@ def backup_scrapbox(
 ) -> None:
     # logger
     if logger is None:
-        logger = logging.getLogger("backup-scrapbox")
+        logger = logging.getLogger("backup-cosense")
         logger.setLevel(logging.INFO)
         handler = logging.StreamHandler()
         handler.formatter = logging.Formatter(
@@ -33,7 +33,7 @@ def backup_scrapbox(
     if config is None:
         config = load_config(option.config, logger=logger)
     # main
-    logger.info("backup-scrapbox")
+    logger.info("backup-cosense")
     # download backup
     if option.command in (None, "download"):
         logger.info("command: download")
@@ -45,8 +45,9 @@ def backup_scrapbox(
     # export
     if option.command == "export":
         logger.info("command: export")
-        destination = ScrapboxSaveDirectoryConfig(
-            name=option.destination, subdirectory=option.subdirectory
+        destination = CosenseSaveDirectoryConfig(
+            name=option.destination,
+            subdirectory=option.subdirectory,
         ).storage()
         export_backups(config, destination, logger=logger)
 

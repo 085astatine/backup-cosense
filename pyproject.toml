@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "backup-scrapbox"
+name = "backup-cosense"
 version = "0.1.0"
 description = ""
 authors = ["085astatine <astatine085@gmail.com>"]

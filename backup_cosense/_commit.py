@@ -29,7 +29,7 @@ def commit_backups(
         # load backup repository
         if backup is None:
             backup = Backup.load(
-                config.scrapbox.project,
+                config.cosense.project,
                 git.path,
                 page_order=config.git.page_order,
                 logger=logger,
@@ -72,7 +72,7 @@ def commit_backup(
         return
     # commit message
     message = Commit.message(
-        config.scrapbox.project,
+        config.cosense.project,
         data.timestamp,
         data.load_info(),
     )
@@ -99,7 +99,7 @@ def staging_backup(
     # load backup repository
     if backup is None:
         backup = Backup.load(
-            config.scrapbox.project,
+            config.cosense.project,
             git.path,
             page_order=config.git.page_order,
             logger=logger,
@@ -114,7 +114,7 @@ def staging_backup(
     if backup is None:
         # initial update
         backup = Backup(
-            config.scrapbox.project,
+            config.cosense.project,
             git.path,
             backup_json,
             info_json,
@@ -154,8 +154,8 @@ def _backup_targets(
 ) -> list[BackupJSONs]:
     # backup start date
     backup_start = (
-        int(config.scrapbox.backup_start_date.timestamp())
-        if config.scrapbox.backup_start_date is not None
+        int(config.cosense.backup_start_date.timestamp())
+        if config.cosense.backup_start_date is not None
         else None
     )
     # get latest backup timestamp
@@ -167,7 +167,7 @@ def _backup_targets(
         default=None,
     )
     # find backup
-    storage = config.scrapbox.save_directory.storage()
+    storage = config.cosense.save_directory.storage()
     targets = [
         backup
         for backup in storage.backups()
