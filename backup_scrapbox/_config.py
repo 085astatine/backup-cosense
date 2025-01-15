@@ -45,6 +45,7 @@ class ScrapboxConfig:
     project: str
     session_id: str
     save_directory: ScrapboxSaveDirectoryConfig
+    domain: Literal["scrapbox.io", "cosen.se"] = "scrapbox.io"
     request_interval: float = 3.0
     request_timeout: float = 10.0
     backup_start_date: Optional[datetime.datetime] = None
@@ -63,6 +64,9 @@ def jsonschema_scrapbox_config() -> dict[str, Any]:
                     {"type": "string"},
                     jsonschema_scrapbox_save_directory_config(),
                 ],
+            },
+            "domain": {
+                "enum": ["scrapbox.io", "cosen.se"],
             },
             "request_interval": {
                 "type": "number",

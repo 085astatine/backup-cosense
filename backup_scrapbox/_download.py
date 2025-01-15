@@ -56,16 +56,20 @@ def download_backups(
 
 
 def _base_url(config: Config) -> str:
-    return f"https://scrapbox.io/api/project-backup/{config.scrapbox.project}"
+    domain = config.scrapbox.domain
+    project = config.scrapbox.project
+    return f"https://{domain}/api/project-backup/{project}"
 
 
 def _session(config: Config) -> requests.Session:
     session = requests.Session()
-    session.cookies.set(
-        "connect.sid",
-        config.scrapbox.session_id,
-        domain="scrapbox.io",
-    )
+    domains = ["scrapbox.io", "cosen.se"]
+    for domain in domains:
+        session.cookies.set(
+            "connect.sid",
+            config.scrapbox.session_id,
+            domain=domain,
+        )
     return session
 
 
