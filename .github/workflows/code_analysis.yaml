@@ -31,16 +31,16 @@ jobs:
 
       # Mypy
       - name: Mypy
-        run: poetry run mypy backup_scrapbox
+        run: poetry run mypy backup_cosense
 
       # Pylint
       - name: Pylint
-        run: poetry run pylint backup_scrapbox
+        run: poetry run pylint backup_cosense
 
       # Black
       - name: Black
-        run: poetry run black --check backup_scrapbox
+        run: poetry run black --check backup_cosense
 
       # isort
       - name: isort
-        run: poetry run isort --check backup_scrapbox
+        run: poetry run isort --check backup_cosense
