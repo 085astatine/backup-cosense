@@ -34,7 +34,7 @@ def export_backups(
     for commit in commits:
         logger.info(f"export {format_timestamp(commit.timestamp)}")
         _export(
-            config.scrapbox.project,
+            config.cosense.project,
             git,
             commit,
             destination,

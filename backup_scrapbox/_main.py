@@ -4,7 +4,7 @@ import pathlib
 from typing import Optional
 
 from ._commit import commit_backups
-from ._config import Config, ScrapboxSaveDirectoryConfig, load_config
+from ._config import Config, CosenseSaveDirectoryConfig, load_config
 from ._download import download_backups
 from ._export import export_backups
 
@@ -45,8 +45,9 @@ def backup_scrapbox(
     # export
     if option.command == "export":
         logger.info("command: export")
-        destination = ScrapboxSaveDirectoryConfig(
-            name=option.destination, subdirectory=option.subdirectory
+        destination = CosenseSaveDirectoryConfig(
+            name=option.destination,
+            subdirectory=option.subdirectory,
         ).storage()
         export_backups(config, destination, logger=logger)
 

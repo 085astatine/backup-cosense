@@ -45,19 +45,19 @@ def download_backups(
     with _session(config) as session:
         # list
         backup_list = _request_backup_list(config, session, logger)
-        time.sleep(config.scrapbox.request_interval)
+        time.sleep(config.cosense.request_interval)
         if not backup_list:
             return
         # backup
         for info in filter(_backup_filter(config, logger), backup_list):
             # download
             _download_backup(config, session, info, logger)
-            time.sleep(config.scrapbox.request_interval)
+            time.sleep(config.cosense.request_interval)
 
 
 def _base_url(config: Config) -> str:
-    domain = config.scrapbox.domain
-    project = config.scrapbox.project
+    domain = config.cosense.domain
+    project = config.cosense.project
     return f"https://{domain}/api/project-backup/{project}"
 
 
@@ -67,7 +67,7 @@ def _session(config: Config) -> requests.Session:
     for domain in domains:
         session.cookies.set(
             "connect.sid",
-            config.scrapbox.session_id,
+            config.cosense.session_id,
             domain=domain,
         )
     return session
@@ -82,7 +82,7 @@ def _request_backup_list(
     response: Optional[BackupListJSON] = request_json(
         f"{_base_url(config)}/list",
         session=session,
-        timeout=config.scrapbox.request_timeout,
+        timeout=config.cosense.request_timeout,
         schema=jsonschema_backup_list(),
         logger=logger,
     )
@@ -113,8 +113,8 @@ def _backup_filter(
 ) -> Callable[[BackupInfoJSON], bool]:
     # backup start date
     start_timestamp = (
-        config.scrapbox.backup_start_date.timestamp()
-        if config.scrapbox.backup_start_date is not None
+        config.cosense.backup_start_date.timestamp()
+        if config.cosense.backup_start_date is not None
         else None
     )
     # get the latest backup timestamp from the Git repository
@@ -122,7 +122,7 @@ def _backup_filter(
     latest_timestamp = git.latest_commit_timestamp()
     logger.info(f"latest backup: {format_timestamp(latest_timestamp)}")
     # backup storage
-    storage = config.scrapbox.save_directory.storage()
+    storage = config.cosense.save_directory.storage()
 
     def backup_filter(backup: BackupInfoJSON) -> bool:
         timestamp = backup["backuped"]
@@ -157,14 +157,14 @@ def _download_backup(
     backup: Optional[BackupJSON] = request_json(
         url,
         session=session,
-        timeout=config.scrapbox.request_timeout,
+        timeout=config.cosense.request_timeout,
         schema=jsonschema_backup(),
         logger=logger,
     )
     if backup is None:
         return
     # save
-    storage = config.scrapbox.save_directory.storage()
+    storage = config.cosense.save_directory.storage()
     # save backup
     backup_path = storage.backup_path(timestamp)
     logger.info(f'save "{backup_path}"')

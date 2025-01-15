@@ -16,7 +16,7 @@ from ._git import Git
 
 
 @dataclasses.dataclass(frozen=True)
-class ScrapboxSaveDirectoryConfig:
+class CosenseSaveDirectoryConfig:
     name: str
     subdirectory: bool = False
 
@@ -27,7 +27,7 @@ class ScrapboxSaveDirectoryConfig:
         )
 
 
-def jsonschema_scrapbox_save_directory_config() -> dict[str, Any]:
+def jsonschema_cosense_save_directory_config() -> dict[str, Any]:
     schema = {
         "type": "object",
         "required": ["name"],
@@ -41,17 +41,17 @@ def jsonschema_scrapbox_save_directory_config() -> dict[str, Any]:
 
 
 @dataclasses.dataclass(frozen=True)
-class ScrapboxConfig:
+class CosenseConfig:
     project: str
     session_id: str
-    save_directory: ScrapboxSaveDirectoryConfig
+    save_directory: CosenseSaveDirectoryConfig
     domain: Literal["scrapbox.io", "cosen.se"] = "scrapbox.io"
     request_interval: float = 3.0
     request_timeout: float = 10.0
     backup_start_date: Optional[datetime.datetime] = None
 
 
-def jsonschema_scrapbox_config() -> dict[str, Any]:
+def jsonschema_cosense_config() -> dict[str, Any]:
     schema = {
         "type": "object",
         "required": ["project", "session_id", "save_directory"],
@@ -62,7 +62,7 @@ def jsonschema_scrapbox_config() -> dict[str, Any]:
             "save_directory": {
                 "oneOf": [
                     {"type": "string"},
-                    jsonschema_scrapbox_save_directory_config(),
+                    jsonschema_cosense_save_directory_config(),
                 ],
             },
             "domain": {
@@ -287,7 +287,7 @@ def jsonschema_external_link_config() -> dict[str, Any]:
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    scrapbox: ScrapboxConfig
+    cosense: CosenseConfig
     git: GitConfig
     external_link: ExternalLinkConfig = ExternalLinkConfig()
 
@@ -295,10 +295,10 @@ class Config:
 def jsonschema_config() -> dict[str, Any]:
     schema = {
         "type": "object",
-        "required": ["scrapbox", "git"],
+        "required": ["cosense", "git"],
         "additional_properties": False,
         "properties": {
-            "scrapbox": jsonschema_scrapbox_config(),
+            "cosense": jsonschema_cosense_config(),
             "git": jsonschema_git_config(),
             "external_link": jsonschema_external_link_config(),
         },
@@ -361,10 +361,10 @@ def _is_datetime(
 
 
 def _preprocess_to_dataclass(data: dict) -> None:
-    # scrapbox.save_directory
-    _update_value(data, ["scrapbox", "save_directory"], _to_save_directory)
-    # scrapbox.backup_start_date
-    _update_value(data, ["scrapbox", "backup_start_date"], _date_to_datetime)
+    # cosense.save_directory
+    _update_value(data, ["cosense", "save_directory"], _to_save_directory)
+    # cosense.backup_start_date
+    _update_value(data, ["cosense", "backup_start_date"], _date_to_datetime)
     # git.empty_initial_commit.timestamp
     _update_value(data, ["git", "empty_initial_commit", "timestamp"], _date_to_datetime)
 
