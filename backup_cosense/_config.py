@@ -1,10 +1,8 @@
 import dataclasses
 import datetime
-import functools
 import logging
-import operator
 import pathlib
-from typing import Any, Callable, Literal, Optional, get_args
+from typing import Any, Literal, Optional, get_args
 
 import dacite
 import fake_useragent
@@ -320,11 +318,16 @@ def load_config(
     # JSON Schema validation
     _validator().validate(instance=loaded)
     # to dataclass
-    _preprocess_to_dataclass(loaded)
     config = dacite.from_dict(
         data_class=Config,
         data=loaded,
-        config=dacite.Config(strict=True),
+        config=dacite.Config(
+            type_hooks={
+                datetime.datetime: _to_datetime,
+                CosenseSaveDirectoryConfig: _to_save_directory,
+            },
+            strict=True,
+        ),
     )
     logger.debug(f"config: {repr(config)}")
     return config
@@ -360,36 +363,13 @@ def _is_datetime(
     return isinstance(instance, datetime.datetime)
 
 
-def _preprocess_to_dataclass(data: dict) -> None:
-    # cosense.save_directory
-    _update_value(data, ["cosense", "save_directory"], _to_save_directory)
-    # cosense.backup_start_date
-    _update_value(data, ["cosense", "backup_start_date"], _date_to_datetime)
-    # git.empty_initial_commit.timestamp
-    _update_value(data, ["git", "empty_initial_commit", "timestamp"], _date_to_datetime)
-
-
-def _update_value(
-    data: dict,
-    keys: list[str],
-    converter: Callable[[Any], Any],
-) -> None:
-    if not keys:
-        return
-    try:
-        parent = functools.reduce(operator.getitem, keys[:-1], data)
-        parent[keys[-1]] = converter(parent[keys[-1]])
-    except KeyError:
-        pass
-
-
-def _to_save_directory(value: str | dict) -> dict:
+def _to_save_directory(value: str | dict) -> CosenseSaveDirectoryConfig:
     if isinstance(value, str):
-        return {"name": value}
-    return value
+        value = {"name": value}
+    return CosenseSaveDirectoryConfig(**value)
 
 
-def _date_to_datetime(value: datetime.date | datetime.datetime) -> datetime.datetime:
+def _to_datetime(value: datetime.date | datetime.datetime) -> datetime.datetime:
     match value:
         case datetime.datetime():
             return value
