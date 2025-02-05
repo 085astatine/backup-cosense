@@ -264,10 +264,7 @@ def jsonschema_external_link_config() -> dict[str, Any]:
                         "type": "integer",
                         "minimum": 0,
                     },
-                    {
-                        "type": "string",
-                        "enum": ["all"],
-                    },
+                    {"const": "all"},
                 ],
             },
             "keep_deleted_links": {"type": "boolean"},
