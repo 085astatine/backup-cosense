@@ -63,9 +63,7 @@ def jsonschema_cosense_config() -> dict[str, Any]:
                     jsonschema_cosense_save_directory_config(),
                 ],
             },
-            "domain": {
-                "enum": ["scrapbox.io", "cosen.se"],
-            },
+            "domain": {"enum": ["scrapbox.io", "cosen.se"]},
             "request_interval": {
                 "type": "number",
                 "exclusiveMinimum": 0.0,
@@ -96,12 +94,7 @@ def jsonschema_git_empty_initial_commit_config() -> dict[str, Any]:
             "message": {"type": "string"},
             "timestamp": {
                 "oneOf": [
-                    {
-                        "enum": [
-                            "oldest_backup",
-                            "oldest_created_page",
-                        ],
-                    },
+                    {"enum": ["oldest_backup", "oldest_created_page"]},
                     {"type": ["date", "datetime"]},
                 ],
             },
@@ -141,20 +134,14 @@ def jsonschema_git_config() -> dict[str, Any]:
         "additionalProperties": False,
         "properties": {
             "path": {"type": "string"},
-            "executable": {
-                "type": ["string", "null"],
-            },
+            "executable": {"type": ["string", "null"]},
             "branch": {"type": "string"},
             "page_order": {
                 "type": ["string", "null"],
                 "enum": [None, *get_args(PageOrder)],
             },
-            "user_name": {
-                "type": ["string", "null"],
-            },
-            "user_email": {
-                "type": ["string", "null"],
-            },
+            "user_name": {"type": ["string", "null"]},
+            "user_email": {"type": ["string", "null"]},
             "empty_initial_commit": jsonschema_git_empty_initial_commit_config(),
             "staging_step_size": {
                 "type": "integer",
@@ -273,8 +260,14 @@ def jsonschema_external_link_config() -> dict[str, Any]:
             "allways_request_all_links": {"type": "boolean"},
             "keep_logs": {
                 "oneOf": [
-                    {"type": "integer", "minimum": 0},
-                    {"type": "string", "enum": ["all"]},
+                    {
+                        "type": "integer",
+                        "minimum": 0,
+                    },
+                    {
+                        "type": "string",
+                        "enum": ["all"],
+                    },
                 ],
             },
             "keep_deleted_links": {"type": "boolean"},
