@@ -115,7 +115,11 @@ class GitConfig:
     empty_initial_commit: Optional[GitEmptyInitialCommitConfig] = None
     staging_step_size: int = 1
 
-    def git(self, *, logger: Optional[logging.Logger] = None) -> Git:
+    def git(
+        self,
+        *,
+        logger: Optional[logging.Logger] = None,
+    ) -> Git:
         return Git(
             pathlib.Path(self.path),
             executable=self.executable,
