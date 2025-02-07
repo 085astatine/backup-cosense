@@ -156,25 +156,58 @@ def jsonschema_git_config() -> dict[str, Any]:
     return schema
 
 
+FakeUserAgentOS = Literal[
+    "Windows",
+    "Linux",
+    "Ubuntu",
+    "Chrome OS",
+    "Mac OS X",
+    "Android",
+    "iOS",
+]
+
+
+FakeUserAgentBrowser = Literal[
+    "Google",
+    "Chrome",
+    "Firefox",
+    "Edge",
+    "Opera",
+    "Safari",
+    "Android",
+    "Yandex Browser",
+    "Samsung Internet",
+    "Opera Mobile",
+    "Mobile Safari",
+    "Firefox Mobile",
+    "Firefox iOS",
+    "Chrome Mobile",
+    "Chrome Mobile iOS",
+    "Mobile Safari UI/WKWebView",
+    "Edge Mobile",
+    "DuckDuckGo Mobile",
+    "MiuiBrowser",
+    "Whale",
+    "Twitter",
+    "Facebook",
+    "Amazon Silk",
+]
+
+
+FakeUserAgentPlatform = Literal["desktop", "mobile", "tablet"]
+
+
 @dataclasses.dataclass(frozen=True)
 class FakeUserAgentConfig:
-    os: Optional[Literal["windows", "macos", "linux"]] = None
-    browser: Optional[Literal["chrome", "firefox", "safari", "edge"]] = None
-    platform: Optional[Literal["pc", "mobile", "tablet"]] = None
+    os: Optional[FakeUserAgentOS] = None
+    browser: Optional[FakeUserAgentBrowser] = None
+    platform: Optional[FakeUserAgentPlatform] = None
 
     def user_agent(self) -> str:
         generator = fake_useragent.UserAgent(
-            os=(self.os if self.os is not None else ["windows", "macos", "linux"]),
-            browsers=(
-                self.browser
-                if self.browser is not None
-                else ["chrome", "firefox", "safari", "edge"]
-            ),
-            platforms=(
-                self.platform
-                if self.platform is not None
-                else ["pc", "mobile", "tablet"]
-            ),
+            os=self.os,
+            browsers=self.browser,
+            platforms=self.platform,
         )
         return generator.random
 
@@ -186,15 +219,15 @@ def jsonschema_fake_user_agent_config() -> dict[str, Any]:
         "properties": {
             "os": {
                 "type": ["string", "null"],
-                "enum": [None, "windows", "macos", "linux"],
+                "enum": [None, *get_args(FakeUserAgentOS)],
             },
             "browser": {
                 "type": ["string", "null"],
-                "enum": [None, "chrome", "firefox", "safari", "edge"],
+                "enum": [None, *get_args(FakeUserAgentBrowser)],
             },
             "platform": {
                 "type": ["string", "null"],
-                "enum": [None, "pc", "mobile", "tablet"],
+                "enum": [None, *get_args(FakeUserAgentPlatform)],
             },
         },
     }
