@@ -9,7 +9,7 @@ license = ""
 python = "^3.12"
 aiohttp = "^3.11.12"
 dacite = "^1.9.2"
-fake-useragent = "^1.5.1"
+fake-useragent = "^2.0.3"
 jsonschema = "^4.23.0"
 requests = "^2.32.3"
 toml = "^0.10.2"
@@ -40,10 +40,6 @@ disable = [
     "consider-using-f-string",  # C0209
     "logging-fstring-interpolation",  # W1203
 ]
-
-[[tool.mypy.overrides]]
-module = ['fake_useragent']
-ignore_missing_imports = true
 
 [tool.pylint.logging]
 logging-format-style = 'new'

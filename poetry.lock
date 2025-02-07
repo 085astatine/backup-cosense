@@ -369,13 +369,13 @@ profile = ["gprof2dot (>=2022.7.29)"]
 
 [[package]]
 name = "fake-useragent"
-version = "1.5.1"
+version = "2.0.3"
 description = "Up-to-date simple useragent faker with real world database"
 optional = false
-python-versions = "*"
+python-versions = ">=3.9"
 files = [
-    {file = "fake-useragent-1.5.1.tar.gz", hash = "sha256:6387269f5a2196b5ba7ed8935852f75486845a1c95c50e72460e6a8e762f5c49"},
-    {file = "fake_useragent-1.5.1-py3-none-any.whl", hash = "sha256:57415096557c8a4e23b62a375c21c55af5fd4ba30549227f562d2c4f5b60e3b3"},
+    {file = "fake_useragent-2.0.3-py3-none-any.whl", hash = "sha256:8bae50abb72c309a5b3ae2f01a0b82426613fd5c4e2a04dca9332399ec44daa1"},
+    {file = "fake_useragent-2.0.3.tar.gz", hash = "sha256:af86a26ef8229efece8fed529b4aeb5b73747d889b60f01cd477b6f301df46e6"},
 ]
 
 [[package]]
@@ -1207,4 +1207,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "a8499be235f541a9216066d648e9b0746b723bffa560da6424f9c19bdaefaf95"
+content-hash = "b53cfaf5fddb3e99ba9e2e94408bb291f917eb7c00f5d2c442e93310ec6b3f05"
