@@ -93,7 +93,7 @@ def jsonschema_external_link_log() -> dict[str, Any]:
                 "oneOf": [
                     jsonschema_response_log(),
                     jsonschema_request_error(),
-                    {"type": "string", "enum": ["excluded"]},
+                    {"const": "excluded"},
                 ],
             },
             "is_saved": {"type": "boolean"},
