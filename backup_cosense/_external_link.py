@@ -466,10 +466,15 @@ async def _request_external_links(
 
     logger.info(f"request {len(links)} links")
 
+    # To fix ClientResponseError
+    #  Got more than 8190 bytes (xxxx) when reading Header value is too long
+    max_size = 8190 * 2
     async with aiohttp.ClientSession(
         connector=connector,
         timeout=timeout,
         headers=_request_headers(config),
+        max_line_size=max_size,
+        max_field_size=max_size,
     ) as session:
         tasks = [_parallel_request(session, i, link) for i, link in enumerate(links)]
         return await asyncio.gather(*tasks)
