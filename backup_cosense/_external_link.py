@@ -213,6 +213,23 @@ def save_external_links(
     )
 
 
+def _create_session(config: ExternalLinkConfig) -> aiohttp.ClientSession:
+    # connector
+    connector = aiohttp.TCPConnector(limit_per_host=config.parallel_limit_per_host)
+    # timeout
+    timeout = aiohttp.ClientTimeout(total=config.timeout)
+    # To fix ClientResponseError
+    #  Got more than 8190 bytes (xxxx) when reading Header value is too long
+    max_size = 8190 * 2
+    return aiohttp.ClientSession(
+        connector=connector,
+        timeout=timeout,
+        headers=_request_headers(config),
+        max_line_size=max_size,
+        max_field_size=max_size,
+    )
+
+
 def _request_logs(
     links: list[ExternalLink],
     previous_logs: list[ExternalLinkLog],
@@ -432,10 +449,6 @@ async def _request_external_links(
     config: ExternalLinkConfig,
     logger: logging.Logger,
 ) -> list[ExternalLinkLog]:
-    # connector
-    connector = aiohttp.TCPConnector(limit_per_host=config.parallel_limit_per_host)
-    # timeout
-    timeout = aiohttp.ClientTimeout(total=config.timeout)
     # semaphore
     semaphore = asyncio.Semaphore(config.parallel_limit)
     # request config
@@ -466,16 +479,7 @@ async def _request_external_links(
 
     logger.info(f"request {len(links)} links")
 
-    # To fix ClientResponseError
-    #  Got more than 8190 bytes (xxxx) when reading Header value is too long
-    max_size = 8190 * 2
-    async with aiohttp.ClientSession(
-        connector=connector,
-        timeout=timeout,
-        headers=_request_headers(config),
-        max_line_size=max_size,
-        max_field_size=max_size,
-    ) as session:
+    async with _create_session(config) as session:
         tasks = [_parallel_request(session, i, link) for i, link in enumerate(links)]
         return await asyncio.gather(*tasks)
 
