@@ -140,11 +140,15 @@ def save_external_links(
     git_directory: pathlib.Path,
     *,
     config: Optional[ExternalLinkConfig] = None,
+    session: Optional[aiohttp.ClientSession] = None,
     logger: Optional[logging.Logger] = None,
 ) -> CommitTarget:
     config = config or ExternalLinkConfig()
     logger = logger or logging.getLogger(__name__)
     request_all = config.allways_request_all_links
+    # session
+    if session is None:
+        session = _create_session(config)
     # log directory
     log_directory = _LogsDirectory(pathlib.Path(config.log_directory), logger)
     # save directory
@@ -180,6 +184,7 @@ def save_external_links(
             previous_logs,
             save_directory,
             config,
+            session,
             logger,
         )
     else:
@@ -189,6 +194,7 @@ def save_external_links(
             previous_logs,
             save_directory,
             config,
+            session,
             logger,
         )
         # save logs
@@ -213,11 +219,30 @@ def save_external_links(
     )
 
 
+def _create_session(config: ExternalLinkConfig) -> aiohttp.ClientSession:
+    # connector
+    connector = aiohttp.TCPConnector(limit_per_host=config.parallel_limit_per_host)
+    # timeout
+    timeout = aiohttp.ClientTimeout(total=config.timeout)
+    # To fix ClientResponseError
+    #  Got more than 8190 bytes (xxxx) when reading Header value is too long
+    max_size = 8190 * 2
+    return aiohttp.ClientSession(
+        connector=connector,
+        timeout=timeout,
+        headers=_request_headers(config),
+        max_line_size=max_size,
+        max_field_size=max_size,
+    )
+
+
 def _request_logs(
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     links: list[ExternalLink],
     previous_logs: list[ExternalLinkLog],
     save_directory: _SaveDirectory,
     config: ExternalLinkConfig,
+    session: aiohttp.ClientSession,
     logger: logging.Logger,
 ) -> list[ExternalLinkLog]:
     # classify links
@@ -233,6 +258,7 @@ def _request_logs(
             classified_links.new_links,
             save_directory,
             config,
+            session,
             logger,
         )
     )
@@ -430,12 +456,9 @@ async def _request_external_links(
     links: list[ExternalLink],
     save_directory: _SaveDirectory,
     config: ExternalLinkConfig,
+    session: aiohttp.ClientSession,
     logger: logging.Logger,
 ) -> list[ExternalLinkLog]:
-    # connector
-    connector = aiohttp.TCPConnector(limit_per_host=config.parallel_limit_per_host)
-    # timeout
-    timeout = aiohttp.ClientTimeout(total=config.timeout)
     # semaphore
     semaphore = asyncio.Semaphore(config.parallel_limit)
     # request config
@@ -466,16 +489,7 @@ async def _request_external_links(
 
     logger.info(f"request {len(links)} links")
 
-    # To fix ClientResponseError
-    #  Got more than 8190 bytes (xxxx) when reading Header value is too long
-    max_size = 8190 * 2
-    async with aiohttp.ClientSession(
-        connector=connector,
-        timeout=timeout,
-        headers=_request_headers(config),
-        max_line_size=max_size,
-        max_field_size=max_size,
-    ) as session:
+    async with session:
         tasks = [_parallel_request(session, i, link) for i, link in enumerate(links)]
         return await asyncio.gather(*tasks)
 
