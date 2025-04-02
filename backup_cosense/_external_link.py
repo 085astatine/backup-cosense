@@ -151,13 +151,10 @@ def save_external_links(
         session = _create_session(config)
     # log directory
     log_directory = _LogsDirectory(pathlib.Path(config.log_directory), logger)
-    # save directory
-    save_directory = _SaveDirectory(
-        root_directory=git_directory,
-        links_directory_name=config.save_directory,
-    )
+    # links directory
+    links_directory = _LinksDirectory(git_directory.joinpath(config.save_directory))
     # load previous saved list
-    previous_saved_list = _load_saved_list(save_directory, logger)
+    previous_saved_list = _load_saved_list(links_directory, logger)
     # check previous content_types
     if previous_saved_list is not None and (
         set(previous_saved_list.content_types) != set(config.content_types)
@@ -182,7 +179,7 @@ def save_external_links(
         _request_logs(
             links,
             previous_logs,
-            save_directory,
+            links_directory,
             config,
             session,
             logger,
@@ -192,7 +189,7 @@ def save_external_links(
         logs = _request_logs(
             backup.external_links(),
             previous_logs,
-            save_directory,
+            links_directory,
             config,
             session,
             logger,
@@ -201,7 +198,7 @@ def save_external_links(
         log_directory.save(backup.timestamp, logs)
     # save list.json
     _save_saved_list(
-        save_directory,
+        links_directory,
         config.content_types,
         logs,
         logger,
@@ -212,7 +209,7 @@ def save_external_links(
     # commit target
     return _commit_target(
         config,
-        save_directory,
+        links_directory,
         logs,
         previous_saved_list,
         logger,
@@ -240,7 +237,7 @@ def _request_logs(
     # pylint: disable=too-many-arguments, too-many-positional-arguments
     links: list[ExternalLink],
     previous_logs: list[ExternalLinkLog],
-    save_directory: _SaveDirectory,
+    links_directory: _LinksDirectory,
     config: ExternalLinkConfig,
     session: aiohttp.ClientSession,
     logger: logging.Logger,
@@ -256,7 +253,7 @@ def _request_logs(
     logs = asyncio.run(
         _request_external_links(
             classified_links.new_links,
-            save_directory,
+            links_directory,
             config,
             session,
             logger,
@@ -433,28 +430,51 @@ def _classify_external_links(
     )
 
 
-@dataclasses.dataclass
-class _SaveDirectory:
-    root_directory: pathlib.Path
-    links_directory: pathlib.Path = dataclasses.field(init=False)
-    links_directory_name: dataclasses.InitVar[str]
-
-    def __post_init__(self, links_directory_name: str) -> None:
-        self.links_directory = self.root_directory.joinpath(links_directory_name)
+class _LinksDirectory:
+    def __init__(self, path: pathlib.Path) -> None:
+        self._path = path
 
     def file_path(self, url: str) -> pathlib.Path:
-        return self.links_directory.joinpath(re.sub(r"https?://", "", url))
+        return self._path.joinpath(re.sub(r"https?://", "", url))
 
     def list_path(self) -> pathlib.Path:
-        return self.links_directory.joinpath("list.json")
+        return self._path.joinpath("list.json")
 
     def gitattributes_path(self) -> pathlib.Path:
-        return self.links_directory.joinpath(".gitattributes")
+        return self._path.joinpath(".gitattributes")
+
+    def create_gitattributes(self) -> None:
+        with self.gitattributes_path().open(mode="w", encoding="utf-8") as file:
+            file.write("**/* filter=lfs diff=lfs merge=lfs -text\n")
+            file.write(".gitattributes !filter !diff !merge text\n")
+            file.write("list.json !filter !diff !merge text\n")
+
+    def remove_empty_directory(
+        self,
+        *,
+        logger: Optional[logging.Logger] = None,
+    ) -> None:
+        # execute recursively
+        def _remove_empty_directory(path: pathlib.Path) -> None:
+            # check if the path is directory
+            if not path.is_dir():
+                return
+            # execute recursively to child directories
+            for child in path.iterdir():
+                _remove_empty_directory(child)
+            # check if empty
+            if not list(path.iterdir()):
+                if logger is not None:
+                    logger.debug(f'delete empty directory: "{path}"')
+                path.rmdir()
+
+        # execute from the root directory
+        _remove_empty_directory(self._path)
 
 
 async def _request_external_links(
     links: list[ExternalLink],
-    save_directory: _SaveDirectory,
+    links_directory: _LinksDirectory,
     config: ExternalLinkConfig,
     session: aiohttp.ClientSession,
     logger: logging.Logger,
@@ -463,7 +483,7 @@ async def _request_external_links(
     semaphore = asyncio.Semaphore(config.parallel_limit)
     # request config
     request_config = _RequestConfig(
-        save_directory=save_directory,
+        links_directory=links_directory,
         content_types=[
             re.compile(content_type) for content_type in config.content_types
         ],
@@ -496,7 +516,7 @@ async def _request_external_links(
 
 @dataclasses.dataclass
 class _RequestConfig:
-    save_directory: _SaveDirectory
+    links_directory: _LinksDirectory
     content_types: list[re.Pattern[str]]
     excluded_urls: list[re.Pattern[str]]
 
@@ -540,11 +560,11 @@ async def _request(
                     f"request({index}): save content ({response_log.content_type})"
                 )
                 # save
-                save_path = config.save_directory.file_path(link.url)
-                logger.debug(f'request({index}): save to "{save_path}"')
-                if not save_path.parent.exists():
-                    save_path.parent.mkdir(parents=True)
-                with save_path.open(mode="bw") as file:
+                file_path = config.links_directory.file_path(link.url)
+                logger.debug(f'request({index}): save to "{file_path}"')
+                if not file_path.parent.exists():
+                    file_path.parent.mkdir(parents=True)
+                with file_path.open(mode="bw") as file:
                     file.write(await response.read())
                 is_saved = True
             return ExternalLinkLog(
@@ -600,7 +620,7 @@ def _re_request_targets(
 
 
 def _load_saved_list(
-    directory: _SaveDirectory,
+    directory: _LinksDirectory,
     logger: logging.Logger,
 ) -> Optional[SavedExternalLinksInfo]:
     file_path = directory.list_path()
@@ -612,7 +632,7 @@ def _load_saved_list(
 
 
 def _save_saved_list(
-    directory: _SaveDirectory,
+    directory: _LinksDirectory,
     content_types: list[str],
     logs: list[ExternalLinkLog],
     logger: logging.Logger,
@@ -632,7 +652,7 @@ def _save_saved_list(
 
 def _commit_target(
     config: ExternalLinkConfig,
-    directory: _SaveDirectory,
+    directory: _LinksDirectory,
     logs: list[ExternalLinkLog],
     previous_list: Optional[SavedExternalLinksInfo],
     logger: logging.Logger,
@@ -660,32 +680,11 @@ def _commit_target(
     if config.use_git_lfs:
         gitattributes_path = directory.gitattributes_path()
         if not gitattributes_path.exists():
-            write_gitattributes(gitattributes_path)
+            directory.create_gitattributes()
             added.add(gitattributes_path)
     # remove deleted links
     for path in deleted:
         path.unlink()
     # remove empty directory
-    _remove_empty_directory(directory.links_directory, logger)
+    directory.remove_empty_directory(logger=logger)
     return CommitTarget(added=added, updated=updated, deleted=deleted)
-
-
-def _remove_empty_directory(
-    directory: pathlib.Path,
-    logger: logging.Logger,
-) -> None:
-    if directory.is_dir():
-        # recursive
-        for child in directory.iterdir():
-            _remove_empty_directory(child, logger)
-        # check if empty
-        if not list(directory.iterdir()):
-            logger.debug(f'delete empty directory: "{directory}"')
-            directory.rmdir()
-
-
-def write_gitattributes(path: pathlib.Path) -> None:
-    with path.open(mode="w", encoding="utf-8") as file:
-        file.write("**/* filter=lfs diff=lfs merge=lfs -text\n")
-        file.write(".gitattributes !filter !diff !merge text\n")
-        file.write("list.json !filter !diff !merge text\n")
