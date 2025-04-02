@@ -140,11 +140,15 @@ def save_external_links(
     git_directory: pathlib.Path,
     *,
     config: Optional[ExternalLinkConfig] = None,
+    session: Optional[aiohttp.ClientSession] = None,
     logger: Optional[logging.Logger] = None,
 ) -> CommitTarget:
     config = config or ExternalLinkConfig()
     logger = logger or logging.getLogger(__name__)
     request_all = config.allways_request_all_links
+    # session
+    if session is None:
+        session = _create_session(config)
     # log directory
     log_directory = _LogsDirectory(pathlib.Path(config.log_directory), logger)
     # save directory
@@ -180,6 +184,7 @@ def save_external_links(
             previous_logs,
             save_directory,
             config,
+            session,
             logger,
         )
     else:
@@ -189,6 +194,7 @@ def save_external_links(
             previous_logs,
             save_directory,
             config,
+            session,
             logger,
         )
         # save logs
@@ -231,10 +237,12 @@ def _create_session(config: ExternalLinkConfig) -> aiohttp.ClientSession:
 
 
 def _request_logs(
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     links: list[ExternalLink],
     previous_logs: list[ExternalLinkLog],
     save_directory: _SaveDirectory,
     config: ExternalLinkConfig,
+    session: aiohttp.ClientSession,
     logger: logging.Logger,
 ) -> list[ExternalLinkLog]:
     # classify links
@@ -250,6 +258,7 @@ def _request_logs(
             classified_links.new_links,
             save_directory,
             config,
+            session,
             logger,
         )
     )
@@ -447,6 +456,7 @@ async def _request_external_links(
     links: list[ExternalLink],
     save_directory: _SaveDirectory,
     config: ExternalLinkConfig,
+    session: aiohttp.ClientSession,
     logger: logging.Logger,
 ) -> list[ExternalLinkLog]:
     # semaphore
@@ -479,7 +489,7 @@ async def _request_external_links(
 
     logger.info(f"request {len(links)} links")
 
-    async with _create_session(config) as session:
+    async with session:
         tasks = [_parallel_request(session, i, link) for i, link in enumerate(links)]
         return await asyncio.gather(*tasks)
 
