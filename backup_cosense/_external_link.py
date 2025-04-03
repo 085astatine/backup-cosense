@@ -152,9 +152,12 @@ def save_external_links(
     # log directory
     log_directory = _LogsDirectory(pathlib.Path(config.log_directory), logger)
     # links directory
-    links_directory = _LinksDirectory(git_directory.joinpath(config.save_directory))
+    links_directory = _LinksDirectory(
+        git_directory.joinpath(config.save_directory),
+        logger,
+    )
     # load previous saved list
-    previous_saved_list = links_directory.load_file_list(logger=logger)
+    previous_saved_list = links_directory.load_file_list()
     # check previous content_types
     if previous_saved_list is not None and (
         set(previous_saved_list.content_types) != set(config.content_types)
@@ -200,7 +203,6 @@ def save_external_links(
     links_directory.save_file_list(
         config.content_types,
         [log.url for log in logs if log.is_saved],
-        logger=logger,
     )
     # clean logs
     if config.keep_logs != "all":
@@ -211,7 +213,6 @@ def save_external_links(
         links_directory,
         logs,
         previous_saved_list,
-        logger,
     )
 
 
@@ -430,8 +431,13 @@ def _classify_external_links(
 
 
 class _LinksDirectory:
-    def __init__(self, path: pathlib.Path) -> None:
+    def __init__(
+        self,
+        path: pathlib.Path,
+        logger: logging.Logger,
+    ) -> None:
         self._path = path
+        self._logger = logger
 
     def file_path(self, url: str) -> pathlib.Path:
         return self._path.joinpath(re.sub(r"https?://", "", url))
@@ -439,14 +445,9 @@ class _LinksDirectory:
     def file_list_path(self) -> pathlib.Path:
         return self._path.joinpath("list.json")
 
-    def load_file_list(
-        self,
-        *,
-        logger: Optional[logging.Logger] = None,
-    ) -> Optional[SavedExternalLinksInfo]:
+    def load_file_list(self) -> Optional[SavedExternalLinksInfo]:
         path = self.file_list_path()
-        if logger:
-            logger.debug(f"load saved link list from {path}")
+        self._logger.debug(f"load saved link list from {path}")
         data = load_json(path, schema=jsonschema_saved_external_links_info())
         if data is not None:
             return dacite.from_dict(data_class=SavedExternalLinksInfo, data=data)
@@ -456,12 +457,9 @@ class _LinksDirectory:
         self,
         content_types: list[str],
         urls: list[str],
-        *,
-        logger: Optional[logging.Logger] = None,
     ) -> None:
         path = self.file_list_path()
-        if logger:
-            logger.debug(f"save saved link list to {path}")
+        self._logger.debug(f"save saved link list to {path}")
         data = {
             "content_types": sorted(content_types),
             "urls": sorted(urls),
@@ -477,11 +475,7 @@ class _LinksDirectory:
             file.write(".gitattributes !filter !diff !merge text\n")
             file.write("list.json !filter !diff !merge text\n")
 
-    def remove_empty_directory(
-        self,
-        *,
-        logger: Optional[logging.Logger] = None,
-    ) -> None:
+    def remove_empty_directory(self) -> None:
         # execute recursively
         def _remove_empty_directory(path: pathlib.Path) -> None:
             # check if the path is directory
@@ -492,8 +486,7 @@ class _LinksDirectory:
                 _remove_empty_directory(child)
             # check if empty
             if not list(path.iterdir()):
-                if logger is not None:
-                    logger.debug(f'delete empty directory: "{path}"')
+                self._logger.debug(f'delete empty directory: "{path}"')
                 path.rmdir()
 
         # execute from the root directory
@@ -652,7 +645,6 @@ def _commit_target(
     directory: _LinksDirectory,
     logs: list[ExternalLinkLog],
     previous_list: Optional[SavedExternalLinksInfo],
-    logger: logging.Logger,
 ) -> CommitTarget:
     # saved files
     saved_files = {directory.file_path(log.url) for log in logs if log.is_saved}
@@ -683,5 +675,5 @@ def _commit_target(
     for path in deleted:
         path.unlink()
     # remove empty directory
-    directory.remove_empty_directory(logger=logger)
+    directory.remove_empty_directory()
     return CommitTarget(added=added, updated=updated, deleted=deleted)
