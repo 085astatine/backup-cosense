@@ -154,7 +154,7 @@ def save_external_links(
     # links directory
     links_directory = _LinksDirectory(git_directory.joinpath(config.save_directory))
     # load previous saved list
-    previous_saved_list = _load_saved_list(links_directory, logger)
+    previous_saved_list = links_directory.load_file_list(logger=logger)
     # check previous content_types
     if previous_saved_list is not None and (
         set(previous_saved_list.content_types) != set(config.content_types)
@@ -197,11 +197,10 @@ def save_external_links(
         # save logs
         log_directory.save(backup.timestamp, logs)
     # save list.json
-    _save_saved_list(
-        links_directory,
+    links_directory.save_file_list(
         config.content_types,
-        logs,
-        logger,
+        [log.url for log in logs if log.is_saved],
+        logger=logger,
     )
     # clean logs
     if config.keep_logs != "all":
@@ -437,8 +436,37 @@ class _LinksDirectory:
     def file_path(self, url: str) -> pathlib.Path:
         return self._path.joinpath(re.sub(r"https?://", "", url))
 
-    def list_path(self) -> pathlib.Path:
+    def file_list_path(self) -> pathlib.Path:
         return self._path.joinpath("list.json")
+
+    def load_file_list(
+        self,
+        *,
+        logger: Optional[logging.Logger] = None,
+    ) -> Optional[SavedExternalLinksInfo]:
+        path = self.file_list_path()
+        if logger:
+            logger.debug(f"load saved link list from {path}")
+        data = load_json(path, schema=jsonschema_saved_external_links_info())
+        if data is not None:
+            return dacite.from_dict(data_class=SavedExternalLinksInfo, data=data)
+        return None
+
+    def save_file_list(
+        self,
+        content_types: list[str],
+        urls: list[str],
+        *,
+        logger: Optional[logging.Logger] = None,
+    ) -> None:
+        path = self.file_list_path()
+        if logger:
+            logger.debug(f"save saved link list to {path}")
+        data = {
+            "content_types": sorted(content_types),
+            "urls": sorted(urls),
+        }
+        save_json(path, data, schema=jsonschema_saved_external_links_info())
 
     def gitattributes_path(self) -> pathlib.Path:
         return self._path.joinpath(".gitattributes")
@@ -619,37 +647,6 @@ def _re_request_targets(
     return links
 
 
-def _load_saved_list(
-    directory: _LinksDirectory,
-    logger: logging.Logger,
-) -> Optional[SavedExternalLinksInfo]:
-    file_path = directory.list_path()
-    logger.debug(f"load saved link list from {file_path}")
-    data = load_json(file_path, schema=jsonschema_saved_external_links_info())
-    if data is not None:
-        return dacite.from_dict(data_class=SavedExternalLinksInfo, data=data)
-    return None
-
-
-def _save_saved_list(
-    directory: _LinksDirectory,
-    content_types: list[str],
-    logs: list[ExternalLinkLog],
-    logger: logging.Logger,
-) -> None:
-    file_path = directory.list_path()
-    saved_list = SavedExternalLinksInfo(
-        content_types=sorted(content_types),
-        urls=sorted(log.url for log in logs if log.is_saved),
-    )
-    logger.debug(f"save saved link list to {file_path}")
-    save_json(
-        file_path,
-        dataclasses.asdict(saved_list),
-        schema=jsonschema_saved_external_links_info(),
-    )
-
-
 def _commit_target(
     config: ExternalLinkConfig,
     directory: _LinksDirectory,
@@ -671,7 +668,7 @@ def _commit_target(
     if not config.keep_deleted_links:
         deleted.update(previous_saved_files - saved_files)
     # list.json
-    list_path = directory.list_path()
+    list_path = directory.file_list_path()
     if list_path.exists():
         updated.add(list_path)
     else:
