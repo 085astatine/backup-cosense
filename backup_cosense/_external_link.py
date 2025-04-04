@@ -150,7 +150,7 @@ def save_external_links(
     if session is None:
         session = _create_session(config)
     # log directory
-    log_directory = _LogsDirectory(pathlib.Path(config.log_directory), logger)
+    log_directory = _LogDirectory(pathlib.Path(config.log_directory), logger)
     # links directory
     links_directory = _LinksDirectory(
         git_directory.joinpath(config.save_directory),
@@ -267,7 +267,7 @@ def _request_logs(
 
 
 @dataclasses.dataclass
-class _LogsFile:
+class _LogFile:
     path: pathlib.Path
     timestamp: int
 
@@ -282,7 +282,7 @@ class _LogsFile:
         return f"external_link_{timestamp}.json"
 
 
-class _LogsDirectory:
+class _LogDirectory:
     def __init__(
         self,
         directory: pathlib.Path,
@@ -292,16 +292,16 @@ class _LogsDirectory:
         self._logger = logger
 
     def file_path(self, timestamp: int) -> pathlib.Path:
-        return self._directory.joinpath(_LogsFile.file_name(timestamp))
+        return self._directory.joinpath(_LogFile.file_name(timestamp))
 
-    def find(self, timestamp: int) -> Optional[_LogsFile]:
+    def find(self, timestamp: int) -> Optional[_LogFile]:
         path = self.file_path(timestamp)
         if path.exists():
-            return _LogsFile(path=path, timestamp=timestamp)
+            return _LogFile(path=path, timestamp=timestamp)
         return None
 
-    def find_all(self) -> list[_LogsFile]:
-        files: list[_LogsFile] = []
+    def find_all(self) -> list[_LogFile]:
+        files: list[_LogFile] = []
         # check if the path is directory
         if not self._directory.is_dir():
             return files
@@ -315,7 +315,7 @@ class _LogsDirectory:
                 r"external_link_(?P<timestamp>\d+).json", path.name
             ):
                 files.append(
-                    _LogsFile(
+                    _LogFile(
                         path=path, timestamp=int(filename_match.group("timestamp"))
                     )
                 )
@@ -327,7 +327,7 @@ class _LogsDirectory:
         self,
         *,
         timestamp: Optional[int] = None,
-    ) -> Optional[_LogsFile]:
+    ) -> Optional[_LogFile]:
         return next(
             (
                 file
