@@ -145,7 +145,6 @@ def save_external_links(
 ) -> CommitTarget:
     config = config or ExternalLinkConfig()
     logger = logger or logging.getLogger(__name__)
-    request_all = config.allways_request_all_links
     # session
     if session is None:
         session = _create_session(config)
@@ -158,20 +157,17 @@ def save_external_links(
     )
     # load previous saved list
     previous_saved_list = links_directory.load_file_list()
-    # check previous content_types
-    if previous_saved_list is not None and (
-        set(previous_saved_list.content_types) != set(config.content_types)
-    ):
-        logger.info("request all links because content types are changed")
-        request_all = True
     # load previous log
     previous_logs = (
         log_directory.load_latest(timestamp=backup.timestamp) or []
-        if not request_all
+        if not config.allways_request_all_links
         else []
     )
     # check if log file exists
-    if not request_all and (logs := log_directory.load(backup.timestamp)) is not None:
+    if (
+        not config.allways_request_all_links
+        and (logs := log_directory.load(backup.timestamp)) is not None
+    ):
         # links
         links = _re_request_targets(
             logs,
