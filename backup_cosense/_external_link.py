@@ -277,10 +277,6 @@ class _LogFile:
             return None
         return [dacite.from_dict(data_class=ExternalLinkLog, data=log) for log in logs]
 
-    @classmethod
-    def file_name(cls, timestamp: int) -> str:
-        return f"external_link_{timestamp}.json"
-
 
 class _LogDirectory:
     def __init__(
@@ -292,7 +288,7 @@ class _LogDirectory:
         self._logger = logger
 
     def file_path(self, timestamp: int) -> pathlib.Path:
-        return self._directory.joinpath(_LogFile.file_name(timestamp))
+        return self._directory.joinpath(f"external_link_{timestamp}.json")
 
     def find(self, timestamp: int) -> Optional[_LogFile]:
         path = self.file_path(timestamp)
@@ -301,23 +297,20 @@ class _LogDirectory:
         return None
 
     def find_all(self) -> list[_LogFile]:
-        files: list[_LogFile] = []
         # check if the path is directory
         if not self._directory.is_dir():
-            return files
+            return []
         # find external_link_{timestamp}.json
+        files: list[_LogFile] = []
+        pattern = re.compile(r"external_link_(?P<timestamp>[0-9]+).json")
         for path in self._directory.iterdir():
             # check if the path is file
             if not path.is_file():
                 continue
             # filename match
-            if filename_match := re.match(
-                r"external_link_(?P<timestamp>\d+).json", path.name
-            ):
+            if match := pattern.match(path.name):
                 files.append(
-                    _LogFile(
-                        path=path, timestamp=int(filename_match.group("timestamp"))
-                    )
+                    _LogFile(path=path, timestamp=int(match.group("timestamp")))
                 )
         # sort by old...new
         files.sort(key=lambda file: file.timestamp)
