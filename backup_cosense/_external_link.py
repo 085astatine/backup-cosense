@@ -267,11 +267,22 @@ class _LogFile:
     path: pathlib.Path
     timestamp: int
 
-    def load(self) -> Optional[list[ExternalLinkLog]]:
+    def load(self) -> Optional[_Log]:
         logs = load_json(self.path, schema=jsonschema_external_link_logs())
         if logs is None:
             return None
-        return [dacite.from_dict(data_class=ExternalLinkLog, data=log) for log in logs]
+        return _Log(
+            timestamp=self.timestamp,
+            logs=[
+                dacite.from_dict(data_class=ExternalLinkLog, data=log) for log in logs
+            ],
+        )
+
+
+@dataclasses.dataclass
+class _Log:
+    timestamp: int
+    logs: list[ExternalLinkLog]
 
 
 class _LogDirectory:
@@ -329,10 +340,10 @@ class _LogDirectory:
     def load(self, timestamp: int) -> Optional[list[ExternalLinkLog]]:
         file = self.find(timestamp)
         if file is not None:
-            self._logger.info(f'load logs from "{file.path}"')
-            logs = file.load()
-            if logs is not None:
-                return logs
+            self._logger.info(f'load log from "{file.path}"')
+            log = file.load()
+            if log is not None:
+                return log.logs
         return None
 
     def load_latest(
@@ -342,10 +353,10 @@ class _LogDirectory:
     ) -> Optional[list[ExternalLinkLog]]:
         file = self.find_latest(timestamp=timestamp)
         if file is not None:
-            self._logger.info(f'load latest logs from "{file.path}"')
-            logs = file.load()
-            if logs is not None:
-                return logs
+            self._logger.info(f'load latest log from "{file.path}"')
+            log = file.load()
+            if log is not None:
+                return log.logs
         return None
 
     def save(
