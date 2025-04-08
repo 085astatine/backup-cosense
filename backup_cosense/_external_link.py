@@ -8,7 +8,7 @@ import pathlib
 import random
 import re
 import time
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Self
 
 import aiohttp
 import dacite
@@ -267,22 +267,32 @@ class _LogFile:
     path: pathlib.Path
     timestamp: int
 
-    def load(self) -> Optional[_Log]:
-        logs = load_json(self.path, schema=jsonschema_external_link_logs())
-        if logs is None:
-            return None
-        return _Log(
-            timestamp=self.timestamp,
-            logs=[
-                dacite.from_dict(data_class=ExternalLinkLog, data=log) for log in logs
-            ],
-        )
-
 
 @dataclasses.dataclass
 class _Log:
     timestamp: int
     logs: list[ExternalLinkLog]
+
+    @classmethod
+    def load(cls, path: pathlib.Path, timestamp: int) -> Optional[Self]:
+        logs = load_json(path, schema=jsonschema_external_link_logs())
+        if logs is None:
+            return None
+        return cls(
+            timestamp=timestamp,
+            logs=[
+                dacite.from_dict(data_class=ExternalLinkLog, data=log) for log in logs
+            ],
+        )
+
+    def save(self, path: pathlib.Path) -> None:
+        # sort by URL
+        logs = sorted(self.logs, key=lambda log: log.url)
+        save_json(
+            path,
+            logs,
+            schema=jsonschema_external_link_log(),
+        )
 
 
 class _LogDirectory:
@@ -341,7 +351,7 @@ class _LogDirectory:
         file = self.find(timestamp)
         if file is not None:
             self._logger.info(f'load log from "{file.path}"')
-            log = file.load()
+            log = _Log.load(file.path, file.timestamp)
             if log is not None:
                 return log.logs
         return None
@@ -354,7 +364,7 @@ class _LogDirectory:
         file = self.find_latest(timestamp=timestamp)
         if file is not None:
             self._logger.info(f'load latest log from "{file.path}"')
-            log = file.load()
+            log = _Log.load(file.path, file.timestamp)
             if log is not None:
                 return log.logs
         return None
