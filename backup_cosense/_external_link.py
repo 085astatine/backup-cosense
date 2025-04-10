@@ -8,7 +8,6 @@ import pathlib
 import random
 import re
 import time
-from collections import defaultdict
 from typing import Any, Literal, Optional, Self
 
 import aiohttp
@@ -407,35 +406,23 @@ class _LogEditor:
         logs: list[ExternalLinkLog],
     ) -> None:
         self._timestamp = timestamp
-        self._logs = logs
-        self._added_links: list[ExternalLink] = []
-        self._deleted_links: list[str] = []
+        self._logs: dict[str, ExternalLinkLog] = {log.url: log for log in logs}
+        self._added_links: dict[str, ExternalLink] = {}
+        self._deleted_links: set[str] = set()
 
     def update_links(self, links: list[ExternalLink]) -> None:
         # match link & log
-        pairs: dict[str, _LinkLogPair] = defaultdict(_LinkLogPair)
+        logs: dict[str, ExternalLinkLog] = {}
+        added_links: dict[str, ExternalLink] = {}
         for link in links:
-            pairs[link.url].link = link
-        for log in self._logs:
-            pairs[log.url].log = log
-        # classify
-        logs: list[ExternalLinkLog] = []
-        added_links: list[ExternalLink] = []
-        deleted_links: list[str] = []
-        for pair in pairs.values():
-            if pair.log is None:
-                if pair.link is None:
-                    pass
-                else:
-                    added_links.append(pair.link)
+            if link.url in self._logs:
+                # update locations
+                log = copy.copy(self._logs.pop(link.url))
+                log.locations = copy.copy(link.locations)
+                logs[log.url] = log
             else:
-                if pair.link is None:
-                    deleted_links.append(pair.log.url)
-                else:
-                    # replace locations
-                    log = copy.copy(pair.log)
-                    log.locations = copy.copy(pair.link.locations)
-                    logs.append(log)
+                added_links[link.url] = link
+        deleted_links = set(self._logs.keys())
         # update
         self._logs = logs
         self._added_links = added_links
@@ -443,14 +430,9 @@ class _LogEditor:
 
     def add_log(self, log: ExternalLinkLog) -> None:
         # delete from added links
-        link = next(
-            (link for link in self._added_links if log.url == link.url),
-            None,
-        )
-        if link is not None:
-            self._added_links.remove(link)
+        self._added_links.pop(log.url)
         # add to logs
-        self._logs.append(log)
+        self._logs[log.url] = log
 
 
 @dataclasses.dataclass
