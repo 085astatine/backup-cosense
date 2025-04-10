@@ -270,64 +270,9 @@ class _LogFile:
 
 
 @dataclasses.dataclass
-class _LinkLogPair:
-    link: Optional[ExternalLink] = None
-    log: Optional[ExternalLinkLog] = None
-
-
-@dataclasses.dataclass
 class _Log:
     timestamp: int
     logs: list[ExternalLinkLog]
-    added_links: list[ExternalLink] = dataclasses.field(default_factory=list)
-    deleted_links: list[str] = dataclasses.field(default_factory=list)
-
-    def update_links(
-        self,
-        timestamp: int,
-        links: list[ExternalLink],
-    ) -> Self:
-        # match link & log
-        pairs: dict[str, _LinkLogPair] = defaultdict(_LinkLogPair)
-        for link in links:
-            pairs[link.url].link = link
-        for log in self.logs:
-            pairs[log.url].log = log
-        # classify
-        logs: list[ExternalLinkLog] = []
-        added_links: list[ExternalLink] = []
-        deleted_links: list[str] = []
-        for pair in pairs.values():
-            if pair.log is None:
-                if pair.link is None:
-                    pass
-                else:
-                    added_links.append(pair.link)
-            else:
-                if pair.link is None:
-                    deleted_links.append(pair.log.url)
-                else:
-                    # replace locations
-                    log = copy.copy(pair.log)
-                    log.locations = copy.copy(pair.link.locations)
-                    logs.append(log)
-        return self.__class__(
-            timestamp=timestamp,
-            logs=logs,
-            added_links=added_links,
-            deleted_links=deleted_links,
-        )
-
-    def add_log(self, log: ExternalLinkLog) -> None:
-        # delete from added links
-        link = next(
-            (link for link in self.added_links if log.url == link.url),
-            None,
-        )
-        if link is not None:
-            self.added_links.remove(link)
-        # add to logs
-        self.logs.append(log)
 
     @classmethod
     def load(cls, path: pathlib.Path, timestamp: int) -> Optional[Self]:
@@ -447,6 +392,65 @@ class _LogDirectory:
                 target.path.unlink()
         else:
             self._logger.warning(f"skip clean: keep({keep}) must be >= 0")
+
+
+@dataclasses.dataclass
+class _LinkLogPair:
+    link: Optional[ExternalLink] = None
+    log: Optional[ExternalLinkLog] = None
+
+
+class _LogEditor:
+    def __init__(
+        self,
+        timestamp: int,
+        logs: list[ExternalLinkLog],
+    ) -> None:
+        self._timestamp = timestamp
+        self._logs = logs
+        self._added_links: list[ExternalLink] = []
+        self._deleted_links: list[str] = []
+
+    def update_links(self, links: list[ExternalLink]) -> None:
+        # match link & log
+        pairs: dict[str, _LinkLogPair] = defaultdict(_LinkLogPair)
+        for link in links:
+            pairs[link.url].link = link
+        for log in self._logs:
+            pairs[log.url].log = log
+        # classify
+        logs: list[ExternalLinkLog] = []
+        added_links: list[ExternalLink] = []
+        deleted_links: list[str] = []
+        for pair in pairs.values():
+            if pair.log is None:
+                if pair.link is None:
+                    pass
+                else:
+                    added_links.append(pair.link)
+            else:
+                if pair.link is None:
+                    deleted_links.append(pair.log.url)
+                else:
+                    # replace locations
+                    log = copy.copy(pair.log)
+                    log.locations = copy.copy(pair.link.locations)
+                    logs.append(log)
+        # update
+        self._logs = logs
+        self._added_links = added_links
+        self._deleted_links = deleted_links
+
+    def add_log(self, log: ExternalLinkLog) -> None:
+        # delete from added links
+        link = next(
+            (link for link in self._added_links if log.url == link.url),
+            None,
+        )
+        if link is not None:
+            self._added_links.remove(link)
+        # add to logs
+        self._logs.append(log)
 
 
 @dataclasses.dataclass
