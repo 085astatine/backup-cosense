@@ -318,6 +318,17 @@ class _Log:
             deleted_links=deleted_links,
         )
 
+    def add_log(self, log: ExternalLinkLog) -> None:
+        # delete from added links
+        link = next(
+            (link for link in self.added_links if log.url == link.url),
+            None,
+        )
+        if link is not None:
+            self.added_links.remove(link)
+        # add to logs
+        self.logs.append(log)
+
     @classmethod
     def load(cls, path: pathlib.Path, timestamp: int) -> Optional[Self]:
         logs = load_json(path, schema=jsonschema_external_link_logs())
