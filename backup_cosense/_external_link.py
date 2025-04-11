@@ -14,7 +14,7 @@ import aiohttp
 import dacite
 import multidict
 
-from ._backup import Backup, ExternalLink, Location, jsonschema_location
+from ._backup import ExternalLink, Location, jsonschema_location
 from ._config import ExternalLinkConfig
 from ._git import CommitTarget
 from ._json import load_json, save_json
@@ -136,7 +136,9 @@ def jsonschema_saved_external_links_info() -> dict[str, Any]:
 
 
 def save_external_links(
-    backup: Backup,
+    # pylint: disable=too-many-arguments
+    timestamp: int,
+    external_links: list[ExternalLink],
     git_directory: pathlib.Path,
     *,
     config: Optional[ExternalLinkConfig] = None,
@@ -159,14 +161,14 @@ def save_external_links(
     previous_saved_list = links_directory.load_file_list()
     # load previous log
     previous_logs = (
-        log_directory.load_latest(timestamp=backup.timestamp) or []
+        log_directory.load_latest(timestamp=timestamp) or []
         if not config.allways_request_all_links
         else []
     )
     # check if log file exists
     if (
         not config.allways_request_all_links
-        and (logs := log_directory.load(backup.timestamp)) is not None
+        and (logs := log_directory.load(timestamp)) is not None
     ):
         # links
         links = _re_request_targets(
@@ -186,7 +188,7 @@ def save_external_links(
     else:
         # request logs
         logs = _request_logs(
-            backup.external_links(),
+            external_links,
             previous_logs,
             links_directory,
             config,
@@ -194,7 +196,7 @@ def save_external_links(
             logger,
         )
         # save logs
-        log_directory.save(backup.timestamp, logs)
+        log_directory.save(timestamp, logs)
     # save list.json
     links_directory.save_file_list(
         config.content_types,
