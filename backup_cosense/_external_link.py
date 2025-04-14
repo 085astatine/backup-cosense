@@ -8,7 +8,7 @@ import pathlib
 import random
 import re
 import time
-from typing import Any, Literal, Optional, Self
+from typing import Any, Callable, Literal, Optional, Self
 
 import aiohttp
 import dacite
@@ -142,14 +142,18 @@ def save_external_links(
     git_directory: pathlib.Path,
     *,
     config: Optional[ExternalLinkConfig] = None,
-    session: Optional[aiohttp.ClientSession] = None,
+    create_session: Optional[Callable[[], aiohttp.ClientSession]] = None,
     logger: Optional[logging.Logger] = None,
 ) -> CommitTarget:
     config = config or ExternalLinkConfig()
     logger = logger or logging.getLogger(__name__)
+
     # session
-    if session is None:
-        session = _create_session(config)
+    def default_create_session() -> aiohttp.ClientSession:
+        return _create_session(config)
+
+    if create_session is None:
+        create_session = default_create_session
     # log directory
     log_directory = _LogDirectory(pathlib.Path(config.log_directory), logger)
     # links directory
@@ -182,7 +186,7 @@ def save_external_links(
             previous_logs,
             links_directory,
             config,
-            session,
+            create_session,
             logger,
         )
     else:
@@ -192,7 +196,7 @@ def save_external_links(
             previous_logs,
             links_directory,
             config,
-            session,
+            create_session,
             logger,
         )
         # save logs
@@ -237,7 +241,7 @@ def _request_logs(
     previous_logs: list[ExternalLinkLog],
     links_directory: _LinksDirectory,
     config: ExternalLinkConfig,
-    session: aiohttp.ClientSession,
+    create_session: Callable[[], aiohttp.ClientSession],
     logger: logging.Logger,
 ) -> list[ExternalLinkLog]:
     # classify links
@@ -253,7 +257,7 @@ def _request_logs(
             classified_links.new_links,
             links_directory,
             config,
-            session,
+            create_session,
             logger,
         )
     )
@@ -545,7 +549,7 @@ async def _request_external_links(
     links: list[ExternalLink],
     links_directory: _LinksDirectory,
     config: ExternalLinkConfig,
-    session: aiohttp.ClientSession,
+    create_session: Callable[[], aiohttp.ClientSession],
     logger: logging.Logger,
 ) -> list[ExternalLinkLog]:
     # semaphore
@@ -578,7 +582,7 @@ async def _request_external_links(
 
     logger.info(f"request {len(links)} links")
 
-    async with session:
+    async with create_session() as session:
         tasks = [_parallel_request(session, i, link) for i, link in enumerate(links)]
         return await asyncio.gather(*tasks)
 
