@@ -164,26 +164,27 @@ def save_external_links(
     # load previous saved list
     previous_saved_list = links_directory.load_file_list()
     # load previous log
-    previous_logs = (
-        log_directory.load_latest(timestamp=timestamp) or []
+    previous_log = (
+        log_directory.load_latest(timestamp=timestamp)
         if not config.allways_request_all_links
-        else []
+        else None
     )
     # check if log file exists
     if (
         not config.allways_request_all_links
-        and (logs := log_directory.load(timestamp)) is not None
+        and (log := log_directory.load(timestamp)) is not None
     ):
         # links
         links = _re_request_targets(
-            logs,
+            log.logs,
             previous_saved_list.urls if previous_saved_list is not None else [],
             config.content_types,
         )
         # re-request
         _request_logs(
+            timestamp,
             links,
-            previous_logs,
+            previous_log,
             links_directory,
             config,
             create_session,
@@ -191,20 +192,21 @@ def save_external_links(
         )
     else:
         # request logs
-        logs = _request_logs(
+        log = _request_logs(
+            timestamp,
             external_links,
-            previous_logs,
+            previous_log,
             links_directory,
             config,
             create_session,
             logger,
         )
         # save logs
-        log_directory.save(timestamp, logs)
+        log_directory.save(log)
     # save list.json
     links_directory.save_file_list(
         config.content_types,
-        [log.url for log in logs if log.is_saved],
+        [log.url for log in log.logs if log.is_saved],
     )
     # clean logs
     if config.keep_logs != "all":
@@ -213,7 +215,7 @@ def save_external_links(
     return _commit_target(
         config,
         links_directory,
-        logs,
+        log.logs,
         previous_saved_list,
     )
 
@@ -237,17 +239,18 @@ def _create_session(config: ExternalLinkConfig) -> aiohttp.ClientSession:
 
 def _request_logs(
     # pylint: disable=too-many-arguments, too-many-positional-arguments
+    timestamp: int,
     links: list[ExternalLink],
-    previous_logs: list[ExternalLinkLog],
+    previous_log: Optional[_Log],
     links_directory: _LinksDirectory,
     config: ExternalLinkConfig,
     create_session: Callable[[], aiohttp.ClientSession],
     logger: logging.Logger,
-) -> list[ExternalLinkLog]:
+) -> _Log:
     # classify links
     classified_links = _classify_external_links(
         links,
-        previous_logs,
+        previous_log.logs if previous_log is not None else [],
     )
     # shuffle links
     random.shuffle(classified_links.new_links)
@@ -265,7 +268,7 @@ def _request_logs(
     logs.extend(classified_links.logs)
     # sort by URL
     logs.sort(key=lambda log: log.url)
-    return logs
+    return _Log(timestamp=timestamp, logs=logs)
 
 
 @dataclasses.dataclass
@@ -353,38 +356,30 @@ class _LogDirectory:
             None,
         )
 
-    def load(self, timestamp: int) -> Optional[list[ExternalLinkLog]]:
+    def load(self, timestamp: int) -> Optional[_Log]:
         file = self.find(timestamp)
         if file is not None:
             self._logger.info(f'load log from "{file.path}"')
-            log = _Log.load(file.path, file.timestamp)
-            if log is not None:
-                return log.logs
+            return _Log.load(file.path, file.timestamp)
         return None
 
     def load_latest(
         self,
         *,
         timestamp: Optional[int] = None,
-    ) -> Optional[list[ExternalLinkLog]]:
+    ) -> Optional[_Log]:
         file = self.find_latest(timestamp=timestamp)
         if file is not None:
             self._logger.info(f'load latest log from "{file.path}"')
-            log = _Log.load(file.path, file.timestamp)
-            if log is not None:
-                return log.logs
+            return _Log.load(file.path, file.timestamp)
         return None
 
-    def save(
-        self,
-        timestamp: int,
-        logs: list[ExternalLinkLog],
-    ) -> None:
-        path = self.file_path(timestamp)
+    def save(self, log: _Log) -> None:
+        path = self.file_path(log.timestamp)
         self._logger.info(f'save logs to "{path}"')
         save_json(
             path,
-            [dataclasses.asdict(log) for log in logs],
+            [dataclasses.asdict(log) for log in log.logs],
             schema=jsonschema_external_link_logs(),
         )
 
