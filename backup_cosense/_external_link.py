@@ -405,8 +405,10 @@ class _LogEditor:
         self,
         timestamp: int,
         logs: list[ExternalLinkLog],
+        logger: logging.Logger,
     ) -> None:
         self._timestamp = timestamp
+        self._logger = logger
         self._logs: dict[str, ExternalLinkLog] = {log.url: log for log in logs}
         self._added_links: dict[str, ExternalLink] = {}
         self._deleted_links: set[str] = set()
@@ -431,7 +433,9 @@ class _LogEditor:
 
     def add_log(self, log: ExternalLinkLog) -> None:
         # delete from added links
-        self._added_links.pop(log.url)
+        link = self._added_links.pop(log.url, None)
+        if link is None:
+            self._logger.warning(f"log of non-target URL({log.url}) is added")
         # add to logs
         self._logs[log.url] = log
 
