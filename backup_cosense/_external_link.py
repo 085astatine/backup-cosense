@@ -247,28 +247,28 @@ def _request_logs(
     create_session: Callable[[], aiohttp.ClientSession],
     logger: logging.Logger,
 ) -> _Log:
-    # classify links
-    classified_links = _classify_external_links(
-        links,
-        previous_log.logs if previous_log is not None else [],
-    )
+    # editor
+    editor = _LogEditor(timestamp, logger)
+    if previous_log is not None:
+        editor.load_logs(previous_log.logs)
+    editor.update_links(links)
     # shuffle links
-    random.shuffle(classified_links.new_links)
+    new_links = editor.added_links()
+    random.shuffle(new_links)
     # request
     logs = asyncio.run(
         _request_external_links(
-            classified_links.new_links,
+            new_links,
             links_directory,
             config,
             create_session,
             logger,
         )
     )
-    # merge previous logs into this logs
-    logs.extend(classified_links.logs)
-    # sort by URL
-    logs.sort(key=lambda log: log.url)
-    return _Log(timestamp=timestamp, logs=logs)
+    # add new log
+    for log in logs:
+        editor.add_log(log)
+    return editor.output()
 
 
 @dataclasses.dataclass
@@ -394,12 +394,6 @@ class _LogDirectory:
             self._logger.warning(f"skip clean: keep({keep}) must be >= 0")
 
 
-@dataclasses.dataclass
-class _LinkLogPair:
-    link: Optional[ExternalLink] = None
-    log: Optional[ExternalLinkLog] = None
-
-
 class _LogEditor:
     def __init__(
         self,
@@ -441,46 +435,16 @@ class _LogEditor:
         # add to logs
         self._logs[log.url] = log
 
+    def added_links(self) -> list[ExternalLink]:
+        return list(self._added_links.values())
 
-@dataclasses.dataclass
-class _ClassifiedExternalLinks:
-    new_links: list[ExternalLink]
-    logs: list[ExternalLinkLog]
-    deleted_links: list[ExternalLinkLog]
-
-
-def _classify_external_links(
-    links: list[ExternalLink],
-    previous_logs: list[ExternalLinkLog],
-) -> _ClassifiedExternalLinks:
-    # link & log pair
-    pairs = {link.url: _LinkLogPair(link=link) for link in links}
-    for log in previous_logs:
-        if log.url in pairs:
-            pairs[log.url].log = log
-        else:
-            pairs[log.url] = _LinkLogPair(log=log)
-    # classify
-    new_links: list[ExternalLink] = []
-    logs: list[ExternalLinkLog] = []
-    deleted_links: list[ExternalLinkLog] = []
-    for pair in pairs.values():
-        if pair.log is None:
-            if pair.link is not None:
-                new_links.append(pair.link)
-        else:
-            if pair.link is None:
-                deleted_links.append(pair.log)
-            else:
-                # replace locations
-                log = copy.copy(pair.log)
-                log.locations = copy.copy(pair.link.locations)
-                logs.append(log)
-    return _ClassifiedExternalLinks(
-        new_links,
-        logs,
-        deleted_links,
-    )
+    def output(self) -> _Log:
+        if self._added_links:
+            self._logger.warning("no logs exist for {len(self._added_links)} URLs")
+        return _Log(
+            timestamp=self._timestamp,
+            logs=sorted(self._logs.values(), key=lambda log: log.url),
+        )
 
 
 class _LinksDirectory:
