@@ -404,14 +404,16 @@ class _LogEditor:
     def __init__(
         self,
         timestamp: int,
-        logs: list[ExternalLinkLog],
         logger: logging.Logger,
     ) -> None:
         self._timestamp = timestamp
         self._logger = logger
-        self._logs: dict[str, ExternalLinkLog] = {log.url: log for log in logs}
+        self._logs: dict[str, ExternalLinkLog] = {}
         self._added_links: dict[str, ExternalLink] = {}
         self._deleted_links: set[str] = set()
+
+    def load_logs(self, logs: list[ExternalLinkLog]) -> None:
+        self._logs.update({log.url: log for log in logs})
 
     def update_links(self, links: list[ExternalLink]) -> None:
         # match link & log
