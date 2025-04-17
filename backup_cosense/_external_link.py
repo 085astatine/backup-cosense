@@ -8,7 +8,7 @@ import pathlib
 import random
 import re
 import time
-from typing import Any, Callable, Literal, Optional, Self
+from typing import Any, Callable, Literal, MutableMapping, Optional, Self
 
 import aiohttp
 import dacite
@@ -535,10 +535,9 @@ async def _request_external_links(
         async with semaphore:
             response = await _request_link(
                 session,
-                index,
                 link,
                 request_config,
-                logger,
+                _RequestLogger(logger, index),
             )
             await asyncio.sleep(config.request_interval)
             return response
@@ -557,19 +556,35 @@ class _RequestConfig:
     excluded_urls: list[re.Pattern[str]]
 
 
+class _RequestLogger(logging.LoggerAdapter):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        index: int,
+    ) -> None:
+        super().__init__(logger)
+        self._index = index
+
+    def process(
+        self,
+        msg: Any,
+        kwargs: MutableMapping[str, Any],
+    ) -> tuple[Any, MutableMapping[str, Any]]:
+        return super().process(f"request({self._index}): {msg}", kwargs)
+
+
 async def _request_link(
     session: aiohttp.ClientSession,
-    index: int,
     link: ExternalLink,
     config: _RequestConfig,
-    logger: logging.Logger,
+    logger: _RequestLogger,
 ) -> ExternalLinkLog:
-    logger.debug(f"request({index}): url={link.url}")
+    logger.debug(f"url={link.url}")
     # access timestamp
     access_timestamp = int(time.time())
     # check if the url is excluded
     if any(url.match(link.url) is not None for url in config.excluded_urls):
-        logger.debug(f"request({index}): excluded url")
+        logger.debug("excluded url")
         return ExternalLinkLog(
             url=link.url,
             locations=link.locations,
@@ -580,24 +595,22 @@ async def _request_link(
     # request
     try:
         async with session.get(link.url) as response:
-            logger.debug(f"request({index}): status={response.status}")
+            logger.debug(f"status={response.status}")
             response_log = ResponseLog(
                 status_code=response.status,
                 content_type=response.headers.get("content-type"),
             )
-            logger.debug(f"request({index}): response={response_log}")
+            logger.debug(f"response={response_log}")
             is_saved = False
             # check content type
             if response_log.content_type is not None and any(
                 content_type.match(response_log.content_type)
                 for content_type in config.content_types
             ):
-                logger.debug(
-                    f"request({index}): save content ({response_log.content_type})"
-                )
+                logger.debug(f"save content ({response_log.content_type})")
                 # save
                 file_path = config.links_directory.file_path(link.url)
-                logger.debug(f'request({index}): save to "{file_path}"')
+                logger.debug(f'save to "{file_path}"')
                 if not file_path.parent.exists():
                     file_path.parent.mkdir(parents=True)
                 with file_path.open(mode="bw") as file:
@@ -611,7 +624,7 @@ async def _request_link(
                 is_saved=is_saved,
             )
     except (asyncio.TimeoutError, aiohttp.ClientError) as error:
-        logger.debug(f"request({index}): error={error.__class__.__name__}({error})")
+        logger.debug(f"error={error.__class__.__name__}({error})")
         return ExternalLinkLog(
             url=link.url,
             locations=link.locations,
