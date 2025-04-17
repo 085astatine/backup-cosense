@@ -172,7 +172,7 @@ def save_external_links(
         logger,
     )
     # request
-    log = _request_logs(
+    log = _request(
         log_editor,
         links_directory,
         config,
@@ -215,30 +215,15 @@ def _create_session(config: ExternalLinkConfig) -> aiohttp.ClientSession:
     )
 
 
-def _request_logs(
-    editor: _LogEditor,
-    links_directory: _LinksDirectory,
-    config: ExternalLinkConfig,
-    create_session: Callable[[], aiohttp.ClientSession],
-    logger: logging.Logger,
-) -> _Log:
-    # shuffle links
-    links = editor.added_links()
-    random.shuffle(links)
-    # request
-    logs = asyncio.run(
-        _request_external_links(
-            links,
-            links_directory,
-            config,
-            create_session,
-            logger,
-        )
-    )
-    # add new log
-    for log in logs:
-        editor.add_log(log)
-    return editor.output()
+def _request_headers(config: ExternalLinkConfig) -> multidict.CIMultiDict:
+    headers: multidict.CIMultiDict = multidict.CIMultiDict()
+    # config.user_agent
+    if config.user_agent is not None:
+        headers["User-Agent"] = config.user_agent.user_agent()
+    # config.request_headers
+    for key, value in config.request_headers.items():
+        headers[key] = value
+    return headers
 
 
 @dataclasses.dataclass
@@ -497,6 +482,32 @@ def _setup_log_editor(
     return editor
 
 
+def _request(
+    editor: _LogEditor,
+    links_directory: _LinksDirectory,
+    config: ExternalLinkConfig,
+    create_session: Callable[[], aiohttp.ClientSession],
+    logger: logging.Logger,
+) -> _Log:
+    # shuffle links
+    links = editor.added_links()
+    random.shuffle(links)
+    # request
+    logs = asyncio.run(
+        _request_external_links(
+            links,
+            links_directory,
+            config,
+            create_session,
+            logger,
+        )
+    )
+    # add new log
+    for log in logs:
+        editor.add_log(log)
+    return editor.output()
+
+
 async def _request_external_links(
     links: list[ExternalLink],
     links_directory: _LinksDirectory,
@@ -522,7 +533,7 @@ async def _request_external_links(
         link: ExternalLink,
     ) -> ExternalLinkLog:
         async with semaphore:
-            response = await _request(
+            response = await _request_link(
                 session,
                 index,
                 link,
@@ -546,7 +557,7 @@ class _RequestConfig:
     excluded_urls: list[re.Pattern[str]]
 
 
-async def _request(
+async def _request_link(
     session: aiohttp.ClientSession,
     index: int,
     link: ExternalLink,
@@ -611,17 +622,6 @@ async def _request(
             ),
             is_saved=False,
         )
-
-
-def _request_headers(config: ExternalLinkConfig) -> multidict.CIMultiDict:
-    headers: multidict.CIMultiDict = multidict.CIMultiDict()
-    # config.user_agent
-    if config.user_agent is not None:
-        headers["User-Agent"] = config.user_agent.user_agent()
-    # config.request_headers
-    for key, value in config.request_headers.items():
-        headers[key] = value
-    return headers
 
 
 def _commit_target(
