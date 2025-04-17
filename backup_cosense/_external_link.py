@@ -163,46 +163,24 @@ def save_external_links(
     )
     # load previous saved list
     previous_saved_list = links_directory.load_file_list()
-    # load previous log
-    previous_log = (
-        log_directory.load_latest(timestamp=timestamp)
-        if not config.allways_request_all_links
-        else None
+    # log editor
+    log_editor = _setup_log_editor(
+        timestamp,
+        external_links,
+        log_directory,
+        config.allways_request_all_links,
+        logger,
     )
-    # check if log file exists
-    if (
-        not config.allways_request_all_links
-        and (log := log_directory.load(timestamp)) is not None
-    ):
-        # links
-        links = _re_request_targets(
-            log.logs,
-            previous_saved_list.urls if previous_saved_list is not None else [],
-            config.content_types,
-        )
-        # re-request
-        _request_logs(
-            timestamp,
-            links,
-            previous_log,
-            links_directory,
-            config,
-            create_session,
-            logger,
-        )
-    else:
-        # request logs
-        log = _request_logs(
-            timestamp,
-            external_links,
-            previous_log,
-            links_directory,
-            config,
-            create_session,
-            logger,
-        )
-        # save logs
-        log_directory.save(log)
+    # request
+    log = _request_logs(
+        log_editor,
+        links_directory,
+        config,
+        create_session,
+        logger,
+    )
+    # save log
+    log_directory.save(log)
     # save list.json
     links_directory.save_file_list(
         config.content_types,
@@ -238,27 +216,19 @@ def _create_session(config: ExternalLinkConfig) -> aiohttp.ClientSession:
 
 
 def _request_logs(
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
-    timestamp: int,
-    links: list[ExternalLink],
-    previous_log: Optional[_Log],
+    editor: _LogEditor,
     links_directory: _LinksDirectory,
     config: ExternalLinkConfig,
     create_session: Callable[[], aiohttp.ClientSession],
     logger: logging.Logger,
 ) -> _Log:
-    # editor
-    editor = _LogEditor(timestamp, logger)
-    if previous_log is not None:
-        editor.load_logs(previous_log.logs)
-    editor.update_links(links)
     # shuffle links
-    new_links = editor.added_links()
-    random.shuffle(new_links)
+    links = editor.added_links()
+    random.shuffle(links)
     # request
     logs = asyncio.run(
         _request_external_links(
-            new_links,
+            links,
             links_directory,
             config,
             create_session,
@@ -510,6 +480,23 @@ class _LinksDirectory:
         _remove_empty_directory(self._path)
 
 
+def _setup_log_editor(
+    timestamp: int,
+    links: list[ExternalLink],
+    log_directory: _LogDirectory,
+    all_request: bool,
+    logger: logging.Logger,
+) -> _LogEditor:
+    # load previous log
+    previous_log = log_directory.load_latest(timestamp=timestamp)
+    # setup log editor
+    editor = _LogEditor(timestamp, logger)
+    if not all_request and previous_log is not None:
+        editor.load_logs(previous_log.logs)
+    editor.update_links(links)
+    return editor
+
+
 async def _request_external_links(
     links: list[ExternalLink],
     links_directory: _LinksDirectory,
@@ -635,26 +622,6 @@ def _request_headers(config: ExternalLinkConfig) -> multidict.CIMultiDict:
     for key, value in config.request_headers.items():
         headers[key] = value
     return headers
-
-
-def _re_request_targets(
-    logs: list[ExternalLinkLog],
-    saved_urls: list[str],
-    content_types: list[str],
-) -> list[ExternalLink]:
-    links: list[ExternalLink] = []
-    content_type_patterns = [re.compile(content_type) for content_type in content_types]
-    for log in logs:
-        # check the urls is already saved
-        if log.url in saved_urls:
-            continue
-        match log.response:
-            case ResponseLog(content_type=content_type):
-                if content_type is not None and any(
-                    pattern.match(content_type) for pattern in content_type_patterns
-                ):
-                    links.append(log.link)
-    return links
 
 
 def _commit_target(
