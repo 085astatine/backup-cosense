@@ -520,13 +520,11 @@ async def _request_external_links(
 ) -> list[ExternalLinkLog]:
     # semaphore
     semaphore = asyncio.Semaphore(config.parallel_limit)
-    # request config
-    request_config = _RequestConfig(
+    # request arguments
+    request_args = _RequestArguments(
         links_directory=links_directory,
-        content_types=[
-            re.compile(content_type) for content_type in config.content_types
-        ],
-        excluded_urls=[re.compile(url) for url in config.excluded_urls],
+        content_types=[re.compile(pattern) for pattern in config.content_types],
+        excluded_urls=[re.compile(pattern) for pattern in config.excluded_urls],
     )
 
     # parallel requests
@@ -537,9 +535,9 @@ async def _request_external_links(
     ) -> ExternalLinkLog:
         async with semaphore:
             response = await _request_link(
+                request_args,
                 session,
                 link,
-                request_config,
                 _RequestLogger(logger, index),
             )
             await asyncio.sleep(config.request_interval)
@@ -552,11 +550,19 @@ async def _request_external_links(
         return await asyncio.gather(*tasks)
 
 
-@dataclasses.dataclass
-class _RequestConfig:
+@dataclasses.dataclass(frozen=True)
+class _RequestArguments:
     links_directory: _LinksDirectory
     content_types: list[re.Pattern[str]]
     excluded_urls: list[re.Pattern[str]]
+
+    def is_target_content_type(self, content_type: Optional[str]) -> bool:
+        if content_type is None:
+            return False
+        return any(pattern.match(content_type) for pattern in self.content_types)
+
+    def is_excluded_url(self, url: str) -> bool:
+        return any(pattern.match(url) for pattern in self.excluded_urls)
 
 
 class _RequestLogger(logging.LoggerAdapter):
@@ -577,16 +583,16 @@ class _RequestLogger(logging.LoggerAdapter):
 
 
 async def _request_link(
+    args: _RequestArguments,
     session: aiohttp.ClientSession,
     link: ExternalLink,
-    config: _RequestConfig,
     logger: _RequestLogger,
 ) -> ExternalLinkLog:
     logger.debug(f"url={link.url}")
     # access timestamp
     access_timestamp = int(time.time())
     # check if the url is excluded
-    if any(url.match(link.url) is not None for url in config.excluded_urls):
+    if args.is_excluded_url(link.url):
         logger.debug("excluded url")
         return ExternalLinkLog(
             url=link.url,
@@ -606,13 +612,10 @@ async def _request_link(
             logger.debug(f"response={response_log}")
             is_saved = False
             # check content type
-            if response_log.content_type is not None and any(
-                content_type.match(response_log.content_type)
-                for content_type in config.content_types
-            ):
+            if args.is_target_content_type(response_log.content_type):
                 logger.debug(f"save content ({response_log.content_type})")
                 # save
-                file_path = config.links_directory.file_path(link.url)
+                file_path = args.links_directory.file_path(link.url)
                 logger.debug(f'save to "{file_path}"')
                 if not file_path.parent.exists():
                     file_path.parent.mkdir(parents=True)
