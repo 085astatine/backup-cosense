@@ -172,7 +172,7 @@ def save_external_links(
         logger,
     )
     # request
-    log = _request(
+    _request(
         log_editor,
         links_directory,
         config,
@@ -180,6 +180,7 @@ def save_external_links(
         logger,
     )
     # save log
+    log = log_editor.output()
     log_directory.save(log)
     # save list.json
     links_directory.save_file_list(
@@ -193,7 +194,7 @@ def save_external_links(
     return _commit_target(
         config,
         links_directory,
-        log.logs,
+        log_editor,
         previous_saved_list,
     )
 
@@ -393,6 +394,9 @@ class _LogEditor:
     def added_links(self) -> list[ExternalLink]:
         return list(self._added_links.values())
 
+    def logs(self) -> list[ExternalLinkLog]:
+        return list(self._logs.values())
+
     def updated_logs(self) -> list[ExternalLinkLog]:
         return list(self._updated_logs.values())
 
@@ -491,7 +495,7 @@ def _request(
     config: ExternalLinkConfig,
     create_session: Callable[[], aiohttp.ClientSession],
     logger: logging.Logger,
-) -> _Log:
+) -> None:
     # shuffle links
     links = editor.added_links()
     random.shuffle(links)
@@ -508,7 +512,6 @@ def _request(
     # add new log
     for log in logs:
         editor.update_log(log)
-    return editor.output()
 
 
 async def _request_external_links(
@@ -646,19 +649,28 @@ async def _request_link(
 def _commit_target(
     config: ExternalLinkConfig,
     directory: _LinksDirectory,
-    logs: list[ExternalLinkLog],
+    log_editor: _LogEditor,
     previous_list: Optional[SavedExternalLinksInfo],
 ) -> CommitTarget:
+    # updated files
+    updated_files = {
+        directory.file_path(log.url)
+        for log in log_editor.updated_logs()
+        if log.is_saved
+    }
     # saved files
-    saved_files = {directory.file_path(log.url) for log in logs if log.is_saved}
+    saved_files = {
+        directory.file_path(log.url) for log in log_editor.logs() if log.is_saved
+    }
+    # previous saved files
     previous_saved_files: set[pathlib.Path] = set()
     if previous_list is not None:
         previous_saved_files.update(
             directory.file_path(url) for url in previous_list.urls
         )
     # added / updated / deleted
-    added = saved_files - previous_saved_files
-    updated = saved_files & previous_saved_files
+    added = updated_files - previous_saved_files
+    updated = updated_files & previous_saved_files
     deleted: set[pathlib.Path] = set()
     if not config.keep_deleted_links:
         deleted.update(previous_saved_files - saved_files)
