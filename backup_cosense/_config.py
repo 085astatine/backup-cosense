@@ -235,6 +235,39 @@ class FakeUserAgentConfig:
 
 
 @dataclasses.dataclass(frozen=True)
+class ExternalLinkSessionConfig:
+    timeout: float = 30
+    parallel_limit_per_host: int = 0
+    user_agent: Optional[FakeUserAgentConfig] = None
+    request_headers: dict[str, str] = dataclasses.field(default_factory=dict)
+
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "timeout": {
+                    "type": "number",
+                    "exclusiveMinimum": 0.0,
+                },
+                "parallel_limit_per_host": {
+                    "type": "integer",
+                    "minimum": 0,
+                },
+                "user_agent": FakeUserAgentConfig.jsonschema(),
+                "request_headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string",
+                    },
+                },
+            },
+        }
+        return schema
+
+
+@dataclasses.dataclass(frozen=True)
 class ExternalLinkConfig:
     # pylint: disable=too-many-instance-attributes
     enabled: bool = False
