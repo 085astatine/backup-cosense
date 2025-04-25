@@ -247,7 +247,7 @@ class _Log:
         logs = sorted(self.logs, key=lambda log: log.url)
         save_json(
             path,
-            logs,
+            [dataclasses.asdict(log) for log in logs],
             schema=self.jsonschema(),
         )
 
