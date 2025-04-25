@@ -14,7 +14,7 @@ import aiohttp
 import dacite
 import multidict
 
-from ._backup import ExternalLink, Location, jsonschema_location
+from ._backup import ExternalLink, Location
 from ._config import ExternalLinkConfig
 from ._git import CommitTarget
 from ._json import load_json, save_json
@@ -87,7 +87,7 @@ class ExternalLinkLog:
                 "access_timestamp": {"type": "integer"},
                 "locations": {
                     "type": "array",
-                    "items": jsonschema_location(),
+                    "items": Location.jsonschema(),
                 },
                 "response": {
                     "oneOf": [
