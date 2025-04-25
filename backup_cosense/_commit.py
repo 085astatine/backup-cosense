@@ -138,7 +138,8 @@ def staging_backup(
     if config.external_link.enabled:
         commit_target.update(
             save_external_links(
-                backup,
+                backup.timestamp,
+                backup.external_links(),
                 git.path,
                 config=config.external_link,
                 logger=logger,

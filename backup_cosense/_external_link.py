@@ -8,13 +8,13 @@ import pathlib
 import random
 import re
 import time
-from typing import Any, Literal, Optional
+from typing import Any, Callable, Literal, MutableMapping, Optional, Self
 
 import aiohttp
 import dacite
 import multidict
 
-from ._backup import Backup, ExternalLink, Location, jsonschema_location
+from ._backup import ExternalLink, Location, jsonschema_location
 from ._config import ExternalLinkConfig
 from ._git import CommitTarget
 from ._json import load_json, save_json
@@ -136,75 +136,56 @@ def jsonschema_saved_external_links_info() -> dict[str, Any]:
 
 
 def save_external_links(
-    backup: Backup,
+    # pylint: disable=too-many-arguments
+    timestamp: int,
+    external_links: list[ExternalLink],
     git_directory: pathlib.Path,
     *,
     config: Optional[ExternalLinkConfig] = None,
-    session: Optional[aiohttp.ClientSession] = None,
+    create_session: Optional[Callable[[], aiohttp.ClientSession]] = None,
     logger: Optional[logging.Logger] = None,
 ) -> CommitTarget:
     config = config or ExternalLinkConfig()
     logger = logger or logging.getLogger(__name__)
-    request_all = config.allways_request_all_links
+
     # session
-    if session is None:
-        session = _create_session(config)
+    def default_create_session() -> aiohttp.ClientSession:
+        return _create_session(config)
+
+    if create_session is None:
+        create_session = default_create_session
     # log directory
-    log_directory = _LogsDirectory(pathlib.Path(config.log_directory), logger)
-    # save directory
-    save_directory = _SaveDirectory(
-        root_directory=git_directory,
-        links_directory_name=config.save_directory,
+    log_directory = _LogDirectory(pathlib.Path(config.log_directory), logger)
+    # links directory
+    links_directory = _LinksDirectory(
+        git_directory.joinpath(config.save_directory),
+        logger,
     )
     # load previous saved list
-    previous_saved_list = _load_saved_list(save_directory, logger)
-    # check previous content_types
-    if previous_saved_list is not None and (
-        set(previous_saved_list.content_types) != set(config.content_types)
-    ):
-        logger.info("request all links because content types are changed")
-        request_all = True
-    # load previous log
-    previous_logs = (
-        log_directory.load_latest(timestamp=backup.timestamp) or []
-        if not request_all
-        else []
-    )
-    # check if log file exists
-    if not request_all and (logs := log_directory.load(backup.timestamp)) is not None:
-        # links
-        links = _re_request_targets(
-            logs,
-            previous_saved_list.urls if previous_saved_list is not None else [],
-            config.content_types,
-        )
-        # re-request
-        _request_logs(
-            links,
-            previous_logs,
-            save_directory,
-            config,
-            session,
-            logger,
-        )
-    else:
-        # request logs
-        logs = _request_logs(
-            backup.external_links(),
-            previous_logs,
-            save_directory,
-            config,
-            session,
-            logger,
-        )
-        # save logs
-        log_directory.save(backup.timestamp, logs)
-    # save list.json
-    _save_saved_list(
-        save_directory,
-        config.content_types,
-        logs,
+    previous_saved_list = links_directory.load_file_list()
+    # log editor
+    log_editor = _setup_log_editor(
+        timestamp,
+        external_links,
+        log_directory,
+        config.allways_request_all_links,
         logger,
+    )
+    # request
+    _request(
+        log_editor,
+        links_directory,
+        config,
+        create_session,
+        logger,
+    )
+    # save log
+    log = log_editor.output()
+    log_directory.save(log)
+    # save list.json
+    links_directory.save_file_list(
+        config.content_types,
+        [log.url for log in log.logs if log.is_saved],
     )
     # clean logs
     if config.keep_logs != "all":
@@ -212,10 +193,9 @@ def save_external_links(
     # commit target
     return _commit_target(
         config,
-        save_directory,
-        logs,
+        links_directory,
+        log_editor,
         previous_saved_list,
-        logger,
     )
 
 
@@ -236,56 +216,51 @@ def _create_session(config: ExternalLinkConfig) -> aiohttp.ClientSession:
     )
 
 
-def _request_logs(
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
-    links: list[ExternalLink],
-    previous_logs: list[ExternalLinkLog],
-    save_directory: _SaveDirectory,
-    config: ExternalLinkConfig,
-    session: aiohttp.ClientSession,
-    logger: logging.Logger,
-) -> list[ExternalLinkLog]:
-    # classify links
-    classified_links = _classify_external_links(
-        links,
-        previous_logs,
-    )
-    # shuffle links
-    random.shuffle(classified_links.new_links)
-    # request
-    logs = asyncio.run(
-        _request_external_links(
-            classified_links.new_links,
-            save_directory,
-            config,
-            session,
-            logger,
-        )
-    )
-    # merge previous logs into this logs
-    logs.extend(classified_links.logs)
-    # sort by URL
-    logs.sort(key=lambda log: log.url)
-    return logs
+def _request_headers(config: ExternalLinkConfig) -> multidict.CIMultiDict:
+    headers: multidict.CIMultiDict = multidict.CIMultiDict()
+    # config.user_agent
+    if config.user_agent is not None:
+        headers["User-Agent"] = config.user_agent.user_agent()
+    # config.request_headers
+    for key, value in config.request_headers.items():
+        headers[key] = value
+    return headers
 
 
 @dataclasses.dataclass
-class _LogsFile:
+class _LogFile:
     path: pathlib.Path
     timestamp: int
 
-    def load(self) -> Optional[list[ExternalLinkLog]]:
-        logs = load_json(self.path, schema=jsonschema_external_link_logs())
-        if logs is None:
-            return None
-        return [dacite.from_dict(data_class=ExternalLinkLog, data=log) for log in logs]
+
+@dataclasses.dataclass
+class _Log:
+    timestamp: int
+    logs: list[ExternalLinkLog]
 
     @classmethod
-    def file_name(cls, timestamp: int) -> str:
-        return f"external_link_{timestamp}.json"
+    def load(cls, path: pathlib.Path, timestamp: int) -> Optional[Self]:
+        logs = load_json(path, schema=jsonschema_external_link_logs())
+        if logs is None:
+            return None
+        return cls(
+            timestamp=timestamp,
+            logs=[
+                dacite.from_dict(data_class=ExternalLinkLog, data=log) for log in logs
+            ],
+        )
+
+    def save(self, path: pathlib.Path) -> None:
+        # sort by URL
+        logs = sorted(self.logs, key=lambda log: log.url)
+        save_json(
+            path,
+            logs,
+            schema=jsonschema_external_link_log(),
+        )
 
 
-class _LogsDirectory:
+class _LogDirectory:
     def __init__(
         self,
         directory: pathlib.Path,
@@ -295,32 +270,29 @@ class _LogsDirectory:
         self._logger = logger
 
     def file_path(self, timestamp: int) -> pathlib.Path:
-        return self._directory.joinpath(_LogsFile.file_name(timestamp))
+        return self._directory.joinpath(f"external_link_{timestamp}.json")
 
-    def find(self, timestamp: int) -> Optional[_LogsFile]:
+    def find(self, timestamp: int) -> Optional[_LogFile]:
         path = self.file_path(timestamp)
         if path.exists():
-            return _LogsFile(path=path, timestamp=timestamp)
+            return _LogFile(path=path, timestamp=timestamp)
         return None
 
-    def find_all(self) -> list[_LogsFile]:
-        files: list[_LogsFile] = []
+    def find_all(self) -> list[_LogFile]:
         # check if the path is directory
         if not self._directory.is_dir():
-            return files
+            return []
         # find external_link_{timestamp}.json
+        files: list[_LogFile] = []
+        pattern = re.compile(r"external_link_(?P<timestamp>[0-9]+).json")
         for path in self._directory.iterdir():
             # check if the path is file
             if not path.is_file():
                 continue
             # filename match
-            if filename_match := re.match(
-                r"external_link_(?P<timestamp>\d+).json", path.name
-            ):
+            if match := pattern.match(path.name):
                 files.append(
-                    _LogsFile(
-                        path=path, timestamp=int(filename_match.group("timestamp"))
-                    )
+                    _LogFile(path=path, timestamp=int(match.group("timestamp")))
                 )
         # sort by old...new
         files.sort(key=lambda file: file.timestamp)
@@ -330,7 +302,7 @@ class _LogsDirectory:
         self,
         *,
         timestamp: Optional[int] = None,
-    ) -> Optional[_LogsFile]:
+    ) -> Optional[_LogFile]:
         return next(
             (
                 file
@@ -340,38 +312,30 @@ class _LogsDirectory:
             None,
         )
 
-    def load(self, timestamp: int) -> Optional[list[ExternalLinkLog]]:
+    def load(self, timestamp: int) -> Optional[_Log]:
         file = self.find(timestamp)
         if file is not None:
-            self._logger.info(f'load logs from "{file.path}"')
-            logs = file.load()
-            if logs is not None:
-                return logs
+            self._logger.info(f'load log from "{file.path}"')
+            return _Log.load(file.path, file.timestamp)
         return None
 
     def load_latest(
         self,
         *,
         timestamp: Optional[int] = None,
-    ) -> Optional[list[ExternalLinkLog]]:
+    ) -> Optional[_Log]:
         file = self.find_latest(timestamp=timestamp)
         if file is not None:
-            self._logger.info(f'load latest logs from "{file.path}"')
-            logs = file.load()
-            if logs is not None:
-                return logs
+            self._logger.info(f'load latest log from "{file.path}"')
+            return _Log.load(file.path, file.timestamp)
         return None
 
-    def save(
-        self,
-        timestamp: int,
-        logs: list[ExternalLinkLog],
-    ) -> None:
-        path = self.file_path(timestamp)
+    def save(self, log: _Log) -> None:
+        path = self.file_path(log.timestamp)
         self._logger.info(f'save logs to "{path}"')
         save_json(
             path,
-            [dataclasses.asdict(log) for log in logs],
+            [dataclasses.asdict(log) for log in log.logs],
             schema=jsonschema_external_link_logs(),
         )
 
@@ -386,88 +350,184 @@ class _LogsDirectory:
             self._logger.warning(f"skip clean: keep({keep}) must be >= 0")
 
 
-@dataclasses.dataclass
-class _LinkLogPair:
-    link: Optional[ExternalLink] = None
-    log: Optional[ExternalLinkLog] = None
+class _LogEditor:
+    def __init__(
+        self,
+        timestamp: int,
+        logger: logging.Logger,
+    ) -> None:
+        self._timestamp = timestamp
+        self._logger = logger
+        self._logs: dict[str, ExternalLinkLog] = {}
+        self._added_links: dict[str, ExternalLink] = {}
+        self._updated_logs: dict[str, ExternalLinkLog] = {}
+        self._deleted_links: set[str] = set()
 
+    def load_logs(self, logs: list[ExternalLinkLog]) -> None:
+        self._logs.update({log.url: log for log in logs})
 
-@dataclasses.dataclass
-class _ClassifiedExternalLinks:
-    new_links: list[ExternalLink]
-    logs: list[ExternalLinkLog]
-    deleted_links: list[ExternalLinkLog]
-
-
-def _classify_external_links(
-    links: list[ExternalLink],
-    previous_logs: list[ExternalLinkLog],
-) -> _ClassifiedExternalLinks:
-    # link & log pair
-    pairs = {link.url: _LinkLogPair(link=link) for link in links}
-    for log in previous_logs:
-        if log.url in pairs:
-            pairs[log.url].log = log
-        else:
-            pairs[log.url] = _LinkLogPair(log=log)
-    # classify
-    new_links: list[ExternalLink] = []
-    logs: list[ExternalLinkLog] = []
-    deleted_links: list[ExternalLinkLog] = []
-    for pair in pairs.values():
-        if pair.log is None:
-            if pair.link is not None:
-                new_links.append(pair.link)
-        else:
-            if pair.link is None:
-                deleted_links.append(pair.log)
+    def update_links(self, links: list[ExternalLink]) -> None:
+        # match link & log
+        logs: dict[str, ExternalLinkLog] = {}
+        added_links: dict[str, ExternalLink] = {}
+        for link in links:
+            if link.url in self._logs:
+                # update locations
+                log = copy.copy(self._logs.pop(link.url))
+                log.locations = copy.copy(link.locations)
+                logs[log.url] = log
             else:
-                # replace locations
-                log = copy.copy(pair.log)
-                log.locations = copy.copy(pair.link.locations)
-                logs.append(log)
-    return _ClassifiedExternalLinks(
-        new_links,
-        logs,
-        deleted_links,
-    )
+                added_links[link.url] = link
+        deleted_links = set(self._logs.keys())
+        # update
+        self._logs = logs
+        self._added_links = added_links
+        self._deleted_links = deleted_links
+
+    def update_log(self, log: ExternalLinkLog) -> None:
+        # delete from added links
+        self._added_links.pop(log.url, None)
+        # add to logs
+        self._logs[log.url] = log
+        self._updated_logs[log.url] = log
+
+    def added_links(self) -> list[ExternalLink]:
+        return list(self._added_links.values())
+
+    def logs(self) -> list[ExternalLinkLog]:
+        return list(self._logs.values())
+
+    def updated_logs(self) -> list[ExternalLinkLog]:
+        return list(self._updated_logs.values())
+
+    def output(self) -> _Log:
+        if self._added_links:
+            self._logger.warning("no logs exist for {len(self._added_links)} URLs")
+        return _Log(
+            timestamp=self._timestamp,
+            logs=sorted(self._logs.values(), key=lambda log: log.url),
+        )
 
 
-@dataclasses.dataclass
-class _SaveDirectory:
-    root_directory: pathlib.Path
-    links_directory: pathlib.Path = dataclasses.field(init=False)
-    links_directory_name: dataclasses.InitVar[str]
-
-    def __post_init__(self, links_directory_name: str) -> None:
-        self.links_directory = self.root_directory.joinpath(links_directory_name)
+class _LinksDirectory:
+    def __init__(
+        self,
+        path: pathlib.Path,
+        logger: logging.Logger,
+    ) -> None:
+        self._path = path
+        self._logger = logger
 
     def file_path(self, url: str) -> pathlib.Path:
-        return self.links_directory.joinpath(re.sub(r"https?://", "", url))
+        return self._path.joinpath(re.sub(r"https?://", "", url))
 
-    def list_path(self) -> pathlib.Path:
-        return self.links_directory.joinpath("list.json")
+    def file_list_path(self) -> pathlib.Path:
+        return self._path.joinpath("list.json")
+
+    def load_file_list(self) -> Optional[SavedExternalLinksInfo]:
+        path = self.file_list_path()
+        self._logger.debug(f"load saved link list from {path}")
+        data = load_json(path, schema=jsonschema_saved_external_links_info())
+        if data is not None:
+            return dacite.from_dict(data_class=SavedExternalLinksInfo, data=data)
+        return None
+
+    def save_file_list(
+        self,
+        content_types: list[str],
+        urls: list[str],
+    ) -> None:
+        path = self.file_list_path()
+        self._logger.debug(f"save saved link list to {path}")
+        data = {
+            "content_types": sorted(content_types),
+            "urls": sorted(urls),
+        }
+        save_json(path, data, schema=jsonschema_saved_external_links_info())
 
     def gitattributes_path(self) -> pathlib.Path:
-        return self.links_directory.joinpath(".gitattributes")
+        return self._path.joinpath(".gitattributes")
+
+    def create_gitattributes(self) -> None:
+        with self.gitattributes_path().open(mode="w", encoding="utf-8") as file:
+            file.write("**/* filter=lfs diff=lfs merge=lfs -text\n")
+            file.write(".gitattributes !filter !diff !merge text\n")
+            file.write("list.json !filter !diff !merge text\n")
+
+    def remove_empty_directory(self) -> None:
+        # execute recursively
+        def _remove_empty_directory(path: pathlib.Path) -> None:
+            # check if the path is directory
+            if not path.is_dir():
+                return
+            # execute recursively to child directories
+            for child in path.iterdir():
+                _remove_empty_directory(child)
+            # check if empty
+            if not list(path.iterdir()):
+                self._logger.debug(f'delete empty directory: "{path}"')
+                path.rmdir()
+
+        # execute from the root directory
+        _remove_empty_directory(self._path)
+
+
+def _setup_log_editor(
+    timestamp: int,
+    links: list[ExternalLink],
+    log_directory: _LogDirectory,
+    all_request: bool,
+    logger: logging.Logger,
+) -> _LogEditor:
+    # load previous log
+    previous_log = log_directory.load_latest(timestamp=timestamp)
+    # setup log editor
+    editor = _LogEditor(timestamp, logger)
+    if not all_request and previous_log is not None:
+        editor.load_logs(previous_log.logs)
+    editor.update_links(links)
+    return editor
+
+
+def _request(
+    editor: _LogEditor,
+    links_directory: _LinksDirectory,
+    config: ExternalLinkConfig,
+    create_session: Callable[[], aiohttp.ClientSession],
+    logger: logging.Logger,
+) -> None:
+    # shuffle links
+    links = editor.added_links()
+    random.shuffle(links)
+    # request
+    logs = asyncio.run(
+        _request_external_links(
+            links,
+            links_directory,
+            config,
+            create_session,
+            logger,
+        )
+    )
+    # add new log
+    for log in logs:
+        editor.update_log(log)
 
 
 async def _request_external_links(
     links: list[ExternalLink],
-    save_directory: _SaveDirectory,
+    links_directory: _LinksDirectory,
     config: ExternalLinkConfig,
-    session: aiohttp.ClientSession,
+    create_session: Callable[[], aiohttp.ClientSession],
     logger: logging.Logger,
 ) -> list[ExternalLinkLog]:
     # semaphore
     semaphore = asyncio.Semaphore(config.parallel_limit)
-    # request config
-    request_config = _RequestConfig(
-        save_directory=save_directory,
-        content_types=[
-            re.compile(content_type) for content_type in config.content_types
-        ],
-        excluded_urls=[re.compile(url) for url in config.excluded_urls],
+    # request arguments
+    request_args = _RequestArguments(
+        links_directory=links_directory,
+        content_types=[re.compile(pattern) for pattern in config.content_types],
+        excluded_urls=[re.compile(pattern) for pattern in config.excluded_urls],
     )
 
     # parallel requests
@@ -477,43 +537,66 @@ async def _request_external_links(
         link: ExternalLink,
     ) -> ExternalLinkLog:
         async with semaphore:
-            response = await _request(
+            response = await _request_link(
+                request_args,
                 session,
-                index,
                 link,
-                request_config,
-                logger,
+                _RequestLogger(logger, index),
             )
             await asyncio.sleep(config.request_interval)
             return response
 
     logger.info(f"request {len(links)} links")
 
-    async with session:
+    async with create_session() as session:
         tasks = [_parallel_request(session, i, link) for i, link in enumerate(links)]
         return await asyncio.gather(*tasks)
 
 
-@dataclasses.dataclass
-class _RequestConfig:
-    save_directory: _SaveDirectory
+@dataclasses.dataclass(frozen=True)
+class _RequestArguments:
+    links_directory: _LinksDirectory
     content_types: list[re.Pattern[str]]
     excluded_urls: list[re.Pattern[str]]
 
+    def is_target_content_type(self, content_type: Optional[str]) -> bool:
+        if content_type is None:
+            return False
+        return any(pattern.match(content_type) for pattern in self.content_types)
 
-async def _request(
+    def is_excluded_url(self, url: str) -> bool:
+        return any(pattern.match(url) for pattern in self.excluded_urls)
+
+
+class _RequestLogger(logging.LoggerAdapter):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        index: int,
+    ) -> None:
+        super().__init__(logger)
+        self._index = index
+
+    def process(
+        self,
+        msg: Any,
+        kwargs: MutableMapping[str, Any],
+    ) -> tuple[Any, MutableMapping[str, Any]]:
+        return super().process(f"request({self._index}): {msg}", kwargs)
+
+
+async def _request_link(
+    args: _RequestArguments,
     session: aiohttp.ClientSession,
-    index: int,
     link: ExternalLink,
-    config: _RequestConfig,
-    logger: logging.Logger,
+    logger: _RequestLogger,
 ) -> ExternalLinkLog:
-    logger.debug(f"request({index}): url={link.url}")
+    logger.debug(f"url={link.url}")
     # access timestamp
     access_timestamp = int(time.time())
     # check if the url is excluded
-    if any(url.match(link.url) is not None for url in config.excluded_urls):
-        logger.debug(f"request({index}): excluded url")
+    if args.is_excluded_url(link.url):
+        logger.debug("excluded url")
         return ExternalLinkLog(
             url=link.url,
             locations=link.locations,
@@ -524,27 +607,22 @@ async def _request(
     # request
     try:
         async with session.get(link.url) as response:
-            logger.debug(f"request({index}): status={response.status}")
+            logger.debug(f"status={response.status}")
             response_log = ResponseLog(
                 status_code=response.status,
                 content_type=response.headers.get("content-type"),
             )
-            logger.debug(f"request({index}): response={response_log}")
+            logger.debug(f"response={response_log}")
             is_saved = False
             # check content type
-            if response_log.content_type is not None and any(
-                content_type.match(response_log.content_type)
-                for content_type in config.content_types
-            ):
-                logger.debug(
-                    f"request({index}): save content ({response_log.content_type})"
-                )
+            if args.is_target_content_type(response_log.content_type):
+                logger.debug(f"save content ({response_log.content_type})")
                 # save
-                save_path = config.save_directory.file_path(link.url)
-                logger.debug(f'request({index}): save to "{save_path}"')
-                if not save_path.parent.exists():
-                    save_path.parent.mkdir(parents=True)
-                with save_path.open(mode="bw") as file:
+                file_path = args.links_directory.file_path(link.url)
+                logger.debug(f'save to "{file_path}"')
+                if not file_path.parent.exists():
+                    file_path.parent.mkdir(parents=True)
+                with file_path.open(mode="bw") as file:
                     file.write(await response.read())
                 is_saved = True
             return ExternalLinkLog(
@@ -555,7 +633,7 @@ async def _request(
                 is_saved=is_saved,
             )
     except (asyncio.TimeoutError, aiohttp.ClientError) as error:
-        logger.debug(f"request({index}): error={error.__class__.__name__}({error})")
+        logger.debug(f"error={error.__class__.__name__}({error})")
         return ExternalLinkLog(
             url=link.url,
             locations=link.locations,
@@ -568,90 +646,36 @@ async def _request(
         )
 
 
-def _request_headers(config: ExternalLinkConfig) -> multidict.CIMultiDict:
-    headers: multidict.CIMultiDict = multidict.CIMultiDict()
-    # config.user_agent
-    if config.user_agent is not None:
-        headers["User-Agent"] = config.user_agent.user_agent()
-    # config.request_headers
-    for key, value in config.request_headers.items():
-        headers[key] = value
-    return headers
-
-
-def _re_request_targets(
-    logs: list[ExternalLinkLog],
-    saved_urls: list[str],
-    content_types: list[str],
-) -> list[ExternalLink]:
-    links: list[ExternalLink] = []
-    content_type_patterns = [re.compile(content_type) for content_type in content_types]
-    for log in logs:
-        # check the urls is already saved
-        if log.url in saved_urls:
-            continue
-        match log.response:
-            case ResponseLog(content_type=content_type):
-                if content_type is not None and any(
-                    pattern.match(content_type) for pattern in content_type_patterns
-                ):
-                    links.append(log.link)
-    return links
-
-
-def _load_saved_list(
-    directory: _SaveDirectory,
-    logger: logging.Logger,
-) -> Optional[SavedExternalLinksInfo]:
-    file_path = directory.list_path()
-    logger.debug(f"load saved link list from {file_path}")
-    data = load_json(file_path, schema=jsonschema_saved_external_links_info())
-    if data is not None:
-        return dacite.from_dict(data_class=SavedExternalLinksInfo, data=data)
-    return None
-
-
-def _save_saved_list(
-    directory: _SaveDirectory,
-    content_types: list[str],
-    logs: list[ExternalLinkLog],
-    logger: logging.Logger,
-) -> None:
-    file_path = directory.list_path()
-    saved_list = SavedExternalLinksInfo(
-        content_types=sorted(content_types),
-        urls=sorted(log.url for log in logs if log.is_saved),
-    )
-    logger.debug(f"save saved link list to {file_path}")
-    save_json(
-        file_path,
-        dataclasses.asdict(saved_list),
-        schema=jsonschema_saved_external_links_info(),
-    )
-
-
 def _commit_target(
     config: ExternalLinkConfig,
-    directory: _SaveDirectory,
-    logs: list[ExternalLinkLog],
+    directory: _LinksDirectory,
+    log_editor: _LogEditor,
     previous_list: Optional[SavedExternalLinksInfo],
-    logger: logging.Logger,
 ) -> CommitTarget:
+    # updated files
+    updated_files = {
+        directory.file_path(log.url)
+        for log in log_editor.updated_logs()
+        if log.is_saved
+    }
     # saved files
-    saved_files = {directory.file_path(log.url) for log in logs if log.is_saved}
+    saved_files = {
+        directory.file_path(log.url) for log in log_editor.logs() if log.is_saved
+    }
+    # previous saved files
     previous_saved_files: set[pathlib.Path] = set()
     if previous_list is not None:
         previous_saved_files.update(
             directory.file_path(url) for url in previous_list.urls
         )
     # added / updated / deleted
-    added = saved_files - previous_saved_files
-    updated = saved_files & previous_saved_files
+    added = updated_files - previous_saved_files
+    updated = updated_files & previous_saved_files
     deleted: set[pathlib.Path] = set()
     if not config.keep_deleted_links:
         deleted.update(previous_saved_files - saved_files)
     # list.json
-    list_path = directory.list_path()
+    list_path = directory.file_list_path()
     if list_path.exists():
         updated.add(list_path)
     else:
@@ -660,32 +684,11 @@ def _commit_target(
     if config.use_git_lfs:
         gitattributes_path = directory.gitattributes_path()
         if not gitattributes_path.exists():
-            write_gitattributes(gitattributes_path)
+            directory.create_gitattributes()
             added.add(gitattributes_path)
     # remove deleted links
     for path in deleted:
         path.unlink()
     # remove empty directory
-    _remove_empty_directory(directory.links_directory, logger)
+    directory.remove_empty_directory()
     return CommitTarget(added=added, updated=updated, deleted=deleted)
-
-
-def _remove_empty_directory(
-    directory: pathlib.Path,
-    logger: logging.Logger,
-) -> None:
-    if directory.is_dir():
-        # recursive
-        for child in directory.iterdir():
-            _remove_empty_directory(child, logger)
-        # check if empty
-        if not list(directory.iterdir()):
-            logger.debug(f'delete empty directory: "{directory}"')
-            directory.rmdir()
-
-
-def write_gitattributes(path: pathlib.Path) -> None:
-    with path.open(mode="w", encoding="utf-8") as file:
-        file.write("**/* filter=lfs diff=lfs merge=lfs -text\n")
-        file.write(".gitattributes !filter !diff !merge text\n")
-        file.write("list.json !filter !diff !merge text\n")
