@@ -167,18 +167,18 @@ class Location:
     title: str
     line: int
 
-
-def jsonschema_location() -> dict[str, Any]:
-    schema = {
-        "type": "object",
-        "required": ["title", "line"],
-        "additionalProperties": False,
-        "properties": {
-            "title": {"type": "string"},
-            "line": {"type": "integer"},
-        },
-    }
-    return schema
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "required": ["title", "line"],
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string"},
+                "line": {"type": "integer"},
+            },
+        }
+        return schema
 
 
 @dataclasses.dataclass

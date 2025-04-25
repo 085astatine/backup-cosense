@@ -14,7 +14,7 @@ import aiohttp
 import dacite
 import multidict
 
-from ._backup import ExternalLink, Location, jsonschema_location
+from ._backup import ExternalLink, Location
 from ._config import ExternalLinkConfig
 from ._git import CommitTarget
 from ._json import load_json, save_json
@@ -25,18 +25,18 @@ class ResponseLog:
     status_code: int
     content_type: Optional[str]
 
-
-def jsonschema_response_log() -> dict[str, Any]:
-    schema = {
-        "type": "object",
-        "required": ["status_code", "content_type"],
-        "additionalProperties": False,
-        "properties": {
-            "status_code": {"type": "integer"},
-            "content_type": {"type": ["string", "null"]},
-        },
-    }
-    return schema
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "required": ["status_code", "content_type"],
+            "additionalProperties": False,
+            "properties": {
+                "status_code": {"type": "integer"},
+                "content_type": {"type": ["string", "null"]},
+            },
+        }
+        return schema
 
 
 @dataclasses.dataclass(frozen=True)
@@ -44,18 +44,18 @@ class RequestError:
     error_type: str
     message: str
 
-
-def jsonschema_request_error() -> dict[str, Any]:
-    schema = {
-        "type": "object",
-        "required": ["error_type", "message"],
-        "additionalProperties": False,
-        "properties": {
-            "error_type": {"type": "string"},
-            "message": {"type": "string"},
-        },
-    }
-    return schema
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "required": ["error_type", "message"],
+            "additionalProperties": False,
+            "properties": {
+                "error_type": {"type": "string"},
+                "message": {"type": "string"},
+            },
+        }
+        return schema
 
 
 @dataclasses.dataclass
@@ -70,44 +70,36 @@ class ExternalLinkLog:
     def link(self) -> ExternalLink:
         return ExternalLink(url=self.url, locations=self.locations)
 
-
-def jsonschema_external_link_log() -> dict[str, Any]:
-    schema = {
-        "type": "object",
-        "required": [
-            "url",
-            "locations",
-            "access_timestamp",
-            "response",
-            "is_saved",
-        ],
-        "additionalProperties": False,
-        "properties": {
-            "url": {"type": "string"},
-            "access_timestamp": {"type": "integer"},
-            "locations": {
-                "type": "array",
-                "items": jsonschema_location(),
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "required": [
+                "url",
+                "locations",
+                "access_timestamp",
+                "response",
+                "is_saved",
+            ],
+            "additionalProperties": False,
+            "properties": {
+                "url": {"type": "string"},
+                "access_timestamp": {"type": "integer"},
+                "locations": {
+                    "type": "array",
+                    "items": Location.jsonschema(),
+                },
+                "response": {
+                    "oneOf": [
+                        ResponseLog.jsonschema(),
+                        RequestError.jsonschema(),
+                        {"const": "excluded"},
+                    ],
+                },
+                "is_saved": {"type": "boolean"},
             },
-            "response": {
-                "oneOf": [
-                    jsonschema_response_log(),
-                    jsonschema_request_error(),
-                    {"const": "excluded"},
-                ],
-            },
-            "is_saved": {"type": "boolean"},
-        },
-    }
-    return schema
-
-
-def jsonschema_external_link_logs() -> dict[str, Any]:
-    schema = {
-        "type": "array",
-        "items": jsonschema_external_link_log(),
-    }
-    return schema
+        }
+        return schema
 
 
 @dataclasses.dataclass(frozen=True)
@@ -115,24 +107,24 @@ class SavedExternalLinksInfo:
     content_types: list[str]
     urls: list[str]
 
-
-def jsonschema_saved_external_links_info() -> dict[str, Any]:
-    schema = {
-        "type": "object",
-        "required": ["content_types", "urls"],
-        "additionalProperties": False,
-        "properties": {
-            "content_types": {
-                "type": "array",
-                "items": {"type": "string"},
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "required": ["content_types", "urls"],
+            "additionalProperties": False,
+            "properties": {
+                "content_types": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "urls": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
             },
-            "urls": {
-                "type": "array",
-                "items": {"type": "string"},
-            },
-        },
-    }
-    return schema
+        }
+        return schema
 
 
 def save_external_links(
@@ -240,7 +232,7 @@ class _Log:
 
     @classmethod
     def load(cls, path: pathlib.Path, timestamp: int) -> Optional[Self]:
-        logs = load_json(path, schema=jsonschema_external_link_logs())
+        logs = load_json(path, schema=cls.jsonschema())
         if logs is None:
             return None
         return cls(
@@ -255,9 +247,17 @@ class _Log:
         logs = sorted(self.logs, key=lambda log: log.url)
         save_json(
             path,
-            logs,
-            schema=jsonschema_external_link_log(),
+            [dataclasses.asdict(log) for log in logs],
+            schema=self.jsonschema(),
         )
+
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "array",
+            "items": ExternalLinkLog.jsonschema(),
+        }
+        return schema
 
 
 class _LogDirectory:
@@ -333,11 +333,7 @@ class _LogDirectory:
     def save(self, log: _Log) -> None:
         path = self.file_path(log.timestamp)
         self._logger.info(f'save logs to "{path}"')
-        save_json(
-            path,
-            [dataclasses.asdict(log) for log in log.logs],
-            schema=jsonschema_external_link_logs(),
-        )
+        log.save(path)
 
     def clean(self, keep: int) -> None:
         if keep >= 0:
@@ -427,7 +423,7 @@ class _LinksDirectory:
     def load_file_list(self) -> Optional[SavedExternalLinksInfo]:
         path = self.file_list_path()
         self._logger.debug(f"load saved link list from {path}")
-        data = load_json(path, schema=jsonschema_saved_external_links_info())
+        data = load_json(path, schema=SavedExternalLinksInfo.jsonschema())
         if data is not None:
             return dacite.from_dict(data_class=SavedExternalLinksInfo, data=data)
         return None
@@ -443,7 +439,7 @@ class _LinksDirectory:
             "content_types": sorted(content_types),
             "urls": sorted(urls),
         }
-        save_json(path, data, schema=jsonschema_saved_external_links_info())
+        save_json(path, data, schema=SavedExternalLinksInfo.jsonschema())
 
     def gitattributes_path(self) -> pathlib.Path:
         return self._path.joinpath(".gitattributes")

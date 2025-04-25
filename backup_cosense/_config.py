@@ -24,18 +24,18 @@ class CosenseSaveDirectoryConfig:
             subdirectory=self.subdirectory,
         )
 
-
-def jsonschema_cosense_save_directory_config() -> dict[str, Any]:
-    schema = {
-        "type": "object",
-        "required": ["name"],
-        "additionalProperties": False,
-        "properties": {
-            "name": {"type": "string"},
-            "subdirectory": {"type": "boolean"},
-        },
-    }
-    return schema
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": False,
+            "properties": {
+                "name": {"type": "string"},
+                "subdirectory": {"type": "boolean"},
+            },
+        }
+        return schema
 
 
 @dataclasses.dataclass(frozen=True)
@@ -48,34 +48,34 @@ class CosenseConfig:
     request_timeout: float = 10.0
     backup_start_date: Optional[datetime.datetime] = None
 
-
-def jsonschema_cosense_config() -> dict[str, Any]:
-    schema = {
-        "type": "object",
-        "required": ["project", "session_id", "save_directory"],
-        "additionalProperties": False,
-        "properties": {
-            "project": {"type": "string"},
-            "session_id": {"type": "string"},
-            "save_directory": {
-                "oneOf": [
-                    {"type": "string"},
-                    jsonschema_cosense_save_directory_config(),
-                ],
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "required": ["project", "session_id", "save_directory"],
+            "additionalProperties": False,
+            "properties": {
+                "project": {"type": "string"},
+                "session_id": {"type": "string"},
+                "save_directory": {
+                    "oneOf": [
+                        {"type": "string"},
+                        CosenseSaveDirectoryConfig.jsonschema(),
+                    ],
+                },
+                "domain": {"enum": ["scrapbox.io", "cosen.se"]},
+                "request_interval": {
+                    "type": "number",
+                    "exclusiveMinimum": 0.0,
+                },
+                "request_timeout": {
+                    "type": "number",
+                    "exclusiveMinimum": 0.0,
+                },
+                "backup_start_date": {"type": ["date", "datetime"]},
             },
-            "domain": {"enum": ["scrapbox.io", "cosen.se"]},
-            "request_interval": {
-                "type": "number",
-                "exclusiveMinimum": 0.0,
-            },
-            "request_timeout": {
-                "type": "number",
-                "exclusiveMinimum": 0.0,
-            },
-            "backup_start_date": {"type": ["date", "datetime"]},
-        },
-    }
-    return schema
+        }
+        return schema
 
 
 @dataclasses.dataclass(frozen=True)
@@ -85,22 +85,22 @@ class GitEmptyInitialCommitConfig:
         "oldest_created_page"
     )
 
-
-def jsonschema_git_empty_initial_commit_config() -> dict[str, Any]:
-    schema = {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "message": {"type": "string"},
-            "timestamp": {
-                "oneOf": [
-                    {"enum": ["oldest_backup", "oldest_created_page"]},
-                    {"type": ["date", "datetime"]},
-                ],
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "message": {"type": "string"},
+                "timestamp": {
+                    "oneOf": [
+                        {"enum": ["oldest_backup", "oldest_created_page"]},
+                        {"type": ["date", "datetime"]},
+                    ],
+                },
             },
-        },
-    }
-    return schema
+        }
+        return schema
 
 
 @dataclasses.dataclass(frozen=True)
@@ -130,30 +130,30 @@ class GitConfig:
             logger=logger,
         )
 
-
-def jsonschema_git_config() -> dict[str, Any]:
-    schema = {
-        "type": "object",
-        "required": ["path"],
-        "additionalProperties": False,
-        "properties": {
-            "path": {"type": "string"},
-            "executable": {"type": ["string", "null"]},
-            "branch": {"type": "string"},
-            "page_order": {
-                "type": ["string", "null"],
-                "enum": [None, *get_args(PageOrder)],
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "required": ["path"],
+            "additionalProperties": False,
+            "properties": {
+                "path": {"type": "string"},
+                "executable": {"type": ["string", "null"]},
+                "branch": {"type": "string"},
+                "page_order": {
+                    "type": ["string", "null"],
+                    "enum": [None, *get_args(PageOrder)],
+                },
+                "user_name": {"type": ["string", "null"]},
+                "user_email": {"type": ["string", "null"]},
+                "empty_initial_commit": GitEmptyInitialCommitConfig.jsonschema(),
+                "staging_step_size": {
+                    "type": "integer",
+                    "minimum": 1,
+                },
             },
-            "user_name": {"type": ["string", "null"]},
-            "user_email": {"type": ["string", "null"]},
-            "empty_initial_commit": jsonschema_git_empty_initial_commit_config(),
-            "staging_step_size": {
-                "type": "integer",
-                "minimum": 1,
-            },
-        },
-    }
-    return schema
+        }
+        return schema
 
 
 FakeUserAgentOS = Literal[
@@ -211,27 +211,27 @@ class FakeUserAgentConfig:
         )
         return generator.random
 
-
-def jsonschema_fake_user_agent_config() -> dict[str, Any]:
-    schema = {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "os": {
-                "type": ["string", "null"],
-                "enum": [None, *get_args(FakeUserAgentOS)],
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "os": {
+                    "type": ["string", "null"],
+                    "enum": [None, *get_args(FakeUserAgentOS)],
+                },
+                "browser": {
+                    "type": ["string", "null"],
+                    "enum": [None, *get_args(FakeUserAgentBrowser)],
+                },
+                "platform": {
+                    "type": ["string", "null"],
+                    "enum": [None, *get_args(FakeUserAgentPlatform)],
+                },
             },
-            "browser": {
-                "type": ["string", "null"],
-                "enum": [None, *get_args(FakeUserAgentBrowser)],
-            },
-            "platform": {
-                "type": ["string", "null"],
-                "enum": [None, *get_args(FakeUserAgentPlatform)],
-            },
-        },
-    }
-    return schema
+        }
+        return schema
 
 
 @dataclasses.dataclass(frozen=True)
@@ -253,61 +253,61 @@ class ExternalLinkConfig:
     keep_logs: int | Literal["all"] = "all"
     keep_deleted_links: bool = False
 
-
-def jsonschema_external_link_config() -> dict[str, Any]:
-    schema = {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "enabled": {"type": "boolean"},
-            "use_git_lfs": {"type": "boolean"},
-            "log_directory": {"type": "string"},
-            "save_directory": {"type": "string"},
-            "parallel_limit": {
-                "type": "integer",
-                "minimum": 1,
-            },
-            "parallel_limit_per_host": {
-                "type": "integer",
-                "minimum": 0,
-            },
-            "request_interval": {
-                "type": "number",
-                "exclusiveMinimum": 0.0,
-            },
-            "user_agent": jsonschema_fake_user_agent_config(),
-            "request_headers": {
-                "type": "object",
-                "additionalProperties": {
-                    "type": "string",
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "enabled": {"type": "boolean"},
+                "use_git_lfs": {"type": "boolean"},
+                "log_directory": {"type": "string"},
+                "save_directory": {"type": "string"},
+                "parallel_limit": {
+                    "type": "integer",
+                    "minimum": 1,
                 },
-            },
-            "timeout": {
-                "type": "number",
-                "exclusiveMinimum": 0.0,
-            },
-            "content_types": {
-                "type": "array",
-                "items": {"type": "string"},
-            },
-            "excluded_urls": {
-                "type": "array",
-                "items": {"type": "string"},
-            },
-            "allways_request_all_links": {"type": "boolean"},
-            "keep_logs": {
-                "oneOf": [
-                    {
-                        "type": "integer",
-                        "minimum": 0,
+                "parallel_limit_per_host": {
+                    "type": "integer",
+                    "minimum": 0,
+                },
+                "request_interval": {
+                    "type": "number",
+                    "exclusiveMinimum": 0.0,
+                },
+                "user_agent": FakeUserAgentConfig.jsonschema(),
+                "request_headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string",
                     },
-                    {"const": "all"},
-                ],
+                },
+                "timeout": {
+                    "type": "number",
+                    "exclusiveMinimum": 0.0,
+                },
+                "content_types": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "excluded_urls": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "allways_request_all_links": {"type": "boolean"},
+                "keep_logs": {
+                    "oneOf": [
+                        {
+                            "type": "integer",
+                            "minimum": 0,
+                        },
+                        {"const": "all"},
+                    ],
+                },
+                "keep_deleted_links": {"type": "boolean"},
             },
-            "keep_deleted_links": {"type": "boolean"},
-        },
-    }
-    return schema
+        }
+        return schema
 
 
 @dataclasses.dataclass(frozen=True)
@@ -316,19 +316,19 @@ class Config:
     git: GitConfig
     external_link: ExternalLinkConfig = ExternalLinkConfig()
 
-
-def jsonschema_config() -> dict[str, Any]:
-    schema = {
-        "type": "object",
-        "required": ["cosense", "git"],
-        "additional_properties": False,
-        "properties": {
-            "cosense": jsonschema_cosense_config(),
-            "git": jsonschema_git_config(),
-            "external_link": jsonschema_external_link_config(),
-        },
-    }
-    return schema
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "required": ["cosense", "git"],
+            "additional_properties": False,
+            "properties": {
+                "cosense": CosenseConfig.jsonschema(),
+                "git": GitConfig.jsonschema(),
+                "external_link": ExternalLinkConfig.jsonschema(),
+            },
+        }
+        return schema
 
 
 def load_config(
@@ -371,7 +371,7 @@ def _validator() -> jsonschema.protocols.Validator:
     return jsonschema.validators.extend(
         Validator,
         type_checker=type_checker,
-    )(schema=jsonschema_config())
+    )(schema=Config.jsonschema())
 
 
 def _is_date(
