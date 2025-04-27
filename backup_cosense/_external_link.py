@@ -15,7 +15,7 @@ import dacite
 import multidict
 
 from ._backup import ExternalLink, Location
-from ._config import ExternalLinkConfig
+from ._config import ExternalLinkConfig, ExternalLinkSessionConfig
 from ._git import CommitTarget
 from ._json import load_json, save_json
 
@@ -142,7 +142,7 @@ def save_external_links(
 
     # session
     def default_create_session() -> aiohttp.ClientSession:
-        return _create_session(config)
+        return _create_session(config.session)
 
     if create_session is None:
         create_session = default_create_session
@@ -191,7 +191,7 @@ def save_external_links(
     )
 
 
-def _create_session(config: ExternalLinkConfig) -> aiohttp.ClientSession:
+def _create_session(config: ExternalLinkSessionConfig) -> aiohttp.ClientSession:
     # connector
     connector = aiohttp.TCPConnector(limit_per_host=config.parallel_limit_per_host)
     # timeout
@@ -208,7 +208,7 @@ def _create_session(config: ExternalLinkConfig) -> aiohttp.ClientSession:
     )
 
 
-def _request_headers(config: ExternalLinkConfig) -> multidict.CIMultiDict:
+def _request_headers(config: ExternalLinkSessionConfig) -> multidict.CIMultiDict:
     headers: multidict.CIMultiDict = multidict.CIMultiDict()
     # config.user_agent
     if config.user_agent is not None:

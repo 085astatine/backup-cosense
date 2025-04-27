@@ -274,12 +274,9 @@ class ExternalLinkConfig:
     use_git_lfs: bool = False
     log_directory: str = "log"
     save_directory: str = "links"
+    session: ExternalLinkSessionConfig = ExternalLinkSessionConfig()
     parallel_limit: int = 5
-    parallel_limit_per_host: int = 0
     request_interval: float = 1.0
-    user_agent: Optional[FakeUserAgentConfig] = None
-    request_headers: dict[str, str] = dataclasses.field(default_factory=dict)
-    timeout: float = 30.0
     content_types: list[str] = dataclasses.field(default_factory=list)
     excluded_urls: list[str] = dataclasses.field(default_factory=list)
     allways_request_all_links: bool = False
@@ -296,26 +293,12 @@ class ExternalLinkConfig:
                 "use_git_lfs": {"type": "boolean"},
                 "log_directory": {"type": "string"},
                 "save_directory": {"type": "string"},
+                "session": ExternalLinkSessionConfig.jsonschema(),
                 "parallel_limit": {
                     "type": "integer",
                     "minimum": 1,
                 },
-                "parallel_limit_per_host": {
-                    "type": "integer",
-                    "minimum": 0,
-                },
                 "request_interval": {
-                    "type": "number",
-                    "exclusiveMinimum": 0.0,
-                },
-                "user_agent": FakeUserAgentConfig.jsonschema(),
-                "request_headers": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string",
-                    },
-                },
-                "timeout": {
                     "type": "number",
                     "exclusiveMinimum": 0.0,
                 },
