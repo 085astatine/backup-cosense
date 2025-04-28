@@ -417,6 +417,9 @@ class _LinksDirectory:
     def file_path(self, url: str) -> pathlib.Path:
         return self._path.joinpath(_url_to_path(url))
 
+    def files(self) -> list[pathlib.Path]:
+        return [path for path in self._path.glob("*/**/*") if path.is_file()]
+
     def file_list_path(self) -> pathlib.Path:
         return self._path.joinpath("list.json")
 
