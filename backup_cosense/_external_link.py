@@ -414,6 +414,10 @@ class _LinksDirectory:
         self._path = path
         self._logger = logger
 
+    @property
+    def path(self) -> pathlib.Path:
+        return self._path
+
     def file_path(self, url: str) -> pathlib.Path:
         return self._path.joinpath(_url_to_path(url))
 
@@ -695,3 +699,16 @@ def _commit_target(
     # remove empty directory
     directory.remove_empty_directory()
     return CommitTarget(added=added, updated=updated, deleted=deleted)
+
+
+def _files_with_no_links(
+    links_directory: _LinksDirectory,
+    external_links: list[ExternalLink],
+) -> set[pathlib.Path]:
+    saved_files = set(
+        path.relative_to(links_directory.path).as_posix()
+        for path in links_directory.files()
+    )
+    linked_files = set(_url_to_path(link.url) for link in external_links)
+    no_linked_files = saved_files - linked_files
+    return set(links_directory.path.joinpath(path) for path in no_linked_files)
