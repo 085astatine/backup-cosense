@@ -415,7 +415,7 @@ class _LinksDirectory:
         self._logger = logger
 
     def file_path(self, url: str) -> pathlib.Path:
-        return self._path.joinpath(re.sub(r"https?://", "", url))
+        return self._path.joinpath(_url_to_path(url))
 
     def file_list_path(self) -> pathlib.Path:
         return self._path.joinpath("list.json")
@@ -466,6 +466,10 @@ class _LinksDirectory:
 
         # execute from the root directory
         _remove_empty_directory(self._path)
+
+
+def _url_to_path(url: str) -> str:
+    return re.sub(r"https?://", "", url)
 
 
 def _setup_log_editor(
