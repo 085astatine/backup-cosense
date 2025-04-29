@@ -153,8 +153,8 @@ def save_external_links(
         git_directory.joinpath(config.save_directory),
         logger,
     )
-    # load previous saved list
-    previous_saved_list = links_directory.load_file_list()
+    # files saved before request
+    already_saved_files = set(links_directory.files())
     # log editor
     log_editor = _setup_log_editor(
         timestamp,
@@ -185,9 +185,10 @@ def save_external_links(
     # commit target
     return _commit_target(
         config,
+        external_links,
         links_directory,
         log_editor,
-        previous_saved_list,
+        already_saved_files,
     )
 
 
@@ -655,9 +656,10 @@ async def _request_link(
 
 def _commit_target(
     config: ExternalLinkConfig,
+    links: list[ExternalLink],
     directory: _LinksDirectory,
     log_editor: _LogEditor,
-    previous_list: Optional[SavedExternalLinksInfo],
+    already_saved_files: set[pathlib.Path],
 ) -> CommitTarget:
     # updated files
     updated_files = {
@@ -665,22 +667,12 @@ def _commit_target(
         for log in log_editor.updated_logs()
         if log.is_saved
     }
-    # saved files
-    saved_files = {
-        directory.file_path(log.url) for log in log_editor.logs() if log.is_saved
-    }
-    # previous saved files
-    previous_saved_files: set[pathlib.Path] = set()
-    if previous_list is not None:
-        previous_saved_files.update(
-            directory.file_path(url) for url in previous_list.urls
-        )
     # added / updated / deleted
-    added = updated_files - previous_saved_files
-    updated = updated_files & previous_saved_files
+    added = updated_files - already_saved_files
+    updated = updated_files & already_saved_files
     deleted: set[pathlib.Path] = set()
     if not config.keep_deleted_links:
-        deleted.update(previous_saved_files - saved_files)
+        deleted = _files_with_no_links(directory, links)
     # list.json
     list_path = directory.file_list_path()
     if list_path.exists():
