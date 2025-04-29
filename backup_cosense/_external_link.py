@@ -102,31 +102,6 @@ class ExternalLinkLog:
         return schema
 
 
-@dataclasses.dataclass(frozen=True)
-class SavedExternalLinksInfo:
-    content_types: list[str]
-    urls: list[str]
-
-    @classmethod
-    def jsonschema(cls) -> dict[str, Any]:
-        schema = {
-            "type": "object",
-            "required": ["content_types", "urls"],
-            "additionalProperties": False,
-            "properties": {
-                "content_types": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "urls": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-            },
-        }
-        return schema
-
-
 def save_external_links(
     # pylint: disable=too-many-arguments
     timestamp: int,
@@ -174,11 +149,6 @@ def save_external_links(
     # save log
     log = log_editor.output()
     log_directory.save(log)
-    # save list.json
-    links_directory.save_file_list(
-        config.content_types,
-        [log.url for log in log.logs if log.is_saved],
-    )
     # clean logs
     if config.keep_logs != "all":
         log_directory.clean(config.keep_logs)
@@ -425,30 +395,6 @@ class _LinksDirectory:
     def files(self) -> list[pathlib.Path]:
         return [path for path in self._path.glob("*/**/*") if path.is_file()]
 
-    def file_list_path(self) -> pathlib.Path:
-        return self._path.joinpath("list.json")
-
-    def load_file_list(self) -> Optional[SavedExternalLinksInfo]:
-        path = self.file_list_path()
-        self._logger.debug(f"load saved link list from {path}")
-        data = load_json(path, schema=SavedExternalLinksInfo.jsonschema())
-        if data is not None:
-            return dacite.from_dict(data_class=SavedExternalLinksInfo, data=data)
-        return None
-
-    def save_file_list(
-        self,
-        content_types: list[str],
-        urls: list[str],
-    ) -> None:
-        path = self.file_list_path()
-        self._logger.debug(f"save saved link list to {path}")
-        data = {
-            "content_types": sorted(content_types),
-            "urls": sorted(urls),
-        }
-        save_json(path, data, schema=SavedExternalLinksInfo.jsonschema())
-
     def gitattributes_path(self) -> pathlib.Path:
         return self._path.joinpath(".gitattributes")
 
@@ -456,7 +402,6 @@ class _LinksDirectory:
         with self.gitattributes_path().open(mode="w", encoding="utf-8") as file:
             file.write("**/* filter=lfs diff=lfs merge=lfs -text\n")
             file.write(".gitattributes !filter !diff !merge text\n")
-            file.write("list.json !filter !diff !merge text\n")
 
     def remove_empty_directory(self) -> None:
         # execute recursively
@@ -673,12 +618,6 @@ def _commit_target(
     deleted: set[pathlib.Path] = set()
     if not config.keep_deleted_links:
         deleted = _files_with_no_links(directory, links)
-    # list.json
-    list_path = directory.file_list_path()
-    if list_path.exists():
-        updated.add(list_path)
-    else:
-        added.add(list_path)
     # .gitattributes
     if config.use_git_lfs:
         gitattributes_path = directory.gitattributes_path()
