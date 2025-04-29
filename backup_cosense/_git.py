@@ -20,7 +20,7 @@ from ._json import parse_json
 from .exceptions import CommitTargetError, GitNotFoundError
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Commit:
     hash: str
     timestamp: int

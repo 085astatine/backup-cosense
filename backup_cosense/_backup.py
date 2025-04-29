@@ -162,7 +162,7 @@ def jsonschema_backup() -> dict[str, Any]:
     return schema
 
 
-@dataclasses.dataclass(order=True)
+@dataclasses.dataclass(order=True, frozen=True)
 class Location:
     title: str
     line: int
@@ -181,25 +181,25 @@ class Location:
         return schema
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class InternalLinkNode:
     name: str
     type: InternalLinkType
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class InternalLink:
     node: InternalLinkNode
     to_links: list[InternalLinkNode]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class ExternalLink:
     url: str
     locations: list[Location]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class UpdateDiff:
     added: list[pathlib.Path]
     updated: list[pathlib.Path]
@@ -445,7 +445,7 @@ class Backup:
         )
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class BackupJSONs:
     timestamp: int
     backup_path: pathlib.Path
