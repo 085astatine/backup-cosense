@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import copy
 import dataclasses
 import logging
 import pathlib
@@ -20,7 +19,7 @@ from ._git import CommitTarget
 from ._json import load_json, save_json
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class ResponseLog:
     status_code: int
     content_type: Optional[str]
@@ -58,7 +57,7 @@ class RequestError:
         return schema
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class ExternalLinkLog:
     url: str
     locations: list[Location]
@@ -190,13 +189,13 @@ def _request_headers(config: ExternalLinkSessionConfig) -> multidict.CIMultiDict
     return headers
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class _LogFile:
     path: pathlib.Path
     timestamp: int
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class _Log:
     timestamp: int
     logs: list[ExternalLinkLog]
@@ -340,9 +339,14 @@ class _LogEditor:
         for link in links:
             if link.url in self._logs:
                 # update locations
-                log = copy.copy(self._logs.pop(link.url))
-                log.locations = copy.copy(link.locations)
-                logs[log.url] = log
+                log = self._logs[link.url]
+                logs[log.url] = ExternalLinkLog(
+                    url=log.url,
+                    locations=link.locations[:],
+                    access_timestamp=log.access_timestamp,
+                    response=log.response,
+                    is_saved=log.is_saved,
+                )
             else:
                 added_links[link.url] = link
         deleted_links = set(self._logs.keys())
