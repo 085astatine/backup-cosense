@@ -102,31 +102,6 @@ class ExternalLinkLog:
         return schema
 
 
-@dataclasses.dataclass(frozen=True)
-class SavedExternalLinksInfo:
-    content_types: list[str]
-    urls: list[str]
-
-    @classmethod
-    def jsonschema(cls) -> dict[str, Any]:
-        schema = {
-            "type": "object",
-            "required": ["content_types", "urls"],
-            "additionalProperties": False,
-            "properties": {
-                "content_types": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "urls": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-            },
-        }
-        return schema
-
-
 def save_external_links(
     # pylint: disable=too-many-arguments
     timestamp: int,
@@ -153,8 +128,8 @@ def save_external_links(
         git_directory.joinpath(config.save_directory),
         logger,
     )
-    # load previous saved list
-    previous_saved_list = links_directory.load_file_list()
+    # files saved before request
+    already_saved_files = set(links_directory.files())
     # log editor
     log_editor = _setup_log_editor(
         timestamp,
@@ -174,20 +149,16 @@ def save_external_links(
     # save log
     log = log_editor.output()
     log_directory.save(log)
-    # save list.json
-    links_directory.save_file_list(
-        config.content_types,
-        [log.url for log in log.logs if log.is_saved],
-    )
     # clean logs
     if config.keep_logs != "all":
         log_directory.clean(config.keep_logs)
     # commit target
     return _commit_target(
         config,
+        external_links,
         links_directory,
         log_editor,
-        previous_saved_list,
+        already_saved_files,
     )
 
 
@@ -414,32 +385,15 @@ class _LinksDirectory:
         self._path = path
         self._logger = logger
 
+    @property
+    def path(self) -> pathlib.Path:
+        return self._path
+
     def file_path(self, url: str) -> pathlib.Path:
-        return self._path.joinpath(re.sub(r"https?://", "", url))
+        return self._path.joinpath(_url_to_path(url))
 
-    def file_list_path(self) -> pathlib.Path:
-        return self._path.joinpath("list.json")
-
-    def load_file_list(self) -> Optional[SavedExternalLinksInfo]:
-        path = self.file_list_path()
-        self._logger.debug(f"load saved link list from {path}")
-        data = load_json(path, schema=SavedExternalLinksInfo.jsonschema())
-        if data is not None:
-            return dacite.from_dict(data_class=SavedExternalLinksInfo, data=data)
-        return None
-
-    def save_file_list(
-        self,
-        content_types: list[str],
-        urls: list[str],
-    ) -> None:
-        path = self.file_list_path()
-        self._logger.debug(f"save saved link list to {path}")
-        data = {
-            "content_types": sorted(content_types),
-            "urls": sorted(urls),
-        }
-        save_json(path, data, schema=SavedExternalLinksInfo.jsonschema())
+    def files(self) -> list[pathlib.Path]:
+        return [path for path in self._path.glob("*/**/*") if path.is_file()]
 
     def gitattributes_path(self) -> pathlib.Path:
         return self._path.joinpath(".gitattributes")
@@ -448,7 +402,6 @@ class _LinksDirectory:
         with self.gitattributes_path().open(mode="w", encoding="utf-8") as file:
             file.write("**/* filter=lfs diff=lfs merge=lfs -text\n")
             file.write(".gitattributes !filter !diff !merge text\n")
-            file.write("list.json !filter !diff !merge text\n")
 
     def remove_empty_directory(self) -> None:
         # execute recursively
@@ -466,6 +419,10 @@ class _LinksDirectory:
 
         # execute from the root directory
         _remove_empty_directory(self._path)
+
+
+def _url_to_path(url: str) -> str:
+    return re.sub(r"https?://", "", url)
 
 
 def _setup_log_editor(
@@ -644,9 +601,10 @@ async def _request_link(
 
 def _commit_target(
     config: ExternalLinkConfig,
+    links: list[ExternalLink],
     directory: _LinksDirectory,
     log_editor: _LogEditor,
-    previous_list: Optional[SavedExternalLinksInfo],
+    already_saved_files: set[pathlib.Path],
 ) -> CommitTarget:
     # updated files
     updated_files = {
@@ -654,28 +612,12 @@ def _commit_target(
         for log in log_editor.updated_logs()
         if log.is_saved
     }
-    # saved files
-    saved_files = {
-        directory.file_path(log.url) for log in log_editor.logs() if log.is_saved
-    }
-    # previous saved files
-    previous_saved_files: set[pathlib.Path] = set()
-    if previous_list is not None:
-        previous_saved_files.update(
-            directory.file_path(url) for url in previous_list.urls
-        )
     # added / updated / deleted
-    added = updated_files - previous_saved_files
-    updated = updated_files & previous_saved_files
+    added = updated_files - already_saved_files
+    updated = updated_files & already_saved_files
     deleted: set[pathlib.Path] = set()
     if not config.keep_deleted_links:
-        deleted.update(previous_saved_files - saved_files)
-    # list.json
-    list_path = directory.file_list_path()
-    if list_path.exists():
-        updated.add(list_path)
-    else:
-        added.add(list_path)
+        deleted = _files_with_no_links(directory, links)
     # .gitattributes
     if config.use_git_lfs:
         gitattributes_path = directory.gitattributes_path()
@@ -688,3 +630,16 @@ def _commit_target(
     # remove empty directory
     directory.remove_empty_directory()
     return CommitTarget(added=added, updated=updated, deleted=deleted)
+
+
+def _files_with_no_links(
+    links_directory: _LinksDirectory,
+    external_links: list[ExternalLink],
+) -> set[pathlib.Path]:
+    saved_files = set(
+        path.relative_to(links_directory.path).as_posix()
+        for path in links_directory.files()
+    )
+    linked_files = set(_url_to_path(link.url) for link in external_links)
+    no_linked_files = saved_files - linked_files
+    return set(links_directory.path.joinpath(path) for path in no_linked_files)
