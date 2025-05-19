@@ -466,26 +466,22 @@ class BackupArchive:
         subdirectory: bool = False,
     ) -> None:
         self._path = path
-        self._subdirectory = subdirectory
+        self._directory = (
+            _ArchiveDirectoryTree(path) if subdirectory else _ArchiveDirectory(path)
+        )
 
     @property
     def path(self) -> pathlib.Path:
         return self._path
 
     def backup_path(self, timestamp: int) -> pathlib.Path:
-        directory = _backup_directory(self._path, self._subdirectory, timestamp)
-        return directory.joinpath(f"{timestamp}.json")
+        return self._directory.file_path(timestamp).backup
 
     def info_path(self, timestamp: int) -> pathlib.Path:
-        directory = _backup_directory(self._path, self._subdirectory, timestamp)
-        return directory.joinpath(f"{timestamp}.info.json")
+        return self._directory.file_path(timestamp).info
 
     def backups(self) -> list[BackupFilePath]:
-        backups = (
-            _search_subdirectory(self._path)
-            if self._subdirectory
-            else _search_backup(self._path)
-        )
+        backups = self._directory.find_all()
         # sort by old...new
         return sorted(backups, key=lambda backup: backup.timestamp)
 
@@ -561,52 +557,63 @@ def _filter_code(page: BackupPageJSON) -> Generator[Tuple[str, Location], None, 
         yield line, Location(title=title, line=i)
 
 
-def _backup_directory(
-    path: pathlib.Path,
-    subdirectory: bool,
-    timestamp: int,
-) -> pathlib.Path:
-    if subdirectory:
-        return path.joinpath(str(math.floor(timestamp / 1.0e7)))
-    return path
+class _ArchiveDirectory:
+    def __init__(self, path: pathlib.Path) -> None:
+        self._path = path
 
+    def file_path(self, timestamp: int) -> BackupFilePath:
+        # {timestamp}.json, {timestamp}.info.json
+        return BackupFilePath(
+            timestamp=timestamp,
+            backup=self._path.joinpath(f"{timestamp}.json"),
+            info=self._path.joinpath(f"{timestamp}.info.json"),
+        )
 
-def _search_backup(directory: pathlib.Path) -> list[BackupFilePath]:
-    # search '{timestamp}.json' & '{timestamp}.info.json'
-    backups: list[BackupFilePath] = []
-    # check if the path is directory
-    if directory.is_dir():
-        for path in directory.iterdir():
-            # check if the path is file
+    def find_all(self) -> list[BackupFilePath]:
+        result: list[BackupFilePath] = []
+        # check if the path is directory
+        if not self._path.is_dir():
+            return result
+        # iterate files
+        pattern = re.compile(r"^(?P<timestamp>[0-9]+)\.json$")
+        for path in self._path.iterdir():
             if not path.is_file():
                 continue
             # check if the filename is '{timestamp}.json'
-            filename_match = re.match(r"^(?P<timestamp>\d+)\.json$", path.name)
-            if filename_match is None:
-                continue
-            timestamp = int(filename_match.group("timestamp"))
-            # info path
-            info_path = directory.joinpath(f"{timestamp}.info.json")
-            backups.append(
-                BackupFilePath(
-                    timestamp=timestamp,
-                    backup=path,
-                    info=info_path,
+            match = pattern.match(path.name)
+            if match:
+                timestamp = int(match.group("timestamp"))
+                result.append(
+                    BackupFilePath(
+                        timestamp=timestamp,
+                        backup=path,
+                        info=path.with_suffix(".info.json"),
+                    )
                 )
-            )
-    return backups
+        return result
 
 
-def _search_subdirectory(directory: pathlib.Path) -> list[BackupFilePath]:
-    # search directory '{timestamp / 1.0e+7}'
-    backups: list[BackupFilePath] = []
-    # check if the path is directory
-    if directory.is_dir():
-        for path in directory.iterdir():
-            # check if the path is directory
+class _ArchiveDirectoryTree:
+    def __init__(self, path: pathlib.Path) -> None:
+        self._path = path
+
+    def file_path(self, timestamp: int) -> BackupFilePath:
+        sub_directory = self._path.joinpath(str(math.floor(timestamp / 1.0e7)))
+        return _ArchiveDirectory(sub_directory).file_path(timestamp)
+
+    def find_all(self) -> list[BackupFilePath]:
+        result: list[BackupFilePath] = []
+        # check if the path is directory
+        if not self._path.is_dir():
+            return result
+        # iterate directories
+        pattern = re.compile(r"^(?P<quotient>[0-9]+)$")
+        for path in self._path.iterdir():
             if not path.is_dir():
                 continue
             # check if the directory name is 'timestamp / 1.0e+7'
-            if re.match(r"[0-9]+", path.name):
-                backups.extend(_search_backup(path))
-    return backups
+            match = pattern.match(path.name)
+            if match:
+                file_paths = _ArchiveDirectory(path).find_all()
+                result.extend(file_paths)
+        return result
