@@ -200,6 +200,19 @@ class ExternalLink:
 
 
 @dataclasses.dataclass(frozen=True)
+class BackupFilePath:
+    timestamp: int
+    backup: pathlib.Path
+    info: pathlib.Path
+
+    def load_backup(self) -> Optional[BackupJSON]:
+        return load_json(self.backup, schema=jsonschema_backup())
+
+    def load_info(self) -> Optional[BackupInfoJSON]:
+        return load_json(self.info, schema=jsonschema_backup_info())
+
+
+@dataclasses.dataclass(frozen=True)
 class UpdateDiff:
     added: list[pathlib.Path]
     updated: list[pathlib.Path]
@@ -445,21 +458,6 @@ class Backup:
         )
 
 
-@dataclasses.dataclass(frozen=True)
-class BackupJSONs:
-    timestamp: int
-    backup_path: pathlib.Path
-    info_path: Optional[pathlib.Path]
-
-    def load_backup(self) -> Optional[BackupJSON]:
-        return load_json(self.backup_path, schema=jsonschema_backup())
-
-    def load_info(self) -> Optional[BackupInfoJSON]:
-        if self.info_path is None:
-            return None
-        return load_json(self.info_path, schema=jsonschema_backup_info())
-
-
 class BackupStorage:
     def __init__(
         self,
@@ -482,7 +480,7 @@ class BackupStorage:
         directory = _backup_directory(self._path, self._subdirectory, timestamp)
         return directory.joinpath(f"{timestamp}.info.json")
 
-    def backups(self) -> list[BackupJSONs]:
+    def backups(self) -> list[BackupFilePath]:
         backups = (
             _search_subdirectory(self._path)
             if self._subdirectory
@@ -573,9 +571,9 @@ def _backup_directory(
     return path
 
 
-def _search_backup(directory: pathlib.Path) -> list[BackupJSONs]:
+def _search_backup(directory: pathlib.Path) -> list[BackupFilePath]:
     # search '{timestamp}.json' & '{timestamp}.info.json'
-    backups: list[BackupJSONs] = []
+    backups: list[BackupFilePath] = []
     # check if the path is directory
     if directory.is_dir():
         for path in directory.iterdir():
@@ -590,18 +588,18 @@ def _search_backup(directory: pathlib.Path) -> list[BackupJSONs]:
             # info path
             info_path = directory.joinpath(f"{timestamp}.info.json")
             backups.append(
-                BackupJSONs(
+                BackupFilePath(
                     timestamp=timestamp,
-                    backup_path=path,
-                    info_path=info_path if info_path.exists() else None,
+                    backup=path,
+                    info=info_path,
                 )
             )
     return backups
 
 
-def _search_subdirectory(directory: pathlib.Path) -> list[BackupJSONs]:
+def _search_subdirectory(directory: pathlib.Path) -> list[BackupFilePath]:
     # search directory '{timestamp / 1.0e+7}'
-    backups: list[BackupJSONs] = []
+    backups: list[BackupFilePath] = []
     # check if the path is directory
     if directory.is_dir():
         for path in directory.iterdir():

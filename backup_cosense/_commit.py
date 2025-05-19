@@ -2,7 +2,7 @@ import datetime
 import logging
 from typing import Optional
 
-from ._backup import Backup, BackupJSONs
+from ._backup import Backup, BackupFilePath
 from ._config import Config, GitEmptyInitialCommitConfig
 from ._external_link import save_external_links
 from ._git import Commit, CommitTarget, Git
@@ -45,7 +45,7 @@ def commit_backups(
 
 def commit_backup(
     config: Config,
-    data: BackupJSONs,
+    data: BackupFilePath,
     *,
     backup: Optional[Backup] = None,
     logger: Optional[logging.Logger] = None,
@@ -86,7 +86,7 @@ def commit_backup(
 
 def staging_backup(
     config: Config,
-    data: BackupJSONs,
+    data: BackupFilePath,
     *,
     backup: Optional[Backup] = None,
     logger: Optional[logging.Logger] = None,
@@ -152,7 +152,7 @@ def _backup_targets(
     config: Config,
     git: Git,
     logger: logging.Logger,
-) -> list[BackupJSONs]:
+) -> list[BackupFilePath]:
     # backup start date
     backup_start = (
         int(config.cosense.backup_start_date.timestamp())
@@ -180,7 +180,7 @@ def _backup_targets(
 def _initial_commit(
     config: Config,
     git: Git,
-    backups: list[BackupJSONs],
+    backups: list[BackupFilePath],
 ) -> None:
     # empty initial commit is enabled
     if config.git.empty_initial_commit is None:
@@ -202,7 +202,7 @@ def _initial_commit(
 
 def _initial_commit_timestamp(
     config: GitEmptyInitialCommitConfig,
-    backups: list[BackupJSONs],
+    backups: list[BackupFilePath],
 ) -> int:
     match config.timestamp:
         case datetime.datetime():
@@ -225,7 +225,7 @@ def _initial_commit_timestamp(
             backup_data = backup.load_backup()
             if backup_data is None:
                 raise InitialCommitError(
-                    f'Could not load oldest backup "{backup.backup_path}"'
+                    f'Could not load oldest backup "{backup.backup}"'
                 )
             # oldest created page
             timestamp = min(
