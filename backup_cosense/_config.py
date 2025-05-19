@@ -9,7 +9,7 @@ import fake_useragent
 import jsonschema
 import toml
 
-from ._backup import BackupStorage, PageOrder
+from ._backup import BackupArchive, PageOrder
 from ._git import Git
 
 
@@ -18,8 +18,8 @@ class CosenseSaveDirectoryConfig:
     name: str
     subdirectory: bool = False
 
-    def storage(self) -> BackupStorage:
-        return BackupStorage(
+    def storage(self) -> BackupArchive:
+        return BackupArchive(
             pathlib.Path(self.name),
             subdirectory=self.subdirectory,
         )

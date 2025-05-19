@@ -3,7 +3,7 @@ import pathlib
 import subprocess
 from typing import Any, Optional
 
-from ._backup import BackupStorage, jsonschema_backup, jsonschema_backup_info
+from ._backup import BackupArchive, jsonschema_backup, jsonschema_backup_info
 from ._config import Config
 from ._git import Commit, Git
 from ._json import parse_json, save_json
@@ -12,7 +12,7 @@ from ._utility import format_timestamp
 
 def export_backups(
     config: Config,
-    destination: BackupStorage,
+    destination: BackupArchive,
     logger: logging.Logger,
 ) -> None:
     git = config.git.git(logger=logger)
@@ -46,7 +46,7 @@ def _export(
     project: str,
     git: Git,
     commit: Commit,
-    destination: BackupStorage,
+    destination: BackupArchive,
     logger: logging.Logger,
 ) -> None:
     # save backup.json

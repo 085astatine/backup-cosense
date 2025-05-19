@@ -458,7 +458,7 @@ class Backup:
         )
 
 
-class BackupStorage:
+class BackupArchive:
     def __init__(
         self,
         path: pathlib.Path,
