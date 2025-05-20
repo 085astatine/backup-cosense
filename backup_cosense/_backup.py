@@ -287,6 +287,21 @@ class BackupData:
             link.locations.sort()
         return links
 
+    def sort_pages(self, order: Optional[PageOrder]) -> None:
+        _sort_pages(self.backup["pages"], order)
+
+    def is_pages_sorted(self, order: Optional[PageOrder]) -> Optional[bool]:
+        if order is None or order == "as-is":
+            return None
+        # sort shallow copied pages
+        sorted_pages = self.backup["pages"][:]
+        _sort_pages(sorted_pages, order)
+        # compare the id of each page
+        return all(
+            id(x) == id(y)
+            for x, y in itertools.zip_longest(self.backup["pages"], sorted_pages)
+        )
+
     def save(
         self,
         path: BackupFilePath,
@@ -326,7 +341,7 @@ class BackupRepository:
         self._data = BackupData(backup=backup, info=info)
         self._page_order = page_order
         # sort pages
-        _sort_pages(self._data.backup["pages"], self._page_order)
+        self._data.sort_pages(self._page_order)
 
     @property
     def project(self) -> str:
@@ -352,9 +367,9 @@ class BackupRepository:
         updated: list[pathlib.Path] = []
         removed: list[pathlib.Path] = []
         # sort pages
-        _sort_pages(backup["pages"], self._page_order)
-        # backup
         data = BackupData(backup=backup, info=info)
+        data.sort_pages(self._page_order)
+        # backup
         file_path = _project_to_file_path(self.directory, self.project)
         data.save(file_path, logger=logger)
         if backup != self._data.backup:
@@ -452,7 +467,7 @@ class BackupRepository:
         if data is None:
             return None
         # check if pages are sorted
-        if _is_sorted_pages(data.backup["pages"], page_order) is False:
+        if data.is_pages_sorted(page_order) is False:
             logger.warn(f"loaded backup pages are not sorted by {page_order}")
         return cls(
             project,
@@ -503,18 +518,6 @@ def _sort_pages(
             pages.sort(key=lambda page: page["created"])
         case "created-desc":
             pages.sort(key=lambda page: -page["created"])
-
-
-def _is_sorted_pages(
-    pages: list[BackupPageJSON], order: Optional[PageOrder]
-) -> Optional[bool]:
-    if order is None or order == "as-is":
-        return None
-    # sort shallow copied pages
-    sorted_pages = pages[:]
-    _sort_pages(sorted_pages, order)
-    # compare the id of each page
-    return all(id(x) == id(y) for x, y in itertools.zip_longest(pages, sorted_pages))
 
 
 def _escape_filename(text: str) -> str:
