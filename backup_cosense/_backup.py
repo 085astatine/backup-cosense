@@ -238,6 +238,55 @@ class BackupData:
                 schema=jsonschema_backup_info(),
             )
 
+    @property
+    def timestamp(self) -> int:
+        return self.backup["exported"]
+
+    def page_titles(self) -> list[str]:
+        return sorted(page["title"] for page in self.backup["pages"])
+
+    def internal_links(self) -> list[InternalLink]:
+        # page
+        pages = {_normalize_page_title(page): page for page in self.page_titles()}
+        # links
+        links: list[InternalLink] = []
+        for page in self.backup["pages"]:
+            to_links = [
+                InternalLinkNode(
+                    name=pages.get(link, link),
+                    type="page" if _normalize_page_title(link) in pages else "word",
+                )
+                for link in page["linksLc"]
+            ]
+            to_links.sort(key=lambda node: node.name)
+            links.append(
+                InternalLink(
+                    node=InternalLinkNode(name=page["title"], type="page"),
+                    to_links=to_links,
+                )
+            )
+        links.sort(key=lambda link: link.node.name)
+        return links
+
+    def external_links(self) -> list[ExternalLink]:
+        # regex pattern
+        pattern = re.compile(r"https?://[^\s\]]+")
+        # links
+        links: list[ExternalLink] = []
+        for page in self.backup["pages"]:
+            for line, location in _filter_code(page):
+                for url in pattern.findall(line):
+                    found = next((link for link in links if link.url == url), None)
+                    if found is not None:
+                        found.locations.append(location)
+                    else:
+                        links.append(ExternalLink(url=url, locations=[location]))
+        # sort
+        links.sort(key=lambda link: link.url)
+        for link in links:
+            link.locations.sort()
+        return links
+
 
 @dataclasses.dataclass(frozen=True)
 class UpdateDiff:
@@ -259,21 +308,10 @@ class BackupRepository:
     ) -> None:
         self._project = project
         self._directory = directory
-        self._backup = backup
-        self._info = info
+        self._data = BackupData(backup=backup, info=info)
         self._page_order = page_order
         # sort pages
-        _sort_pages(self._backup["pages"], self._page_order)
-        # JSON Schema validation
-        jsonschema.validate(
-            instance=self._backup,
-            schema=jsonschema_backup(),
-        )
-        if self._info is not None:
-            jsonschema.validate(
-                instance=self._info,
-                schema=jsonschema_backup_info(),
-            )
+        _sort_pages(self._data.backup["pages"], self._page_order)
 
     @property
     def project(self) -> str:
@@ -284,65 +322,8 @@ class BackupRepository:
         return self._directory
 
     @property
-    def timestamp(self) -> int:
-        return self._backup["exported"]
-
-    @property
-    def data(self) -> BackupJSON:
-        return self._backup
-
-    @property
-    def info(self) -> Optional[BackupInfoJSON]:
-        return self._info
-
-    def page_titles(self) -> list[str]:
-        return sorted(page["title"] for page in self._backup["pages"])
-
-    def internal_links(self) -> list[InternalLink]:
-        # page
-        pages = {_normalize_page_title(page): page for page in self.page_titles()}
-        # links
-        links: list[InternalLink] = []
-        for page in self._backup["pages"]:
-            to_links = sorted(
-                (
-                    InternalLinkNode(
-                        name=pages.get(link, link),
-                        type=(
-                            "page" if _normalize_page_title(link) in pages else "word"
-                        ),
-                    )
-                    for link in page["linksLc"]
-                ),
-                key=lambda node: node.name,
-            )
-            links.append(
-                InternalLink(
-                    node=InternalLinkNode(name=page["title"], type="page"),
-                    to_links=to_links,
-                )
-            )
-        links.sort(key=lambda link: link.node.name)
-        return links
-
-    def external_links(self) -> list[ExternalLink]:
-        # regex
-        regex = re.compile(r"https?://[^\s\]]+")
-        # links
-        links: list[ExternalLink] = []
-        for page in self._backup["pages"]:
-            for line, location in _filter_code(page):
-                for url in regex.findall(line):
-                    found = next((link for link in links if link.url == url), None)
-                    if found is not None:
-                        found.locations.append(location)
-                    else:
-                        links.append(ExternalLink(url=url, locations=[location]))
-        # sort
-        links.sort(key=lambda link: link.url)
-        for link in links:
-            link.locations.sort()
-        return links
+    def data(self) -> BackupData:
+        return self._data
 
     def update(
         self,
@@ -359,18 +340,18 @@ class BackupRepository:
         _sort_pages(backup["pages"], self._page_order)
         # backup
         backup_path = self.directory.joinpath(f"{_escape_filename(self.project)}.json")
-        if backup != self._backup:
+        if backup != self._data.backup:
             logger.debug(f'update "{backup_path}"')
             save_json(backup_path, backup)
             updated.append(backup_path)
         # info
         info_path = backup_path.with_suffix(".info.json")
-        if info != self._info:
+        if info != self._data.info:
             if info is None:
                 logger.debug(f'remove "{backup_path}"')
                 info_path.unlink()
                 removed.append(info_path)
-            elif self._info is None:
+            elif self._data.info is None:
                 logger.debug(f'add "{backup_path}"')
                 save_json(info_path, info)
                 added.append(info_path)
@@ -380,7 +361,7 @@ class BackupRepository:
                 updated.append(info_path)
         # previous pages
         previous_pages = {
-            _escape_filename(page["title"]): page for page in self._backup["pages"]
+            _escape_filename(page["title"]): page for page in self._data.backup["pages"]
         }
         # add/update pages
         page_directory = self.directory.joinpath("pages")
@@ -407,8 +388,7 @@ class BackupRepository:
             page_path.unlink()
             removed.append(page_path)
         # update self
-        self._backup = backup
-        self._info = info
+        self._data = BackupData(backup=backup, info=info)
         return UpdateDiff(added, updated, removed)
 
     def save_files(self) -> list[pathlib.Path]:
@@ -417,11 +397,11 @@ class BackupRepository:
         backup_path = self.directory.joinpath(f"{_escape_filename(self.project)}.json")
         files.append(backup_path)
         # {project}.info.json
-        if self._info is not None:
+        if self._data.info is not None:
             files.append(backup_path.with_suffix(".info.json"))
         # pages
         page_directory = self.directory.joinpath("pages")
-        for page in self._backup["pages"]:
+        for page in self._data.backup["pages"]:
             files.append(
                 page_directory.joinpath(f'{_escape_filename(page["title"])}.json')
             )
@@ -436,15 +416,15 @@ class BackupRepository:
         # {project}.json
         backup_path = self.directory.joinpath(f"{_escape_filename(self.project)}.json")
         logger.debug(f'save "{backup_path}"')
-        save_json(backup_path, self._backup)
+        save_json(backup_path, self._data.backup)
         # {project}.info.json
-        if self._info is not None:
+        if self._data.info is not None:
             info_path = backup_path.with_suffix(".info.json")
             logger.debug(f'save "{info_path}"')
-            save_json(info_path, self._info)
+            save_json(info_path, self._data.info)
         # pages
         page_directory = self.directory.joinpath("pages")
-        for page in self._backup["pages"]:
+        for page in self._data.backup["pages"]:
             page_path = page_directory.joinpath(
                 f'{_escape_filename(page["title"])}.json'
             )
