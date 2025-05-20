@@ -464,10 +464,14 @@ class BackupArchive:
         path: pathlib.Path,
         *,
         subdirectory: bool = False,
+        logger: Optional[logging.Logger] = None,
     ) -> None:
+        logger = logger or logging.getLogger(__name__)
         self._path = path
         self._directory = (
-            _ArchiveDirectoryTree(path) if subdirectory else _ArchiveDirectory(path)
+            _ArchiveDirectoryTree(path, logger)
+            if subdirectory
+            else _ArchiveDirectory(path)
         )
 
     @property
@@ -594,8 +598,13 @@ class _ArchiveDirectory:
 
 
 class _ArchiveDirectoryTree:
-    def __init__(self, path: pathlib.Path) -> None:
+    def __init__(
+        self,
+        path: pathlib.Path,
+        logger: logging.Logger,
+    ) -> None:
         self._path = path
+        self._logger = logger
 
     def file_path(self, timestamp: int) -> BackupFilePath:
         sub_directory = self._path.joinpath(str(math.floor(timestamp / 1.0e7)))
@@ -614,6 +623,12 @@ class _ArchiveDirectoryTree:
             # check if the directory name is 'timestamp / 1.0e+7'
             match = pattern.match(path.name)
             if match:
+                quotient = int(match.group("quotient"))
                 file_paths = _ArchiveDirectory(path).find_all()
+                if any(
+                    math.floor(file_path.timestamp / 1.0e7) != quotient
+                    for file_path in file_paths
+                ):
+                    self._logger.warning(f'unexpected files exist in "{path}"')
                 result.extend(file_paths)
         return result

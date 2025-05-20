@@ -48,7 +48,7 @@ def backup_cosense(
         destination = CosenseSaveDirectoryConfig(
             name=option.destination,
             subdirectory=option.subdirectory,
-        ).storage()
+        ).storage(logger=logger)
         export_backups(config, destination, logger=logger)
 
 

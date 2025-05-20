@@ -168,7 +168,7 @@ def _backup_targets(
         default=None,
     )
     # find backup
-    storage = config.cosense.save_directory.storage()
+    storage = config.cosense.save_directory.storage(logger=logger)
     targets = [
         backup
         for backup in storage.backups()

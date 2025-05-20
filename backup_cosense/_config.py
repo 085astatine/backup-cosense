@@ -18,10 +18,15 @@ class CosenseSaveDirectoryConfig:
     name: str
     subdirectory: bool = False
 
-    def storage(self) -> BackupArchive:
+    def storage(
+        self,
+        *,
+        logger: Optional[logging.Logger] = None,
+    ) -> BackupArchive:
         return BackupArchive(
             pathlib.Path(self.name),
             subdirectory=self.subdirectory,
+            logger=logger,
         )
 
     @classmethod
