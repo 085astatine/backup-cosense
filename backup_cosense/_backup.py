@@ -213,6 +213,24 @@ class BackupFilePath:
 
 
 @dataclasses.dataclass(frozen=True)
+class BackupData:
+    backup: BackupJSON
+    info: Optional[BackupInfoJSON]
+
+    def __post_init__(self) -> None:
+        # JSONSchema validation
+        jsonschema.validate(
+            instance=self.backup,
+            schema=jsonschema_backup(),
+        )
+        if self.info is not None:
+            jsonschema.validate(
+                instance=self.info,
+                schema=jsonschema_backup_info(),
+            )
+
+
+@dataclasses.dataclass(frozen=True)
 class UpdateDiff:
     added: list[pathlib.Path]
     updated: list[pathlib.Path]
