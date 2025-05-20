@@ -355,11 +355,7 @@ class BackupRepository:
         _sort_pages(backup["pages"], self._page_order)
         # backup
         data = BackupData(backup=backup, info=info)
-        file_path = BackupFilePath(
-            timestamp=0,  #  dummy timestamp
-            backup=self.directory.joinpath(f"{_escape_filename(self.project)}.json"),
-            info=self.directory.joinpath(f"{_escape_filename(self.project)}.json"),
-        )
+        file_path = _project_to_file_path(self.directory, self.project)
         data.save(file_path, logger=logger)
         if backup != self._data.backup:
             logger.debug(f'update "{file_path.backup}"')
@@ -410,12 +406,11 @@ class BackupRepository:
 
     def save_files(self) -> list[pathlib.Path]:
         files: list[pathlib.Path] = []
-        # {project}.json
-        backup_path = self.directory.joinpath(f"{_escape_filename(self.project)}.json")
-        files.append(backup_path)
-        # {project}.info.json
+        # {project}.json & {project}.info.json
+        file_path = _project_to_file_path(self.directory, self.project)
+        files.append(file_path.backup)
         if self._data.info is not None:
-            files.append(backup_path.with_suffix(".info.json"))
+            files.append(file_path.info)
         # pages
         page_directory = self.directory.joinpath("pages")
         for page in self._data.backup["pages"]:
@@ -431,11 +426,7 @@ class BackupRepository:
     ) -> None:
         logger = logger or logging.getLogger(__name__)
         # {project}.json & {project}.info.json
-        file_path = BackupFilePath(
-            timestamp=0,  # dummy timestamp
-            backup=self.directory.joinpath(f"{_escape_filename(self.project)}.json"),
-            info=self.directory.joinpath(f"{_escape_filename(self.project)}.info.json"),
-        )
+        file_path = _project_to_file_path(self.directory, self.project)
         self._data.save(file_path, logger=logger)
         # pages
         page_directory = self.directory.joinpath("pages")
@@ -457,11 +448,7 @@ class BackupRepository:
     ) -> Optional[Self]:
         logger = logger or logging.getLogger(__name__)
         # {project}.json & {project}.info.json
-        data = BackupFilePath(
-            timestamp=0,  # dummy timestamp
-            backup=directory.joinpath(f"{_escape_filename(project)}.json"),
-            info=directory.joinpath(f"{_escape_filename(project)}.info.json"),
-        ).load()
+        data = _project_to_file_path(directory, project).load()
         if data is None:
             return None
         # check if pages are sorted
@@ -574,6 +561,18 @@ def _filter_code(page: BackupPageJSON) -> Generator[Tuple[str, Location], None, 
         # code snippets
         line = code_snippets.sub(" ", line)
         yield line, Location(title=title, line=i)
+
+
+def _project_to_file_path(
+    directory: pathlib.Path,
+    project: str,
+) -> BackupFilePath:
+    filename = _escape_filename(project)
+    return BackupFilePath(
+        timestamp=0,  # dummy timestamp
+        backup=directory.joinpath(f"{filename}.json"),
+        info=directory.joinpath(f"{filename}.info.json"),
+    )
 
 
 class _ArchiveDirectory:
