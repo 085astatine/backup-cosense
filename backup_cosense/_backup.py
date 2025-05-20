@@ -6,7 +6,7 @@ import logging
 import math
 import pathlib
 import re
-from typing import Any, Generator, Literal, Optional, Tuple, TypedDict
+from typing import Any, Generator, Literal, Optional, Self, Tuple, TypedDict
 
 import jsonschema
 
@@ -219,7 +219,7 @@ class UpdateDiff:
     removed: list[pathlib.Path]
 
 
-class Backup:
+class BackupRepository:
     def __init__(
         # pylint: disable=too-many-arguments
         self,
@@ -432,7 +432,7 @@ class Backup:
         *,
         page_order: Optional[PageOrder] = None,
         logger: Optional[logging.Logger] = None,
-    ) -> Optional[Backup]:
+    ) -> Optional[Self]:
         logger = logger or logging.getLogger(__name__)
         # {project}.json
         backup_path = directory.joinpath(f"{_escape_filename(project)}.json")

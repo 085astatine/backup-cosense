@@ -2,7 +2,7 @@ import datetime
 import logging
 from typing import Optional
 
-from ._backup import Backup, BackupFilePath
+from ._backup import BackupFilePath, BackupRepository
 from ._config import Config, GitEmptyInitialCommitConfig
 from ._external_link import save_external_links
 from ._git import Commit, CommitTarget, Git
@@ -17,7 +17,7 @@ def commit_backups(
 ) -> None:
     logger = logger or logging.getLogger(__name__)
     git = config.git.git(logger=logger)
-    backup: Optional[Backup] = None
+    backup_repository: Optional[BackupRepository] = None
     # git switch
     if git.exists():
         git.switch(allow_orphan=True)
@@ -27,8 +27,8 @@ def commit_backups(
     for target in backup_targets:
         logger.info(f"commit {format_timestamp(target.timestamp)}")
         # load backup repository
-        if backup is None:
-            backup = Backup.load(
+        if backup_repository is None:
+            backup_repository = BackupRepository.load(
                 config.cosense.project,
                 git.path,
                 page_order=config.git.page_order,
@@ -38,7 +38,7 @@ def commit_backups(
         commit_backup(
             config,
             target,
-            backup=backup,
+            backup_repository=backup_repository,
             logger=logger,
         )
 
@@ -47,7 +47,7 @@ def commit_backup(
     config: Config,
     data: BackupFilePath,
     *,
-    backup: Optional[Backup] = None,
+    backup_repository: Optional[BackupRepository] = None,
     logger: Optional[logging.Logger] = None,
 ) -> None:
     logger = logger or logging.getLogger(__name__)
@@ -64,7 +64,7 @@ def commit_backup(
     commit_target = staging_backup(
         config,
         data,
-        backup=backup,
+        backup_repository=backup_repository,
         logger=logger,
     )
     if commit_target is None:
@@ -88,7 +88,7 @@ def staging_backup(
     config: Config,
     data: BackupFilePath,
     *,
-    backup: Optional[Backup] = None,
+    backup_repository: Optional[BackupRepository] = None,
     logger: Optional[logging.Logger] = None,
 ) -> Optional[CommitTarget]:
     logger = logger or logging.getLogger(__name__)
@@ -97,8 +97,8 @@ def staging_backup(
     if git.exists():
         git.switch(allow_orphan=True)
     # load backup repository
-    if backup is None:
-        backup = Backup.load(
+    if backup_repository is None:
+        backup_repository = BackupRepository.load(
             config.cosense.project,
             git.path,
             page_order=config.git.page_order,
@@ -111,20 +111,20 @@ def staging_backup(
         logger.error('failure to load "{data.backup_path}"')
         return None
     # update backup
-    if backup is None:
+    if backup_repository is None:
         # initial update
-        backup = Backup(
+        backup_repository = BackupRepository(
             config.cosense.project,
             git.path,
             backup_json,
             info_json,
             page_order=config.git.page_order,
         )
-        backup.save(logger=logger)
-        commit_target = CommitTarget(updated=set(backup.save_files()))
+        backup_repository.save(logger=logger)
+        commit_target = CommitTarget(updated=set(backup_repository.save_files()))
     else:
         # update
-        update_diff = backup.update(
+        update_diff = backup_repository.update(
             backup_json,
             info_json,
             logger=logger,
@@ -138,8 +138,8 @@ def staging_backup(
     if config.external_link.enabled:
         commit_target.update(
             save_external_links(
-                backup.timestamp,
-                backup.external_links(),
+                backup_repository.timestamp,
+                backup_repository.external_links(),
                 git.path,
                 config=config.external_link,
                 logger=logger,
