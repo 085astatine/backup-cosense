@@ -501,11 +501,8 @@ class BackupArchive:
     def path(self) -> pathlib.Path:
         return self._path
 
-    def backup_path(self, timestamp: int) -> pathlib.Path:
-        return self._directory.file_path(timestamp).backup
-
-    def info_path(self, timestamp: int) -> pathlib.Path:
-        return self._directory.file_path(timestamp).info
+    def file_path(self, timestamp: int) -> BackupFilePath:
+        return self._directory.file_path(timestamp)
 
     def backups(self) -> list[BackupFilePath]:
         backups = self._directory.find_all()

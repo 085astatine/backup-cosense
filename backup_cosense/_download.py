@@ -126,7 +126,7 @@ def _backup_filter(
 
     def backup_filter(backup: BackupInfoJSON) -> bool:
         timestamp = backup["backuped"]
-        if storage.backup_path(timestamp).exists():
+        if storage.file_path(timestamp).backup.exists():
             logger.debug(f"skip {format_timestamp(timestamp)}: already downloaded")
             return False
         if start_timestamp is not None and start_timestamp > timestamp:
@@ -165,11 +165,10 @@ def _download_backup(
         return
     # save
     storage = config.cosense.save_directory.storage(logger=logger)
+    file_path = storage.file_path(timestamp)
     # save backup
-    backup_path = storage.backup_path(timestamp)
-    logger.info(f'save "{backup_path}"')
-    save_json(backup_path, backup)
+    logger.info(f'save "{file_path.backup}"')
+    save_json(file_path.backup, backup)
     # save backup info
-    info_path = storage.info_path(timestamp)
-    logger.info(f'save "{info_path}"')
-    save_json(info_path, info)
+    logger.info(f'save "{file_path.info}"')
+    save_json(file_path.info, info)
