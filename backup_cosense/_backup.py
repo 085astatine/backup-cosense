@@ -211,6 +211,15 @@ class BackupFilePath:
     def load_info(self) -> Optional[BackupInfoJSON]:
         return load_json(self.info, schema=jsonschema_backup_info())
 
+    def load(self) -> Optional[BackupData]:
+        backup = self.load_backup()
+        if backup is None:
+            return None
+        return BackupData(
+            backup=backup,
+            info=self.load_info(),
+        )
+
 
 @dataclasses.dataclass(frozen=True)
 class BackupData:
@@ -452,26 +461,22 @@ class BackupRepository:
         logger: Optional[logging.Logger] = None,
     ) -> Optional[Self]:
         logger = logger or logging.getLogger(__name__)
-        # {project}.json
-        backup_path = directory.joinpath(f"{_escape_filename(project)}.json")
-        backup: Optional[BackupJSON] = load_json(
-            backup_path, schema=jsonschema_backup()
-        )
-        if backup is None:
+        # {project}.json & {project}.info.json
+        data = BackupFilePath(
+            timestamp=0,  # dummy timestamp
+            backup=directory.joinpath(f"{_escape_filename(project)}.json"),
+            info=directory.joinpath(f"{_escape_filename(project)}.info.json"),
+        ).load()
+        if data is None:
             return None
-        # {project}.info.json
-        info_path = backup_path.with_suffix(".info.json")
-        info: Optional[BackupInfoJSON] = load_json(
-            info_path, schema=jsonschema_backup_info()
-        )
         # check if pages are sorted
-        if _is_sorted_pages(backup["pages"], page_order) is False:
+        if _is_sorted_pages(data.backup["pages"], page_order) is False:
             logger.warn(f"loaded backup pages are not sorted by {page_order}")
         return cls(
             project,
             directory,
-            backup,
-            info,
+            data.backup,
+            data.info,
             page_order=page_order,
         )
 

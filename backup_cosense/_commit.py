@@ -86,7 +86,7 @@ def commit_backup(
 
 def staging_backup(
     config: Config,
-    data: BackupFilePath,
+    backup_path: BackupFilePath,
     *,
     backup_repository: Optional[BackupRepository] = None,
     logger: Optional[logging.Logger] = None,
@@ -104,11 +104,10 @@ def staging_backup(
             page_order=config.git.page_order,
             logger=logger,
         )
-    # load json
-    backup_json = data.load_backup()
-    info_json = data.load_info()
-    if backup_json is None:
-        logger.error('failure to load "{data.backup_path}"')
+    # load backup
+    data = backup_path.load()
+    if data is None:
+        logger.error('failure to load "{backup_path.backup}"')
         return None
     # update backup
     if backup_repository is None:
@@ -116,8 +115,8 @@ def staging_backup(
         backup_repository = BackupRepository(
             config.cosense.project,
             git.path,
-            backup_json,
-            info_json,
+            data.backup,
+            data.info,
             page_order=config.git.page_order,
         )
         backup_repository.save(logger=logger)
@@ -125,8 +124,8 @@ def staging_backup(
     else:
         # update
         update_diff = backup_repository.update(
-            backup_json,
-            info_json,
+            data.backup,
+            data.info,
             logger=logger,
         )
         commit_target = CommitTarget(
@@ -221,7 +220,7 @@ def _initial_commit_timestamp(
                 raise InitialCommitError(
                     "Since there is no backup, unable to define timestamp"
                 )
-            # load json
+            # load backup
             backup_data = backup.load_backup()
             if backup_data is None:
                 raise InitialCommitError(
