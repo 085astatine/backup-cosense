@@ -287,6 +287,21 @@ class BackupData:
             link.locations.sort()
         return links
 
+    def save(
+        self,
+        path: BackupFilePath,
+        *,
+        logger: Optional[logging.Logger] = None,
+    ) -> None:
+        logger = logger or logging.getLogger(__name__)
+        # save backup
+        logger.debug(f'save "{path.backup}"')
+        save_json(path.backup, self.backup)
+        # save info
+        if self.info is not None:
+            logger.debug(f'save "{path.info}"')
+            save_json(path.info, self.info)
+
 
 @dataclasses.dataclass(frozen=True)
 class UpdateDiff:
@@ -339,26 +354,28 @@ class BackupRepository:
         # sort pages
         _sort_pages(backup["pages"], self._page_order)
         # backup
-        backup_path = self.directory.joinpath(f"{_escape_filename(self.project)}.json")
+        data = BackupData(backup=backup, info=info)
+        file_path = BackupFilePath(
+            timestamp=0,  #  dummy timestamp
+            backup=self.directory.joinpath(f"{_escape_filename(self.project)}.json"),
+            info=self.directory.joinpath(f"{_escape_filename(self.project)}.json"),
+        )
+        data.save(file_path, logger=logger)
         if backup != self._data.backup:
-            logger.debug(f'update "{backup_path}"')
-            save_json(backup_path, backup)
-            updated.append(backup_path)
+            logger.debug(f'update "{file_path.backup}"')
+            updated.append(file_path.backup)
         # info
-        info_path = backup_path.with_suffix(".info.json")
         if info != self._data.info:
             if info is None:
-                logger.debug(f'remove "{backup_path}"')
-                info_path.unlink()
-                removed.append(info_path)
+                logger.debug(f'remove "{file_path.info}"')
+                file_path.info.unlink()
+                removed.append(file_path.info)
             elif self._data.info is None:
-                logger.debug(f'add "{backup_path}"')
-                save_json(info_path, info)
-                added.append(info_path)
+                logger.debug(f'add "{file_path.info}"')
+                added.append(file_path.info)
             else:
-                logger.debug(f'update "{backup_path}"')
-                save_json(info_path, info)
-                updated.append(info_path)
+                logger.debug(f'update "{file_path.info}"')
+                updated.append(file_path.info)
         # previous pages
         previous_pages = {
             _escape_filename(page["title"]): page for page in self._data.backup["pages"]
@@ -388,7 +405,7 @@ class BackupRepository:
             page_path.unlink()
             removed.append(page_path)
         # update self
-        self._data = BackupData(backup=backup, info=info)
+        self._data = data
         return UpdateDiff(added, updated, removed)
 
     def save_files(self) -> list[pathlib.Path]:
@@ -413,15 +430,13 @@ class BackupRepository:
         logger: Optional[logging.Logger] = None,
     ) -> None:
         logger = logger or logging.getLogger(__name__)
-        # {project}.json
-        backup_path = self.directory.joinpath(f"{_escape_filename(self.project)}.json")
-        logger.debug(f'save "{backup_path}"')
-        save_json(backup_path, self._data.backup)
-        # {project}.info.json
-        if self._data.info is not None:
-            info_path = backup_path.with_suffix(".info.json")
-            logger.debug(f'save "{info_path}"')
-            save_json(info_path, self._data.info)
+        # {project}.json & {project}.info.json
+        file_path = BackupFilePath(
+            timestamp=0,  # dummy timestamp
+            backup=self.directory.joinpath(f"{_escape_filename(self.project)}.json"),
+            info=self.directory.joinpath(f"{_escape_filename(self.project)}.info.json"),
+        )
+        self._data.save(file_path, logger=logger)
         # pages
         page_directory = self.directory.joinpath("pages")
         for page in self._data.backup["pages"]:
