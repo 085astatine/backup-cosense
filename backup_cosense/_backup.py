@@ -392,7 +392,7 @@ class BackupRepository:
         page_directory = self.directory.joinpath("pages")
         for page in data.backup["pages"]:
             title = _escape_filename(page["title"])
-            page_path = page_directory.joinpath(f"{title}.json")
+            page_path = _page_to_file_path(page_directory, page)
             if title in previous_pages:
                 if page != previous_pages[title]:
                     # update page
@@ -426,9 +426,7 @@ class BackupRepository:
         # pages
         page_directory = self.directory.joinpath("pages")
         for page in self._data.backup["pages"]:
-            files.append(
-                page_directory.joinpath(f'{_escape_filename(page["title"])}.json')
-            )
+            files.append(_page_to_file_path(page_directory, page))
         return files
 
     def save(
@@ -443,9 +441,7 @@ class BackupRepository:
         # pages
         page_directory = self.directory.joinpath("pages")
         for page in self._data.backup["pages"]:
-            page_path = page_directory.joinpath(
-                f'{_escape_filename(page["title"])}.json'
-            )
+            page_path = _page_to_file_path(page_directory, page)
             logger.debug(f'save "{page_path}"')
             save_json(page_path, page)
 
@@ -572,6 +568,14 @@ def _project_to_file_path(
         backup=directory.joinpath(f"{filename}.json"),
         info=directory.joinpath(f"{filename}.info.json"),
     )
+
+
+def _page_to_file_path(
+    directory: pathlib.Path,
+    page: BackupPageJSON,
+) -> pathlib.Path:
+    filename = _escape_filename(page["title"])
+    return directory.joinpath(f"{filename}.json")
 
 
 class _ArchiveDirectory:
