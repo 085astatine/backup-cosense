@@ -115,19 +115,14 @@ def staging_backup(
         backup_repository = BackupRepository(
             config.cosense.project,
             git.path,
-            data.backup,
-            data.info,
+            data,
             page_order=config.git.page_order,
         )
         backup_repository.save(logger=logger)
         commit_target = CommitTarget(updated=set(backup_repository.save_files()))
     else:
         # update
-        update_diff = backup_repository.update(
-            data.backup,
-            data.info,
-            logger=logger,
-        )
+        update_diff = backup_repository.update(data, logger=logger)
         commit_target = CommitTarget(
             added=set(update_diff.added),
             updated=set(update_diff.updated),

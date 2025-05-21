@@ -331,14 +331,13 @@ class BackupRepository:
         self,
         project: str,
         directory: pathlib.Path,
-        backup: BackupJSON,
-        info: Optional[BackupInfoJSON],
+        data: BackupData,
         *,
         page_order: Optional[PageOrder] = None,
     ) -> None:
         self._project = project
         self._directory = directory
-        self._data = BackupData(backup=backup, info=info)
+        self._data = data
         self._page_order = page_order
         # sort pages
         self._data.sort_pages(self._page_order)
@@ -357,8 +356,7 @@ class BackupRepository:
 
     def update(
         self,
-        backup: BackupJSON,
-        info: Optional[BackupInfoJSON],
+        data: BackupData,
         *,
         logger: Optional[logging.Logger] = None,
     ) -> UpdateDiff:
@@ -367,17 +365,16 @@ class BackupRepository:
         updated: list[pathlib.Path] = []
         removed: list[pathlib.Path] = []
         # sort pages
-        data = BackupData(backup=backup, info=info)
         data.sort_pages(self._page_order)
         # backup
         file_path = _project_to_file_path(self.directory, self.project)
         data.save(file_path, logger=logger)
-        if backup != self._data.backup:
+        if data.backup != self._data.backup:
             logger.debug(f'update "{file_path.backup}"')
             updated.append(file_path.backup)
         # info
-        if info != self._data.info:
-            if info is None:
+        if data.info != self._data.info:
+            if data.info is None:
                 logger.debug(f'remove "{file_path.info}"')
                 file_path.info.unlink()
                 removed.append(file_path.info)
@@ -393,7 +390,7 @@ class BackupRepository:
         }
         # add/update pages
         page_directory = self.directory.joinpath("pages")
-        for page in backup["pages"]:
+        for page in data.backup["pages"]:
             title = _escape_filename(page["title"])
             page_path = page_directory.joinpath(f"{title}.json")
             if title in previous_pages:
@@ -472,8 +469,7 @@ class BackupRepository:
         return cls(
             project,
             directory,
-            data.backup,
-            data.info,
+            data,
             page_order=page_order,
         )
 
