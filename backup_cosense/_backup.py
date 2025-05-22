@@ -11,6 +11,7 @@ from typing import Any, Generator, Literal, Optional, Self, Tuple, TypedDict
 import jsonschema
 
 from ._json import load_json, save_json
+from ._utility import CommitTarget
 
 PageOrder = Literal["as-is", "created-asc", "created-desc"]
 InternalLinkType = Literal["page", "word"]
@@ -322,13 +323,6 @@ class BackupData:
             save_json(path.info, self.info)
 
 
-@dataclasses.dataclass(frozen=True)
-class UpdateDiff:
-    added: list[pathlib.Path]
-    updated: list[pathlib.Path]
-    removed: list[pathlib.Path]
-
-
 class BackupRepository:
     def __init__(
         # pylint: disable=too-many-arguments
@@ -363,11 +357,11 @@ class BackupRepository:
         data: BackupData,
         *,
         logger: Optional[logging.Logger] = None,
-    ) -> UpdateDiff:
+    ) -> CommitTarget:
         logger = logger or logging.getLogger(__name__)
-        added: list[pathlib.Path] = []
-        updated: list[pathlib.Path] = []
-        removed: list[pathlib.Path] = []
+        added: set[pathlib.Path] = set()
+        updated: set[pathlib.Path] = set()
+        deleted: set[pathlib.Path] = set()
         # sort pages
         data.sort_pages(self._page_order)
         # backup
@@ -375,19 +369,19 @@ class BackupRepository:
         data.save(file_path, logger=logger)
         if data.backup != self._data.backup:
             logger.debug(f'update "{file_path.backup}"')
-            updated.append(file_path.backup)
+            updated.add(file_path.backup)
         # info
         if data.info != self._data.info:
             if data.info is None:
-                logger.debug(f'remove "{file_path.info}"')
+                logger.debug(f'delete "{file_path.info}"')
                 file_path.info.unlink()
-                removed.append(file_path.info)
+                deleted.add(file_path.info)
             elif self._data.info is None:
                 logger.debug(f'add "{file_path.info}"')
-                added.append(file_path.info)
+                added.add(file_path.info)
             else:
                 logger.debug(f'update "{file_path.info}"')
-                updated.append(file_path.info)
+                updated.add(file_path.info)
         # pages
         pages_diff = _diff_pages(data, self._data)
         page_directory = self.directory.joinpath("pages")
@@ -396,22 +390,22 @@ class BackupRepository:
             page_path = _page_to_file_path(page_directory, page)
             logger.debug(f'delete "{page_path}"')
             page_path.unlink()
-            removed.append(page_path)
+            deleted.add(page_path)
         # updated pages
         for page in pages_diff.updated:
             page_path = _page_to_file_path(page_directory, page)
             logger.debug(f'update "{page_path}"')
             save_json(page_path, page, schema=jsonschema_backup_page())
-            updated.append(page_path)
+            updated.add(page_path)
         # added pages
         for page in pages_diff.added:
             page_path = _page_to_file_path(page_directory, page)
             logger.debug(f'add "{page_path}"')
             save_json(page_path, page, schema=jsonschema_backup_page())
-            added.append(page_path)
+            added.add(page_path)
         # update self
         self._data = data
-        return UpdateDiff(added, updated, removed)
+        return CommitTarget(added=added, updated=updated, deleted=deleted)
 
     def save_files(self) -> list[pathlib.Path]:
         files: list[pathlib.Path] = []

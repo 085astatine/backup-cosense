@@ -122,12 +122,7 @@ def staging_backup(
         commit_target = CommitTarget(updated=set(backup_repository.save_files()))
     else:
         # update
-        update_diff = backup_repository.update(data, logger=logger)
-        commit_target = CommitTarget(
-            added=set(update_diff.added),
-            updated=set(update_diff.updated),
-            deleted=set(update_diff.removed),
-        )
+        commit_target = backup_repository.update(data, logger=logger)
     # external links
     if config.external_link.enabled:
         commit_target.update(
