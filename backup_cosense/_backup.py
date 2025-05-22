@@ -359,53 +359,17 @@ class BackupRepository:
         logger: Optional[logging.Logger] = None,
     ) -> CommitTarget:
         logger = logger or logging.getLogger(__name__)
-        added: set[pathlib.Path] = set()
-        updated: set[pathlib.Path] = set()
-        deleted: set[pathlib.Path] = set()
         # sort pages
         data.sort_pages(self._page_order)
-        # backup
+        # update backup
         file_path = _project_to_file_path(self.directory, self.project)
-        data.save(file_path, logger=logger)
-        if data.backup != self._data.backup:
-            logger.debug(f'update "{file_path.backup}"')
-            updated.add(file_path.backup)
-        # info
-        if data.info != self._data.info:
-            if data.info is None:
-                logger.debug(f'delete "{file_path.info}"')
-                file_path.info.unlink()
-                deleted.add(file_path.info)
-            elif self._data.info is None:
-                logger.debug(f'add "{file_path.info}"')
-                added.add(file_path.info)
-            else:
-                logger.debug(f'update "{file_path.info}"')
-                updated.add(file_path.info)
-        # pages
-        pages_diff = _diff_pages(data, self._data)
+        updated_files = _update_backup(file_path, data, self._data, logger)
+        # update pages
         page_directory = self.directory.joinpath("pages")
-        # deleted pages
-        for page in pages_diff.deleted:
-            page_path = _page_to_file_path(page_directory, page)
-            logger.debug(f'delete "{page_path}"')
-            page_path.unlink()
-            deleted.add(page_path)
-        # updated pages
-        for page in pages_diff.updated:
-            page_path = _page_to_file_path(page_directory, page)
-            logger.debug(f'update "{page_path}"')
-            save_json(page_path, page, schema=jsonschema_backup_page())
-            updated.add(page_path)
-        # added pages
-        for page in pages_diff.added:
-            page_path = _page_to_file_path(page_directory, page)
-            logger.debug(f'add "{page_path}"')
-            save_json(page_path, page, schema=jsonschema_backup_page())
-            added.add(page_path)
+        updated_files.update(_update_pages(page_directory, data, self.data, logger))
         # update self
         self._data = data
-        return CommitTarget(added=added, updated=updated, deleted=deleted)
+        return updated_files
 
     def save_files(self) -> list[pathlib.Path]:
         files: list[pathlib.Path] = []
@@ -567,6 +531,74 @@ def _page_to_file_path(
 ) -> pathlib.Path:
     filename = _escape_filename(page["title"])
     return directory.joinpath(f"{filename}.json")
+
+
+def _update_backup(
+    file_path: BackupFilePath,
+    current: BackupData,
+    previous: Optional[BackupData],
+    logger: logging.Logger,
+) -> CommitTarget:
+    added: set[pathlib.Path] = set()
+    updated: set[pathlib.Path] = set()
+    deleted: set[pathlib.Path] = set()
+    if previous is None:
+        added.add(file_path.backup)
+        if current.info is not None:
+            added.add(file_path.info)
+    else:
+        # backup
+        if current.backup != previous.backup:
+            logger.debug(f'update "{file_path.backup}"')
+            updated.add(file_path.backup)
+        # info
+        if current.info != previous.info:
+            if current.info is None:
+                logger.debug(f'delete "{file_path.info}"')
+                if file_path.info.exists():
+                    file_path.info.unlink()
+                deleted.add(file_path.info)
+            elif previous.info is None:
+                logger.debug(f'add "{file_path.info}"')
+                added.add(file_path.info)
+            else:
+                logger.debug(f'update "{file_path.info}"')
+                updated.add(file_path.info)
+    # save
+    current.save(file_path, logger=logger)
+    return CommitTarget(added=added, updated=updated, deleted=deleted)
+
+
+def _update_pages(
+    directory: pathlib.Path,
+    current: BackupData,
+    previous: Optional[BackupData],
+    logger: logging.Logger,
+) -> CommitTarget:
+    added: set[pathlib.Path] = set()
+    updated: set[pathlib.Path] = set()
+    deleted: set[pathlib.Path] = set()
+    # diff
+    pages_diff = _diff_pages(current, previous)
+    # deleted pages
+    for page in pages_diff.deleted:
+        page_path = _page_to_file_path(directory, page)
+        logger.debug(f'delete "{page_path}"')
+        page_path.unlink()
+        deleted.add(page_path)
+    # updated pages
+    for page in pages_diff.updated:
+        page_path = _page_to_file_path(directory, page)
+        logger.debug(f'update "{page_path}"')
+        save_json(page_path, page, schema=jsonschema_backup_page())
+        updated.add(page_path)
+    # added pages
+    for page in pages_diff.added:
+        page_path = _page_to_file_path(directory, page)
+        logger.debug(f'add "{page_path}"')
+        save_json(page_path, page, schema=jsonschema_backup_page())
+        added.add(page_path)
+    return CommitTarget(added=added, updated=updated, deleted=deleted)
 
 
 @dataclasses.dataclass(frozen=True)
