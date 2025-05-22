@@ -2,7 +2,7 @@ import datetime
 import logging
 from typing import Optional
 
-from ._backup import Backup, BackupJSONs
+from ._backup import BackupFilePath, BackupRepository
 from ._config import Config, GitEmptyInitialCommitConfig
 from ._external_link import save_external_links
 from ._git import Commit, CommitTarget, Git
@@ -13,41 +13,43 @@ from .exceptions import InitialCommitError
 def commit_backups(
     config: Config,
     *,
+    backup_repository: Optional[BackupRepository] = None,
     logger: Optional[logging.Logger] = None,
 ) -> None:
     logger = logger or logging.getLogger(__name__)
     git = config.git.git(logger=logger)
-    backup: Optional[Backup] = None
     # git switch
     if git.exists():
         git.switch(allow_orphan=True)
+    # backup repository
+    if backup_repository is None:
+        backup_repository = BackupRepository(
+            config.cosense.project,
+            git.path,
+            page_order=config.git.page_order,
+            logger=logger,
+        )
+    if backup_repository.data is None:
+        backup_repository.load()
     # backup targets
     backup_targets = _backup_targets(config, git, logger)
     # commit
     for target in backup_targets:
         logger.info(f"commit {format_timestamp(target.timestamp)}")
-        # load backup repository
-        if backup is None:
-            backup = Backup.load(
-                config.cosense.project,
-                git.path,
-                page_order=config.git.page_order,
-                logger=logger,
-            )
         # commit
         commit_backup(
             config,
             target,
-            backup=backup,
+            backup_repository=backup_repository,
             logger=logger,
         )
 
 
 def commit_backup(
     config: Config,
-    data: BackupJSONs,
+    data: BackupFilePath,
     *,
-    backup: Optional[Backup] = None,
+    backup_repository: Optional[BackupRepository] = None,
     logger: Optional[logging.Logger] = None,
 ) -> None:
     logger = logger or logging.getLogger(__name__)
@@ -64,7 +66,7 @@ def commit_backup(
     commit_target = staging_backup(
         config,
         data,
-        backup=backup,
+        backup_repository=backup_repository,
         logger=logger,
     )
     if commit_target is None:
@@ -86,9 +88,9 @@ def commit_backup(
 
 def staging_backup(
     config: Config,
-    data: BackupJSONs,
+    backup_path: BackupFilePath,
     *,
-    backup: Optional[Backup] = None,
+    backup_repository: Optional[BackupRepository] = None,
     logger: Optional[logging.Logger] = None,
 ) -> Optional[CommitTarget]:
     logger = logger or logging.getLogger(__name__)
@@ -97,49 +99,28 @@ def staging_backup(
     if git.exists():
         git.switch(allow_orphan=True)
     # load backup repository
-    if backup is None:
-        backup = Backup.load(
+    if backup_repository is None:
+        backup_repository = BackupRepository(
             config.cosense.project,
             git.path,
             page_order=config.git.page_order,
             logger=logger,
         )
-    # load json
-    backup_json = data.load_backup()
-    info_json = data.load_info()
-    if backup_json is None:
-        logger.error('failure to load "{data.backup_path}"')
+    if backup_repository.data is None:
+        backup_repository.load()
+    # load backup
+    data = backup_path.load()
+    if data is None:
+        logger.error('failure to load "{backup_path.backup}"')
         return None
     # update backup
-    if backup is None:
-        # initial update
-        backup = Backup(
-            config.cosense.project,
-            git.path,
-            backup_json,
-            info_json,
-            page_order=config.git.page_order,
-        )
-        backup.save(logger=logger)
-        commit_target = CommitTarget(updated=set(backup.save_files()))
-    else:
-        # update
-        update_diff = backup.update(
-            backup_json,
-            info_json,
-            logger=logger,
-        )
-        commit_target = CommitTarget(
-            added=set(update_diff.added),
-            updated=set(update_diff.updated),
-            deleted=set(update_diff.removed),
-        )
+    commit_target = backup_repository.update(data)
     # external links
     if config.external_link.enabled:
         commit_target.update(
             save_external_links(
-                backup.timestamp,
-                backup.external_links(),
+                data.timestamp,
+                data.external_links(),
                 git.path,
                 config=config.external_link,
                 logger=logger,
@@ -152,7 +133,7 @@ def _backup_targets(
     config: Config,
     git: Git,
     logger: logging.Logger,
-) -> list[BackupJSONs]:
+) -> list[BackupFilePath]:
     # backup start date
     backup_start = (
         int(config.cosense.backup_start_date.timestamp())
@@ -168,7 +149,7 @@ def _backup_targets(
         default=None,
     )
     # find backup
-    storage = config.cosense.save_directory.storage()
+    storage = config.cosense.save_directory.storage(logger=logger)
     targets = [
         backup
         for backup in storage.backups()
@@ -180,7 +161,7 @@ def _backup_targets(
 def _initial_commit(
     config: Config,
     git: Git,
-    backups: list[BackupJSONs],
+    backups: list[BackupFilePath],
 ) -> None:
     # empty initial commit is enabled
     if config.git.empty_initial_commit is None:
@@ -202,7 +183,7 @@ def _initial_commit(
 
 def _initial_commit_timestamp(
     config: GitEmptyInitialCommitConfig,
-    backups: list[BackupJSONs],
+    backups: list[BackupFilePath],
 ) -> int:
     match config.timestamp:
         case datetime.datetime():
@@ -221,11 +202,11 @@ def _initial_commit_timestamp(
                 raise InitialCommitError(
                     "Since there is no backup, unable to define timestamp"
                 )
-            # load json
+            # load backup
             backup_data = backup.load_backup()
             if backup_data is None:
                 raise InitialCommitError(
-                    f'Could not load oldest backup "{backup.backup_path}"'
+                    f'Could not load oldest backup "{backup.backup}"'
                 )
             # oldest created page
             timestamp = min(

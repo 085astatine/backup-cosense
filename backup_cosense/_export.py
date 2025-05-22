@@ -3,7 +3,7 @@ import pathlib
 import subprocess
 from typing import Any, Optional
 
-from ._backup import BackupStorage, jsonschema_backup, jsonschema_backup_info
+from ._backup import BackupArchive, jsonschema_backup, jsonschema_backup_info
 from ._config import Config
 from ._git import Commit, Git
 from ._json import parse_json, save_json
@@ -12,7 +12,7 @@ from ._utility import format_timestamp
 
 def export_backups(
     config: Config,
-    destination: BackupStorage,
+    destination: BackupArchive,
     logger: logging.Logger,
 ) -> None:
     git = config.git.git(logger=logger)
@@ -46,37 +46,36 @@ def _export(
     project: str,
     git: Git,
     commit: Commit,
-    destination: BackupStorage,
+    destination: BackupArchive,
     logger: logging.Logger,
 ) -> None:
+    file_path = destination.file_path(commit.timestamp)
     # save backup.json
-    backup_path = destination.backup_path(commit.timestamp)
     if not _export_json(
         git,
         commit.hash,
         f"{project}.json",
-        backup_path,
+        file_path.backup,
         jsonschema_backup(),
     ):
         logger.warning(f"skip commit: {commit.hash}")
         return
-    logger.debug(f'save "{backup_path}"')
+    logger.debug(f'save "{file_path.backup}"')
     # save backup.info.json
-    info_path = destination.info_path(commit.timestamp)
     if _export_json(
         git,
         commit.hash,
         f"{project}.info.json",
-        info_path,
+        file_path.info,
         jsonschema_backup_info(),
     ):
-        logger.debug(f'save "{info_path}"')
+        logger.debug(f'save "{file_path.info}"')
     else:
         # from commit message
         info_json = commit.backup_info()
         if info_json is not None:
-            save_json(info_path, info_json)
-            logger.debug(f'save "{info_path}"')
+            save_json(file_path.info, info_json)
+            logger.debug(f'save "{file_path.info}"')
 
 
 def _export_json(

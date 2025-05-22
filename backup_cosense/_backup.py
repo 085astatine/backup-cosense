@@ -11,6 +11,7 @@ from typing import Any, Generator, Literal, Optional, Tuple, TypedDict
 import jsonschema
 
 from ._json import load_json, save_json
+from ._utility import CommitTarget
 
 PageOrder = Literal["as-is", "created-asc", "created-desc"]
 InternalLinkType = Literal["page", "word"]
@@ -200,82 +201,69 @@ class ExternalLink:
 
 
 @dataclasses.dataclass(frozen=True)
-class UpdateDiff:
-    added: list[pathlib.Path]
-    updated: list[pathlib.Path]
-    removed: list[pathlib.Path]
+class BackupFilePath:
+    timestamp: int
+    backup: pathlib.Path
+    info: pathlib.Path
+
+    def load_backup(self) -> Optional[BackupJSON]:
+        return load_json(self.backup, schema=jsonschema_backup())
+
+    def load_info(self) -> Optional[BackupInfoJSON]:
+        return load_json(self.info, schema=jsonschema_backup_info())
+
+    def load(self) -> Optional[BackupData]:
+        backup = self.load_backup()
+        if backup is None:
+            return None
+        return BackupData(
+            backup=backup,
+            info=self.load_info(),
+        )
 
 
-class Backup:
-    def __init__(
-        # pylint: disable=too-many-arguments
-        self,
-        project: str,
-        directory: pathlib.Path,
-        backup: BackupJSON,
-        info: Optional[BackupInfoJSON],
-        *,
-        page_order: Optional[PageOrder] = None,
-    ) -> None:
-        self._project = project
-        self._directory = directory
-        self._backup = backup
-        self._info = info
-        self._page_order = page_order
-        # sort pages
-        _sort_pages(self._backup["pages"], self._page_order)
-        # JSON Schema validation
+@dataclasses.dataclass(frozen=True)
+class BackupData:
+    backup: BackupJSON
+    info: Optional[BackupInfoJSON]
+
+    def __post_init__(self) -> None:
+        # JSONSchema validation
         jsonschema.validate(
-            instance=self._backup,
+            instance=self.backup,
             schema=jsonschema_backup(),
         )
-        if self._info is not None:
+        if self.info is not None:
             jsonschema.validate(
-                instance=self._info,
+                instance=self.info,
                 schema=jsonschema_backup_info(),
             )
 
     @property
-    def project(self) -> str:
-        return self._project
-
-    @property
-    def directory(self) -> pathlib.Path:
-        return self._directory
-
-    @property
     def timestamp(self) -> int:
-        return self._backup["exported"]
+        return self.backup["exported"]
 
     @property
-    def data(self) -> BackupJSON:
-        return self._backup
-
-    @property
-    def info(self) -> Optional[BackupInfoJSON]:
-        return self._info
+    def pages(self) -> list[BackupPageJSON]:
+        return self.backup["pages"]
 
     def page_titles(self) -> list[str]:
-        return sorted(page["title"] for page in self._backup["pages"])
+        return sorted(page["title"] for page in self.backup["pages"])
 
     def internal_links(self) -> list[InternalLink]:
         # page
         pages = {_normalize_page_title(page): page for page in self.page_titles()}
         # links
         links: list[InternalLink] = []
-        for page in self._backup["pages"]:
-            to_links = sorted(
-                (
-                    InternalLinkNode(
-                        name=pages.get(link, link),
-                        type=(
-                            "page" if _normalize_page_title(link) in pages else "word"
-                        ),
-                    )
-                    for link in page["linksLc"]
-                ),
-                key=lambda node: node.name,
-            )
+        for page in self.backup["pages"]:
+            to_links = [
+                InternalLinkNode(
+                    name=pages.get(link, link),
+                    type="page" if _normalize_page_title(link) in pages else "word",
+                )
+                for link in page["linksLc"]
+            ]
+            to_links.sort(key=lambda node: node.name)
             links.append(
                 InternalLink(
                     node=InternalLinkNode(name=page["title"], type="page"),
@@ -286,13 +274,13 @@ class Backup:
         return links
 
     def external_links(self) -> list[ExternalLink]:
-        # regex
-        regex = re.compile(r"https?://[^\s\]]+")
+        # regex pattern
+        pattern = re.compile(r"https?://[^\s\]]+")
         # links
         links: list[ExternalLink] = []
-        for page in self._backup["pages"]:
+        for page in self.backup["pages"]:
             for line, location in _filter_code(page):
-                for url in regex.findall(line):
+                for url in pattern.findall(line):
                     found = next((link for link in links if link.url == url), None)
                     if found is not None:
                         found.locations.append(location)
@@ -304,190 +292,132 @@ class Backup:
             link.locations.sort()
         return links
 
-    def update(
-        self,
-        backup: BackupJSON,
-        info: Optional[BackupInfoJSON],
-        *,
-        logger: Optional[logging.Logger] = None,
-    ) -> UpdateDiff:
-        logger = logger or logging.getLogger(__name__)
-        added: list[pathlib.Path] = []
-        updated: list[pathlib.Path] = []
-        removed: list[pathlib.Path] = []
-        # sort pages
-        _sort_pages(backup["pages"], self._page_order)
-        # backup
-        backup_path = self.directory.joinpath(f"{_escape_filename(self.project)}.json")
-        if backup != self._backup:
-            logger.debug(f'update "{backup_path}"')
-            save_json(backup_path, backup)
-            updated.append(backup_path)
-        # info
-        info_path = backup_path.with_suffix(".info.json")
-        if info != self._info:
-            if info is None:
-                logger.debug(f'remove "{backup_path}"')
-                info_path.unlink()
-                removed.append(info_path)
-            elif self._info is None:
-                logger.debug(f'add "{backup_path}"')
-                save_json(info_path, info)
-                added.append(info_path)
-            else:
-                logger.debug(f'update "{backup_path}"')
-                save_json(info_path, info)
-                updated.append(info_path)
-        # previous pages
-        previous_pages = {
-            _escape_filename(page["title"]): page for page in self._backup["pages"]
-        }
-        # add/update pages
-        page_directory = self.directory.joinpath("pages")
-        for page in backup["pages"]:
-            title = _escape_filename(page["title"])
-            page_path = page_directory.joinpath(f"{title}.json")
-            if title in previous_pages:
-                if page != previous_pages[title]:
-                    # update page
-                    logger.debug(f'update "{page_path}"')
-                    save_json(page_path, page)
-                    updated.append(page_path)
-                # remove from dict to detect deleted pages
-                del previous_pages[title]
-            else:
-                # add new page
-                logger.debug(f'add "{page_path}"')
-                save_json(page_path, page)
-                added.append(page_path)
-        # remove deleted pages
-        for title in previous_pages.keys():
-            page_path = page_directory.joinpath(f"{title}.json")
-            logger.debug(f'remove "{page_path}"')
-            page_path.unlink()
-            removed.append(page_path)
-        # update self
-        self._backup = backup
-        self._info = info
-        return UpdateDiff(added, updated, removed)
+    def sort_pages(self, order: Optional[PageOrder]) -> None:
+        _sort_pages(self.backup["pages"], order)
 
-    def save_files(self) -> list[pathlib.Path]:
-        files: list[pathlib.Path] = []
-        # {project}.json
-        backup_path = self.directory.joinpath(f"{_escape_filename(self.project)}.json")
-        files.append(backup_path)
-        # {project}.info.json
-        if self._info is not None:
-            files.append(backup_path.with_suffix(".info.json"))
-        # pages
-        page_directory = self.directory.joinpath("pages")
-        for page in self._backup["pages"]:
-            files.append(
-                page_directory.joinpath(f'{_escape_filename(page["title"])}.json')
-            )
-        return files
+    def is_pages_sorted(self, order: Optional[PageOrder]) -> Optional[bool]:
+        if order is None or order == "as-is":
+            return None
+        # sort shallow copied pages
+        sorted_pages = self.backup["pages"][:]
+        _sort_pages(sorted_pages, order)
+        # compare the id of each page
+        return all(
+            id(x) == id(y)
+            for x, y in itertools.zip_longest(self.backup["pages"], sorted_pages)
+        )
 
     def save(
         self,
+        path: BackupFilePath,
         *,
         logger: Optional[logging.Logger] = None,
     ) -> None:
         logger = logger or logging.getLogger(__name__)
-        # {project}.json
-        backup_path = self.directory.joinpath(f"{_escape_filename(self.project)}.json")
-        logger.debug(f'save "{backup_path}"')
-        save_json(backup_path, self._backup)
-        # {project}.info.json
-        if self._info is not None:
-            info_path = backup_path.with_suffix(".info.json")
-            logger.debug(f'save "{info_path}"')
-            save_json(info_path, self._info)
-        # pages
-        page_directory = self.directory.joinpath("pages")
-        for page in self._backup["pages"]:
-            page_path = page_directory.joinpath(
-                f'{_escape_filename(page["title"])}.json'
-            )
-            logger.debug(f'save "{page_path}"')
-            save_json(page_path, page)
+        # save backup
+        logger.debug(f'save "{path.backup}"')
+        save_json(path.backup, self.backup)
+        # save info
+        if self.info is not None:
+            logger.debug(f'save "{path.info}"')
+            save_json(path.info, self.info)
 
-    @classmethod
-    def load(
-        cls,
+
+class BackupRepository:
+    def __init__(
+        # pylint: disable=too-many-arguments
+        self,
         project: str,
         directory: pathlib.Path,
         *,
+        data: Optional[BackupData] = None,
         page_order: Optional[PageOrder] = None,
         logger: Optional[logging.Logger] = None,
-    ) -> Optional[Backup]:
-        logger = logger or logging.getLogger(__name__)
-        # {project}.json
-        backup_path = directory.joinpath(f"{_escape_filename(project)}.json")
-        backup: Optional[BackupJSON] = load_json(
-            backup_path, schema=jsonschema_backup()
-        )
-        if backup is None:
-            return None
-        # {project}.info.json
-        info_path = backup_path.with_suffix(".info.json")
-        info: Optional[BackupInfoJSON] = load_json(
-            info_path, schema=jsonschema_backup_info()
-        )
-        # check if pages are sorted
-        if _is_sorted_pages(backup["pages"], page_order) is False:
-            logger.warn(f"loaded backup pages are not sorted by {page_order}")
-        return cls(
-            project,
-            directory,
-            backup,
-            info,
-            page_order=page_order,
-        )
+    ) -> None:
+        self._project = project
+        self._directory = directory
+        self._data = data
+        self._page_order = page_order
+        self._logger = logger or logging.getLogger(__name__)
+        # sort pages
+        if self._data is not None:
+            self._data.sort_pages(self._page_order)
+
+    @property
+    def project(self) -> str:
+        return self._project
+
+    @property
+    def directory(self) -> pathlib.Path:
+        return self._directory
+
+    @property
+    def data(self) -> Optional[BackupData]:
+        return self._data
+
+    def update(self, data: BackupData) -> CommitTarget:
+        # sort pages
+        data.sort_pages(self._page_order)
+        # update backup
+        file_path = _project_to_file_path(self.directory, self.project)
+        updated = _update_backup(file_path, data, self._data, self._logger)
+        # update pages
+        page_directory = self.directory.joinpath("pages")
+        updated.update(_update_pages(page_directory, data, self.data, self._logger))
+        # update self
+        self._data = data
+        return updated
+
+    def load(self) -> None:
+        # load {project}.json & {project}.info.json
+        data = _project_to_file_path(self.directory, self.project).load()
+        if data is not None:
+            # check if pages are sorted
+            if data.is_pages_sorted(self._page_order) is False:
+                self._logger.warn(
+                    f"loaded backup pages are not sorted by {self._page_order}"
+                )
+            self._data = data
+
+    def save(self) -> None:
+        if self._data is None:
+            return
+        # {project}.json & {project}.info.json
+        file_path = _project_to_file_path(self.directory, self.project)
+        self._data.save(file_path, logger=self._logger)
+        # pages
+        page_directory = self.directory.joinpath("pages")
+        for page in self._data.backup["pages"]:
+            page_path = _page_to_file_path(page_directory, page)
+            self._logger.debug(f'save "{page_path}"')
+            save_json(page_path, page)
 
 
-@dataclasses.dataclass(frozen=True)
-class BackupJSONs:
-    timestamp: int
-    backup_path: pathlib.Path
-    info_path: Optional[pathlib.Path]
-
-    def load_backup(self) -> Optional[BackupJSON]:
-        return load_json(self.backup_path, schema=jsonschema_backup())
-
-    def load_info(self) -> Optional[BackupInfoJSON]:
-        if self.info_path is None:
-            return None
-        return load_json(self.info_path, schema=jsonschema_backup_info())
-
-
-class BackupStorage:
+class BackupArchive:
     def __init__(
         self,
         path: pathlib.Path,
         *,
         subdirectory: bool = False,
+        logger: Optional[logging.Logger] = None,
     ) -> None:
+        logger = logger or logging.getLogger(__name__)
         self._path = path
-        self._subdirectory = subdirectory
+        self._directory = (
+            _ArchiveDirectoryTree(path, logger)
+            if subdirectory
+            else _ArchiveDirectory(path)
+        )
 
     @property
     def path(self) -> pathlib.Path:
         return self._path
 
-    def backup_path(self, timestamp: int) -> pathlib.Path:
-        directory = _backup_directory(self._path, self._subdirectory, timestamp)
-        return directory.joinpath(f"{timestamp}.json")
+    def file_path(self, timestamp: int) -> BackupFilePath:
+        return self._directory.file_path(timestamp)
 
-    def info_path(self, timestamp: int) -> pathlib.Path:
-        directory = _backup_directory(self._path, self._subdirectory, timestamp)
-        return directory.joinpath(f"{timestamp}.info.json")
-
-    def backups(self) -> list[BackupJSONs]:
-        backups = (
-            _search_subdirectory(self._path)
-            if self._subdirectory
-            else _search_backup(self._path)
-        )
+    def backups(self) -> list[BackupFilePath]:
+        backups = self._directory.find_all()
         # sort by old...new
         return sorted(backups, key=lambda backup: backup.timestamp)
 
@@ -503,18 +433,6 @@ def _sort_pages(
             pages.sort(key=lambda page: page["created"])
         case "created-desc":
             pages.sort(key=lambda page: -page["created"])
-
-
-def _is_sorted_pages(
-    pages: list[BackupPageJSON], order: Optional[PageOrder]
-) -> Optional[bool]:
-    if order is None or order == "as-is":
-        return None
-    # sort shallow copied pages
-    sorted_pages = pages[:]
-    _sort_pages(sorted_pages, order)
-    # compare the id of each page
-    return all(id(x) == id(y) for x, y in itertools.zip_longest(pages, sorted_pages))
 
 
 def _escape_filename(text: str) -> str:
@@ -563,52 +481,195 @@ def _filter_code(page: BackupPageJSON) -> Generator[Tuple[str, Location], None, 
         yield line, Location(title=title, line=i)
 
 
-def _backup_directory(
-    path: pathlib.Path,
-    subdirectory: bool,
-    timestamp: int,
+def _project_to_file_path(
+    directory: pathlib.Path,
+    project: str,
+) -> BackupFilePath:
+    filename = _escape_filename(project)
+    return BackupFilePath(
+        timestamp=0,  # dummy timestamp
+        backup=directory.joinpath(f"{filename}.json"),
+        info=directory.joinpath(f"{filename}.info.json"),
+    )
+
+
+def _page_to_file_path(
+    directory: pathlib.Path,
+    page: BackupPageJSON,
 ) -> pathlib.Path:
-    if subdirectory:
-        return path.joinpath(str(math.floor(timestamp / 1.0e7)))
-    return path
+    filename = _escape_filename(page["title"])
+    return directory.joinpath(f"{filename}.json")
 
 
-def _search_backup(directory: pathlib.Path) -> list[BackupJSONs]:
-    # search '{timestamp}.json' & '{timestamp}.info.json'
-    backups: list[BackupJSONs] = []
-    # check if the path is directory
-    if directory.is_dir():
-        for path in directory.iterdir():
-            # check if the path is file
+def _update_backup(
+    file_path: BackupFilePath,
+    current: BackupData,
+    previous: Optional[BackupData],
+    logger: logging.Logger,
+) -> CommitTarget:
+    added: set[pathlib.Path] = set()
+    updated: set[pathlib.Path] = set()
+    deleted: set[pathlib.Path] = set()
+    if previous is None:
+        added.add(file_path.backup)
+        if current.info is not None:
+            added.add(file_path.info)
+    else:
+        # backup
+        if current.backup != previous.backup:
+            logger.debug(f'update "{file_path.backup}"')
+            updated.add(file_path.backup)
+        # info
+        if current.info != previous.info:
+            if current.info is None:
+                logger.debug(f'delete "{file_path.info}"')
+                if file_path.info.exists():
+                    file_path.info.unlink()
+                deleted.add(file_path.info)
+            elif previous.info is None:
+                logger.debug(f'add "{file_path.info}"')
+                added.add(file_path.info)
+            else:
+                logger.debug(f'update "{file_path.info}"')
+                updated.add(file_path.info)
+    # save
+    current.save(file_path, logger=logger)
+    return CommitTarget(added=added, updated=updated, deleted=deleted)
+
+
+def _update_pages(
+    directory: pathlib.Path,
+    current: BackupData,
+    previous: Optional[BackupData],
+    logger: logging.Logger,
+) -> CommitTarget:
+    added: set[pathlib.Path] = set()
+    updated: set[pathlib.Path] = set()
+    deleted: set[pathlib.Path] = set()
+    # diff
+    pages_diff = _diff_pages(current, previous)
+    # deleted pages
+    for page in pages_diff.deleted:
+        page_path = _page_to_file_path(directory, page)
+        logger.debug(f'delete "{page_path}"')
+        page_path.unlink()
+        deleted.add(page_path)
+    # updated pages
+    for page in pages_diff.updated:
+        page_path = _page_to_file_path(directory, page)
+        logger.debug(f'update "{page_path}"')
+        save_json(page_path, page, schema=jsonschema_backup_page())
+        updated.add(page_path)
+    # added pages
+    for page in pages_diff.added:
+        page_path = _page_to_file_path(directory, page)
+        logger.debug(f'add "{page_path}"')
+        save_json(page_path, page, schema=jsonschema_backup_page())
+        added.add(page_path)
+    return CommitTarget(added=added, updated=updated, deleted=deleted)
+
+
+@dataclasses.dataclass(frozen=True)
+class PagesDiff:
+    added: list[BackupPageJSON]
+    updated: list[BackupPageJSON]
+    deleted: list[BackupPageJSON]
+
+
+def _diff_pages(
+    current: BackupData,
+    previous: Optional[BackupData],
+) -> PagesDiff:
+    added: list[BackupPageJSON] = []
+    updated: list[BackupPageJSON] = []
+    deleted: list[BackupPageJSON] = []
+    if previous is None:
+        added.extend(current.pages)
+    else:
+        pages = {_escape_filename(page["title"]): page for page in previous.pages}
+        for page in current.pages:
+            title = _escape_filename(page["title"])
+            # added
+            if title not in pages:
+                added.append(page)
+            else:
+                # upated
+                if page != pages[title]:
+                    updated.append(page)
+                del pages[title]
+        # delted
+        deleted.extend(pages.values())
+    return PagesDiff(added=added, updated=updated, deleted=deleted)
+
+
+class _ArchiveDirectory:
+    def __init__(self, path: pathlib.Path) -> None:
+        self._path = path
+
+    def file_path(self, timestamp: int) -> BackupFilePath:
+        # {timestamp}.json, {timestamp}.info.json
+        return BackupFilePath(
+            timestamp=timestamp,
+            backup=self._path.joinpath(f"{timestamp}.json"),
+            info=self._path.joinpath(f"{timestamp}.info.json"),
+        )
+
+    def find_all(self) -> list[BackupFilePath]:
+        result: list[BackupFilePath] = []
+        # check if the path is directory
+        if not self._path.is_dir():
+            return result
+        # iterate files
+        pattern = re.compile(r"^(?P<timestamp>[0-9]+)\.json$")
+        for path in self._path.iterdir():
             if not path.is_file():
                 continue
             # check if the filename is '{timestamp}.json'
-            filename_match = re.match(r"^(?P<timestamp>\d+)\.json$", path.name)
-            if filename_match is None:
-                continue
-            timestamp = int(filename_match.group("timestamp"))
-            # info path
-            info_path = directory.joinpath(f"{timestamp}.info.json")
-            backups.append(
-                BackupJSONs(
-                    timestamp=timestamp,
-                    backup_path=path,
-                    info_path=info_path if info_path.exists() else None,
+            match = pattern.match(path.name)
+            if match:
+                timestamp = int(match.group("timestamp"))
+                result.append(
+                    BackupFilePath(
+                        timestamp=timestamp,
+                        backup=path,
+                        info=path.with_suffix(".info.json"),
+                    )
                 )
-            )
-    return backups
+        return result
 
 
-def _search_subdirectory(directory: pathlib.Path) -> list[BackupJSONs]:
-    # search directory '{timestamp / 1.0e+7}'
-    backups: list[BackupJSONs] = []
-    # check if the path is directory
-    if directory.is_dir():
-        for path in directory.iterdir():
-            # check if the path is directory
+class _ArchiveDirectoryTree:
+    def __init__(
+        self,
+        path: pathlib.Path,
+        logger: logging.Logger,
+    ) -> None:
+        self._path = path
+        self._logger = logger
+
+    def file_path(self, timestamp: int) -> BackupFilePath:
+        sub_directory = self._path.joinpath(str(math.floor(timestamp / 1.0e7)))
+        return _ArchiveDirectory(sub_directory).file_path(timestamp)
+
+    def find_all(self) -> list[BackupFilePath]:
+        result: list[BackupFilePath] = []
+        # check if the path is directory
+        if not self._path.is_dir():
+            return result
+        # iterate directories
+        pattern = re.compile(r"^(?P<quotient>[0-9]+)$")
+        for path in self._path.iterdir():
             if not path.is_dir():
                 continue
             # check if the directory name is 'timestamp / 1.0e+7'
-            if re.match(r"[0-9]+", path.name):
-                backups.extend(_search_backup(path))
-    return backups
+            match = pattern.match(path.name)
+            if match:
+                quotient = int(match.group("quotient"))
+                file_paths = _ArchiveDirectory(path).find_all()
+                if any(
+                    math.floor(file_path.timestamp / 1.0e7) != quotient
+                    for file_path in file_paths
+                ):
+                    self._logger.warning(f'unexpected files exist in "{path}"')
+                result.extend(file_paths)
+        return result
