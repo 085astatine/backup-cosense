@@ -13,6 +13,7 @@ from .exceptions import InitialCommitError
 def commit_backups(
     config: Config,
     *,
+    backup_repository: Optional[BackupRepository] = None,
     logger: Optional[logging.Logger] = None,
 ) -> None:
     logger = logger or logging.getLogger(__name__)
@@ -21,12 +22,13 @@ def commit_backups(
     if git.exists():
         git.switch(allow_orphan=True)
     # backup repository
-    backup_repository = BackupRepository(
-        config.cosense.project,
-        git.path,
-        page_order=config.git.page_order,
-        logger=logger,
-    )
+    if backup_repository is None:
+        backup_repository = BackupRepository(
+            config.cosense.project,
+            git.path,
+            page_order=config.git.page_order,
+            logger=logger,
+        )
     if backup_repository.data is None:
         backup_repository.load()
     # backup targets
