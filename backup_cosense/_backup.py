@@ -332,11 +332,13 @@ class BackupRepository:
         data: BackupData,
         *,
         page_order: Optional[PageOrder] = None,
+        logger: Optional[logging.Logger] = None,
     ) -> None:
         self._project = project
         self._directory = directory
         self._data = data
         self._page_order = page_order
+        self._logger = logger or logging.getLogger(__name__)
         # sort pages
         self._data.sort_pages(self._page_order)
 
@@ -352,24 +354,18 @@ class BackupRepository:
     def data(self) -> BackupData:
         return self._data
 
-    def update(
-        self,
-        data: BackupData,
-        *,
-        logger: Optional[logging.Logger] = None,
-    ) -> CommitTarget:
-        logger = logger or logging.getLogger(__name__)
+    def update(self, data: BackupData) -> CommitTarget:
         # sort pages
         data.sort_pages(self._page_order)
         # update backup
         file_path = _project_to_file_path(self.directory, self.project)
-        updated_files = _update_backup(file_path, data, self._data, logger)
+        updated = _update_backup(file_path, data, self._data, self._logger)
         # update pages
         page_directory = self.directory.joinpath("pages")
-        updated_files.update(_update_pages(page_directory, data, self.data, logger))
+        updated.update(_update_pages(page_directory, data, self.data, self._logger))
         # update self
         self._data = data
-        return updated_files
+        return updated
 
     def save_files(self) -> list[pathlib.Path]:
         files: list[pathlib.Path] = []
@@ -384,20 +380,15 @@ class BackupRepository:
             files.append(_page_to_file_path(page_directory, page))
         return files
 
-    def save(
-        self,
-        *,
-        logger: Optional[logging.Logger] = None,
-    ) -> None:
-        logger = logger or logging.getLogger(__name__)
+    def save(self) -> None:
         # {project}.json & {project}.info.json
         file_path = _project_to_file_path(self.directory, self.project)
-        self._data.save(file_path, logger=logger)
+        self._data.save(file_path, logger=self._logger)
         # pages
         page_directory = self.directory.joinpath("pages")
         for page in self._data.backup["pages"]:
             page_path = _page_to_file_path(page_directory, page)
-            logger.debug(f'save "{page_path}"')
+            self._logger.debug(f'save "{page_path}"')
             save_json(page_path, page)
 
     @classmethod
@@ -422,6 +413,7 @@ class BackupRepository:
             directory,
             data,
             page_order=page_order,
+            logger=logger,
         )
 
 

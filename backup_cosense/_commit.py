@@ -118,11 +118,11 @@ def staging_backup(
             data,
             page_order=config.git.page_order,
         )
-        backup_repository.save(logger=logger)
+        backup_repository.save()
         commit_target = CommitTarget(updated=set(backup_repository.save_files()))
     else:
         # update
-        commit_target = backup_repository.update(data, logger=logger)
+        commit_target = backup_repository.update(data)
     # external links
     if config.external_link.enabled:
         commit_target.update(
