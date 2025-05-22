@@ -242,6 +242,10 @@ class BackupData:
     def timestamp(self) -> int:
         return self.backup["exported"]
 
+    @property
+    def pages(self) -> list[BackupPageJSON]:
+        return self.backup["pages"]
+
     def page_titles(self) -> list[str]:
         return sorted(page["title"] for page in self.backup["pages"])
 
@@ -384,34 +388,27 @@ class BackupRepository:
             else:
                 logger.debug(f'update "{file_path.info}"')
                 updated.append(file_path.info)
-        # previous pages
-        previous_pages = {
-            _escape_filename(page["title"]): page for page in self._data.backup["pages"]
-        }
-        # add/update pages
+        # pages
+        pages_diff = _diff_pages(data, self._data)
         page_directory = self.directory.joinpath("pages")
-        for page in data.backup["pages"]:
-            title = _escape_filename(page["title"])
+        # deleted pages
+        for page in pages_diff.deleted:
             page_path = _page_to_file_path(page_directory, page)
-            if title in previous_pages:
-                if page != previous_pages[title]:
-                    # update page
-                    logger.debug(f'update "{page_path}"')
-                    save_json(page_path, page)
-                    updated.append(page_path)
-                # remove from dict to detect deleted pages
-                del previous_pages[title]
-            else:
-                # add new page
-                logger.debug(f'add "{page_path}"')
-                save_json(page_path, page)
-                added.append(page_path)
-        # remove deleted pages
-        for title in previous_pages.keys():
-            page_path = page_directory.joinpath(f"{title}.json")
-            logger.debug(f'remove "{page_path}"')
+            logger.debug(f'delete "{page_path}"')
             page_path.unlink()
             removed.append(page_path)
+        # updated pages
+        for page in pages_diff.updated:
+            page_path = _page_to_file_path(page_directory, page)
+            logger.debug(f'update "{page_path}"')
+            save_json(page_path, page, schema=jsonschema_backup_page())
+            updated.append(page_path)
+        # added pages
+        for page in pages_diff.added:
+            page_path = _page_to_file_path(page_directory, page)
+            logger.debug(f'add "{page_path}"')
+            save_json(page_path, page, schema=jsonschema_backup_page())
+            added.append(page_path)
         # update self
         self._data = data
         return UpdateDiff(added, updated, removed)
@@ -576,6 +573,39 @@ def _page_to_file_path(
 ) -> pathlib.Path:
     filename = _escape_filename(page["title"])
     return directory.joinpath(f"{filename}.json")
+
+
+@dataclasses.dataclass(frozen=True)
+class PagesDiff:
+    added: list[BackupPageJSON]
+    updated: list[BackupPageJSON]
+    deleted: list[BackupPageJSON]
+
+
+def _diff_pages(
+    current: BackupData,
+    previous: Optional[BackupData],
+) -> PagesDiff:
+    added: list[BackupPageJSON] = []
+    updated: list[BackupPageJSON] = []
+    deleted: list[BackupPageJSON] = []
+    if previous is None:
+        added.extend(current.pages)
+    else:
+        pages = {_escape_filename(page["title"]): page for page in previous.pages}
+        for page in current.pages:
+            title = _escape_filename(page["title"])
+            # added
+            if title not in pages:
+                added.append(page)
+            else:
+                # upated
+                if page != pages[title]:
+                    updated.append(page)
+                del pages[title]
+        # delted
+        deleted.extend(pages.values())
+    return PagesDiff(added=added, updated=updated, deleted=deleted)
 
 
 class _ArchiveDirectory:
