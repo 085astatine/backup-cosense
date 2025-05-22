@@ -17,23 +17,23 @@ def commit_backups(
 ) -> None:
     logger = logger or logging.getLogger(__name__)
     git = config.git.git(logger=logger)
-    backup_repository: Optional[BackupRepository] = None
     # git switch
     if git.exists():
         git.switch(allow_orphan=True)
+    # backup repository
+    backup_repository = BackupRepository(
+        config.cosense.project,
+        git.path,
+        page_order=config.git.page_order,
+        logger=logger,
+    )
+    if backup_repository.data is None:
+        backup_repository.load()
     # backup targets
     backup_targets = _backup_targets(config, git, logger)
     # commit
     for target in backup_targets:
         logger.info(f"commit {format_timestamp(target.timestamp)}")
-        # load backup repository
-        if backup_repository is None:
-            backup_repository = BackupRepository.load(
-                config.cosense.project,
-                git.path,
-                page_order=config.git.page_order,
-                logger=logger,
-            )
         # commit
         commit_backup(
             config,
@@ -98,37 +98,27 @@ def staging_backup(
         git.switch(allow_orphan=True)
     # load backup repository
     if backup_repository is None:
-        backup_repository = BackupRepository.load(
+        backup_repository = BackupRepository(
             config.cosense.project,
             git.path,
             page_order=config.git.page_order,
             logger=logger,
         )
+    if backup_repository.data is None:
+        backup_repository.load()
     # load backup
     data = backup_path.load()
     if data is None:
         logger.error('failure to load "{backup_path.backup}"')
         return None
     # update backup
-    if backup_repository is None:
-        # initial update
-        backup_repository = BackupRepository(
-            config.cosense.project,
-            git.path,
-            data,
-            page_order=config.git.page_order,
-        )
-        backup_repository.save()
-        commit_target = CommitTarget(updated=set(backup_repository.save_files()))
-    else:
-        # update
-        commit_target = backup_repository.update(data)
+    commit_target = backup_repository.update(data)
     # external links
     if config.external_link.enabled:
         commit_target.update(
             save_external_links(
-                backup_repository.data.timestamp,
-                backup_repository.data.external_links(),
+                data.timestamp,
+                data.external_links(),
                 git.path,
                 config=config.external_link,
                 logger=logger,

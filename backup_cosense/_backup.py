@@ -6,7 +6,7 @@ import logging
 import math
 import pathlib
 import re
-from typing import Any, Generator, Literal, Optional, Self, Tuple, TypedDict
+from typing import Any, Generator, Literal, Optional, Tuple, TypedDict
 
 import jsonschema
 
@@ -329,8 +329,8 @@ class BackupRepository:
         self,
         project: str,
         directory: pathlib.Path,
-        data: BackupData,
         *,
+        data: Optional[BackupData] = None,
         page_order: Optional[PageOrder] = None,
         logger: Optional[logging.Logger] = None,
     ) -> None:
@@ -340,7 +340,8 @@ class BackupRepository:
         self._page_order = page_order
         self._logger = logger or logging.getLogger(__name__)
         # sort pages
-        self._data.sort_pages(self._page_order)
+        if self._data is not None:
+            self._data.sort_pages(self._page_order)
 
     @property
     def project(self) -> str:
@@ -351,7 +352,7 @@ class BackupRepository:
         return self._directory
 
     @property
-    def data(self) -> BackupData:
+    def data(self) -> Optional[BackupData]:
         return self._data
 
     def update(self, data: BackupData) -> CommitTarget:
@@ -367,20 +368,20 @@ class BackupRepository:
         self._data = data
         return updated
 
-    def save_files(self) -> list[pathlib.Path]:
-        files: list[pathlib.Path] = []
-        # {project}.json & {project}.info.json
-        file_path = _project_to_file_path(self.directory, self.project)
-        files.append(file_path.backup)
-        if self._data.info is not None:
-            files.append(file_path.info)
-        # pages
-        page_directory = self.directory.joinpath("pages")
-        for page in self._data.backup["pages"]:
-            files.append(_page_to_file_path(page_directory, page))
-        return files
+    def load(self) -> None:
+        # load {project}.json & {project}.info.json
+        data = _project_to_file_path(self.directory, self.project).load()
+        if data is not None:
+            # check if pages are sorted
+            if data.is_pages_sorted(self._page_order) is False:
+                self._logger.warn(
+                    f"loaded backup pages are not sorted by {self._page_order}"
+                )
+            self._data = data
 
     def save(self) -> None:
+        if self._data is None:
+            return
         # {project}.json & {project}.info.json
         file_path = _project_to_file_path(self.directory, self.project)
         self._data.save(file_path, logger=self._logger)
@@ -390,31 +391,6 @@ class BackupRepository:
             page_path = _page_to_file_path(page_directory, page)
             self._logger.debug(f'save "{page_path}"')
             save_json(page_path, page)
-
-    @classmethod
-    def load(
-        cls,
-        project: str,
-        directory: pathlib.Path,
-        *,
-        page_order: Optional[PageOrder] = None,
-        logger: Optional[logging.Logger] = None,
-    ) -> Optional[Self]:
-        logger = logger or logging.getLogger(__name__)
-        # {project}.json & {project}.info.json
-        data = _project_to_file_path(directory, project).load()
-        if data is None:
-            return None
-        # check if pages are sorted
-        if data.is_pages_sorted(page_order) is False:
-            logger.warn(f"loaded backup pages are not sorted by {page_order}")
-        return cls(
-            project,
-            directory,
-            data,
-            page_order=page_order,
-            logger=logger,
-        )
 
 
 class BackupArchive:
