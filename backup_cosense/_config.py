@@ -14,7 +14,7 @@ from ._git import Git
 
 
 @dataclasses.dataclass(frozen=True)
-class CosenseSaveDirectoryConfig:
+class BackupArchiveConfig:
     name: str
     subdirectory: bool = False
 
@@ -47,7 +47,7 @@ class CosenseSaveDirectoryConfig:
 class CosenseConfig:
     project: str
     session_id: str
-    save_directory: CosenseSaveDirectoryConfig
+    backup_archive: BackupArchiveConfig
     domain: Literal["scrapbox.io", "cosen.se"] = "scrapbox.io"
     request_interval: float = 3.0
     request_timeout: float = 10.0
@@ -57,15 +57,15 @@ class CosenseConfig:
     def jsonschema(cls) -> dict[str, Any]:
         schema = {
             "type": "object",
-            "required": ["project", "session_id", "save_directory"],
+            "required": ["project", "session_id", "backup_archive"],
             "additionalProperties": False,
             "properties": {
                 "project": {"type": "string"},
                 "session_id": {"type": "string"},
-                "save_directory": {
+                "backup_archive": {
                     "oneOf": [
                         {"type": "string"},
-                        CosenseSaveDirectoryConfig.jsonschema(),
+                        BackupArchiveConfig.jsonschema(),
                     ],
                 },
                 "domain": {"enum": ["scrapbox.io", "cosen.se"]},
@@ -372,7 +372,7 @@ def load_config(
         config=dacite.Config(
             type_hooks={
                 datetime.datetime: _to_datetime,
-                CosenseSaveDirectoryConfig: _to_save_directory,
+                BackupArchiveConfig: _to_backup_archive,
             },
             strict=True,
         ),
@@ -411,10 +411,10 @@ def _is_datetime(
     return isinstance(instance, datetime.datetime)
 
 
-def _to_save_directory(value: str | dict) -> CosenseSaveDirectoryConfig:
+def _to_backup_archive(value: str | dict) -> BackupArchiveConfig:
     if isinstance(value, str):
         value = {"name": value}
-    return CosenseSaveDirectoryConfig(**value)
+    return BackupArchiveConfig(**value)
 
 
 def _to_datetime(value: datetime.date | datetime.datetime) -> datetime.datetime:

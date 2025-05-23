@@ -4,7 +4,7 @@ import pathlib
 from typing import Optional
 
 from ._commit import commit_backups
-from ._config import Config, CosenseSaveDirectoryConfig, load_config
+from ._config import BackupArchiveConfig, Config, load_config
 from ._download import download_backups
 from ._export import export_backups
 
@@ -45,7 +45,7 @@ def backup_cosense(
     # export
     if option.command == "export":
         logger.info("command: export")
-        destination = CosenseSaveDirectoryConfig(
+        destination = BackupArchiveConfig(
             name=option.destination,
             subdirectory=option.subdirectory,
         ).storage(logger=logger)
