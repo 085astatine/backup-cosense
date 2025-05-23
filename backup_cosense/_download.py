@@ -118,7 +118,7 @@ def _backup_filter(
         else None
     )
     # get the latest backup timestamp from the Git repository
-    git = config.git.git(logger=logger)
+    git = config.git.create(logger=logger)
     latest_timestamp = git.latest_commit_timestamp()
     logger.info(f"latest backup: {format_timestamp(latest_timestamp)}")
     # backup archive
