@@ -121,12 +121,12 @@ def _backup_filter(
     git = config.git.git(logger=logger)
     latest_timestamp = git.latest_commit_timestamp()
     logger.info(f"latest backup: {format_timestamp(latest_timestamp)}")
-    # backup storage
-    storage = config.cosense.backup_archive.storage(logger=logger)
+    # backup archive
+    archive = config.cosense.backup_archive.create(logger=logger)
 
     def backup_filter(backup: BackupInfoJSON) -> bool:
         timestamp = backup["backuped"]
-        if storage.file_path(timestamp).backup.exists():
+        if archive.file_path(timestamp).backup.exists():
             logger.debug(f"skip {format_timestamp(timestamp)}: already downloaded")
             return False
         if start_timestamp is not None and start_timestamp > timestamp:
@@ -164,8 +164,8 @@ def _download_backup(
     if backup is None:
         return
     # save
-    storage = config.cosense.backup_archive.storage(logger=logger)
-    file_path = storage.file_path(timestamp)
+    archive = config.cosense.backup_archive.create(logger=logger)
+    file_path = archive.file_path(timestamp)
     # save backup
     logger.info(f'save "{file_path.backup}"')
     save_json(file_path.backup, backup)

@@ -149,10 +149,10 @@ def _backup_targets(
         default=None,
     )
     # find backup
-    storage = config.cosense.backup_archive.storage(logger=logger)
+    archive = config.cosense.backup_archive.create(logger=logger)
     targets = [
         backup
-        for backup in storage.backups()
+        for backup in archive.backups()
         if threshold is None or threshold < backup.timestamp
     ]
     return targets

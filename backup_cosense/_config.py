@@ -18,7 +18,7 @@ class BackupArchiveConfig:
     name: str
     subdirectory: bool = False
 
-    def storage(
+    def create(
         self,
         *,
         logger: Optional[logging.Logger] = None,
