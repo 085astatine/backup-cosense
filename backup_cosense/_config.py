@@ -12,6 +12,83 @@ import toml
 from ._backup import BackupArchive, PageOrder
 from ._git import Git
 
+FakeUserAgentOS = Literal[
+    "Windows",
+    "Linux",
+    "Ubuntu",
+    "Chrome OS",
+    "Mac OS X",
+    "Android",
+    "iOS",
+]
+
+
+FakeUserAgentBrowser = Literal[
+    "Google",
+    "Chrome",
+    "Firefox",
+    "Edge",
+    "Opera",
+    "Safari",
+    "Android",
+    "Yandex Browser",
+    "Samsung Internet",
+    "Opera Mobile",
+    "Mobile Safari",
+    "Firefox Mobile",
+    "Firefox iOS",
+    "Chrome Mobile",
+    "Chrome Mobile iOS",
+    "Mobile Safari UI/WKWebView",
+    "Edge Mobile",
+    "DuckDuckGo Mobile",
+    "MiuiBrowser",
+    "Whale",
+    "Twitter",
+    "Facebook",
+    "Amazon Silk",
+]
+
+
+FakeUserAgentPlatform = Literal["desktop", "mobile", "tablet"]
+
+
+@dataclasses.dataclass(frozen=True)
+class FakeUserAgentConfig:
+    os: Optional[FakeUserAgentOS] = None
+    browser: Optional[FakeUserAgentBrowser] = None
+    platform: Optional[FakeUserAgentPlatform] = None
+
+    def user_agent(self) -> str:
+        generator = fake_useragent.UserAgent(
+            os=self.os,
+            browsers=self.browser,
+            platforms=self.platform,
+        )
+        return generator.random
+
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "os": {
+                    "type": ["string", "null"],
+                    "enum": [None, *get_args(FakeUserAgentOS)],
+                },
+                "browser": {
+                    "type": ["string", "null"],
+                    "enum": [None, *get_args(FakeUserAgentBrowser)],
+                },
+                "platform": {
+                    "type": ["string", "null"],
+                    "enum": [None, *get_args(FakeUserAgentPlatform)],
+                },
+            },
+        }
+        return schema
+
 
 @dataclasses.dataclass(frozen=True)
 class BackupArchiveConfig:
@@ -155,84 +232,6 @@ class GitConfig:
                 "staging_step_size": {
                     "type": "integer",
                     "minimum": 1,
-                },
-            },
-        }
-        return schema
-
-
-FakeUserAgentOS = Literal[
-    "Windows",
-    "Linux",
-    "Ubuntu",
-    "Chrome OS",
-    "Mac OS X",
-    "Android",
-    "iOS",
-]
-
-
-FakeUserAgentBrowser = Literal[
-    "Google",
-    "Chrome",
-    "Firefox",
-    "Edge",
-    "Opera",
-    "Safari",
-    "Android",
-    "Yandex Browser",
-    "Samsung Internet",
-    "Opera Mobile",
-    "Mobile Safari",
-    "Firefox Mobile",
-    "Firefox iOS",
-    "Chrome Mobile",
-    "Chrome Mobile iOS",
-    "Mobile Safari UI/WKWebView",
-    "Edge Mobile",
-    "DuckDuckGo Mobile",
-    "MiuiBrowser",
-    "Whale",
-    "Twitter",
-    "Facebook",
-    "Amazon Silk",
-]
-
-
-FakeUserAgentPlatform = Literal["desktop", "mobile", "tablet"]
-
-
-@dataclasses.dataclass(frozen=True)
-class FakeUserAgentConfig:
-    os: Optional[FakeUserAgentOS] = None
-    browser: Optional[FakeUserAgentBrowser] = None
-    platform: Optional[FakeUserAgentPlatform] = None
-
-    def user_agent(self) -> str:
-        generator = fake_useragent.UserAgent(
-            os=self.os,
-            browsers=self.browser,
-            platforms=self.platform,
-        )
-        return generator.random
-
-    @classmethod
-    def jsonschema(cls) -> dict[str, Any]:
-        schema = {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "os": {
-                    "type": ["string", "null"],
-                    "enum": [None, *get_args(FakeUserAgentOS)],
-                },
-                "browser": {
-                    "type": ["string", "null"],
-                    "enum": [None, *get_args(FakeUserAgentBrowser)],
-                },
-                "platform": {
-                    "type": ["string", "null"],
-                    "enum": [None, *get_args(FakeUserAgentPlatform)],
                 },
             },
         }
