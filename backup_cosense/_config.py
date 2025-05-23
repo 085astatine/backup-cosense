@@ -55,11 +55,14 @@ FakeUserAgentPlatform = Literal["desktop", "mobile", "tablet"]
 
 @dataclasses.dataclass(frozen=True)
 class FakeUserAgentConfig:
+    value: Optional[str] = None
     os: Optional[FakeUserAgentOS] = None
     browser: Optional[FakeUserAgentBrowser] = None
     platform: Optional[FakeUserAgentPlatform] = None
 
     def user_agent(self) -> str:
+        if self.value is not None:
+            return self.value
         generator = fake_useragent.UserAgent(
             os=self.os,
             browsers=self.browser,
@@ -70,22 +73,27 @@ class FakeUserAgentConfig:
     @classmethod
     def jsonschema(cls) -> dict[str, Any]:
         schema = {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "os": {
-                    "type": ["string", "null"],
-                    "enum": [None, *get_args(FakeUserAgentOS)],
+            "oneOf": [
+                {"type": "string"},
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "os": {
+                            "type": ["string", "null"],
+                            "enum": [None, *get_args(FakeUserAgentOS)],
+                        },
+                        "browser": {
+                            "type": ["string", "null"],
+                            "enum": [None, *get_args(FakeUserAgentBrowser)],
+                        },
+                        "platform": {
+                            "type": ["string", "null"],
+                            "enum": [None, *get_args(FakeUserAgentPlatform)],
+                        },
+                    },
                 },
-                "browser": {
-                    "type": ["string", "null"],
-                    "enum": [None, *get_args(FakeUserAgentBrowser)],
-                },
-                "platform": {
-                    "type": ["string", "null"],
-                    "enum": [None, *get_args(FakeUserAgentPlatform)],
-                },
-            },
+            ],
         }
         return schema
 
@@ -372,6 +380,7 @@ def load_config(
             type_hooks={
                 datetime.datetime: _to_datetime,
                 BackupArchiveConfig: _to_backup_archive,
+                FakeUserAgentConfig: _to_user_agent,
             },
             strict=True,
         ),
@@ -423,3 +432,9 @@ def _to_datetime(value: datetime.date | datetime.datetime) -> datetime.datetime:
         case datetime.date():
             # add time(00:00:00) to date
             return datetime.datetime.combine(value, datetime.time())
+
+
+def _to_user_agent(value: str | dict) -> FakeUserAgentConfig:
+    if isinstance(value, str):
+        value = {"value": value}
+    return FakeUserAgentConfig(**value)
