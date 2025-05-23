@@ -3,8 +3,9 @@ import logging
 import pathlib
 from typing import Optional
 
+from ._backup import BackupArchive
 from ._commit import commit_backups
-from ._config import BackupArchiveConfig, Config, load_config
+from ._config import Config, load_config
 from ._download import download_backups
 from ._export import export_backups
 
@@ -45,10 +46,11 @@ def backup_cosense(
     # export
     if option.command == "export":
         logger.info("command: export")
-        destination = BackupArchiveConfig(
-            name=option.destination,
+        destination = BackupArchive(
+            pathlib.Path(option.destination),
             subdirectory=option.subdirectory,
-        ).create(logger=logger)
+            logger=logger,
+        )
         export_backups(config, destination, logger=logger)
 
 
