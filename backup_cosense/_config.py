@@ -117,13 +117,18 @@ class BackupArchiveConfig:
     @classmethod
     def jsonschema(cls) -> dict[str, Any]:
         schema = {
-            "type": "object",
-            "required": ["name"],
-            "additionalProperties": False,
-            "properties": {
-                "name": {"type": "string"},
-                "subdirectory": {"type": "boolean"},
-            },
+            "oneOf": [
+                {"type": "string"},
+                {
+                    "type": "object",
+                    "required": ["name"],
+                    "additionalProperties": False,
+                    "properties": {
+                        "name": {"type": "string"},
+                        "subdirectory": {"type": "boolean"},
+                    },
+                },
+            ],
         }
         return schema
 
@@ -147,12 +152,7 @@ class CosenseConfig:
             "properties": {
                 "project": {"type": "string"},
                 "session_id": {"type": "string"},
-                "backup_archive": {
-                    "oneOf": [
-                        {"type": "string"},
-                        BackupArchiveConfig.jsonschema(),
-                    ],
-                },
+                "backup_archive": BackupArchiveConfig.jsonschema(),
                 "domain": {"enum": ["scrapbox.io", "cosen.se"]},
                 "request_interval": {
                     "type": "number",
