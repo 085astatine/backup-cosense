@@ -60,7 +60,7 @@ class UserAgentConfig:
     browser: Optional[FakeUserAgentBrowser] = None
     platform: Optional[FakeUserAgentPlatform] = None
 
-    def user_agent(self) -> str:
+    def create(self) -> str:
         if self.value is not None:
             return self.value
         generator = fake_useragent.UserAgent(
