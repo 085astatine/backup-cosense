@@ -63,6 +63,7 @@ def _base_url(config: Config) -> str:
 
 def _session(config: Config) -> requests.Session:
     session = requests.Session()
+    # cookie
     domains = ["scrapbox.io", "cosen.se"]
     for domain in domains:
         session.cookies.set(
@@ -70,6 +71,9 @@ def _session(config: Config) -> requests.Session:
             config.cosense.session_id,
             domain=domain,
         )
+    # user agent
+    if config.cosense.user_agent is not None:
+        session.headers.update({"User-Agent": config.cosense.user_agent.create()})
     return session
 
 

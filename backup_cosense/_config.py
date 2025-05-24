@@ -135,12 +135,14 @@ class BackupArchiveConfig:
 
 @dataclasses.dataclass(frozen=True)
 class CosenseConfig:
+    # pylint: disable=too-many-instance-attributes
     project: str
     session_id: str
     backup_archive: BackupArchiveConfig
     domain: Literal["scrapbox.io", "cosen.se"] = "scrapbox.io"
     request_interval: float = 3.0
     request_timeout: float = 10.0
+    user_agent: Optional[UserAgentConfig] = None
     backup_start_date: Optional[datetime.datetime] = None
 
     @classmethod
@@ -162,6 +164,7 @@ class CosenseConfig:
                     "type": "number",
                     "exclusiveMinimum": 0.0,
                 },
+                "user_agent": UserAgentConfig.jsonschema(),
                 "backup_start_date": {"type": ["date", "datetime"]},
             },
         }
