@@ -17,7 +17,7 @@ def commit_backups(
     logger: Optional[logging.Logger] = None,
 ) -> None:
     logger = logger or logging.getLogger(__name__)
-    git = config.git.git(logger=logger)
+    git = config.git.create(logger=logger)
     # git switch
     if git.exists():
         git.switch(allow_orphan=True)
@@ -53,7 +53,7 @@ def commit_backup(
     logger: Optional[logging.Logger] = None,
 ) -> None:
     logger = logger or logging.getLogger(__name__)
-    git = config.git.git(logger=logger)
+    git = config.git.create(logger=logger)
     # git init
     if not git.exists():
         logger.info(f'create git repository "{git.path}"')
@@ -95,7 +95,7 @@ def staging_backup(
 ) -> Optional[CommitTarget]:
     logger = logger or logging.getLogger(__name__)
     # git switch
-    git = config.git.git(logger=logger)
+    git = config.git.create(logger=logger)
     if git.exists():
         git.switch(allow_orphan=True)
     # load backup repository
@@ -149,10 +149,10 @@ def _backup_targets(
         default=None,
     )
     # find backup
-    storage = config.cosense.save_directory.storage(logger=logger)
+    archive = config.cosense.backup_archive.create(logger=logger)
     targets = [
         backup
-        for backup in storage.backups()
+        for backup in archive.backups()
         if threshold is None or threshold < backup.timestamp
     ]
     return targets

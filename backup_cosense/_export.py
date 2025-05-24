@@ -15,7 +15,7 @@ def export_backups(
     destination: BackupArchive,
     logger: logging.Logger,
 ) -> None:
-    git = config.git.git(logger=logger)
+    git = config.git.create(logger=logger)
     # check if the destination exists
     if not destination.path.exists():
         logger.error(f'export directory "{destination.path}" does not exist')

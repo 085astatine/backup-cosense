@@ -12,13 +12,98 @@ import toml
 from ._backup import BackupArchive, PageOrder
 from ._git import Git
 
+FakeUserAgentOS = Literal[
+    "Windows",
+    "Linux",
+    "Ubuntu",
+    "Chrome OS",
+    "Mac OS X",
+    "Android",
+    "iOS",
+]
+
+
+FakeUserAgentBrowser = Literal[
+    "Google",
+    "Chrome",
+    "Firefox",
+    "Edge",
+    "Opera",
+    "Safari",
+    "Android",
+    "Yandex Browser",
+    "Samsung Internet",
+    "Opera Mobile",
+    "Mobile Safari",
+    "Firefox Mobile",
+    "Firefox iOS",
+    "Chrome Mobile",
+    "Chrome Mobile iOS",
+    "Mobile Safari UI/WKWebView",
+    "Edge Mobile",
+    "DuckDuckGo Mobile",
+    "MiuiBrowser",
+    "Whale",
+    "Twitter",
+    "Facebook",
+    "Amazon Silk",
+]
+
+
+FakeUserAgentPlatform = Literal["desktop", "mobile", "tablet"]
+
 
 @dataclasses.dataclass(frozen=True)
-class CosenseSaveDirectoryConfig:
+class UserAgentConfig:
+    value: Optional[str] = None
+    os: Optional[FakeUserAgentOS] = None
+    browser: Optional[FakeUserAgentBrowser] = None
+    platform: Optional[FakeUserAgentPlatform] = None
+
+    def create(self) -> str:
+        if self.value is not None:
+            return self.value
+        generator = fake_useragent.UserAgent(
+            os=self.os,
+            browsers=self.browser,
+            platforms=self.platform,
+        )
+        return generator.random
+
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "oneOf": [
+                {"type": "string"},
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "os": {
+                            "type": ["string", "null"],
+                            "enum": [None, *get_args(FakeUserAgentOS)],
+                        },
+                        "browser": {
+                            "type": ["string", "null"],
+                            "enum": [None, *get_args(FakeUserAgentBrowser)],
+                        },
+                        "platform": {
+                            "type": ["string", "null"],
+                            "enum": [None, *get_args(FakeUserAgentPlatform)],
+                        },
+                    },
+                },
+            ],
+        }
+        return schema
+
+
+@dataclasses.dataclass(frozen=True)
+class BackupArchiveConfig:
     name: str
     subdirectory: bool = False
 
-    def storage(
+    def create(
         self,
         *,
         logger: Optional[logging.Logger] = None,
@@ -32,42 +117,44 @@ class CosenseSaveDirectoryConfig:
     @classmethod
     def jsonschema(cls) -> dict[str, Any]:
         schema = {
-            "type": "object",
-            "required": ["name"],
-            "additionalProperties": False,
-            "properties": {
-                "name": {"type": "string"},
-                "subdirectory": {"type": "boolean"},
-            },
+            "oneOf": [
+                {"type": "string"},
+                {
+                    "type": "object",
+                    "required": ["name"],
+                    "additionalProperties": False,
+                    "properties": {
+                        "name": {"type": "string"},
+                        "subdirectory": {"type": "boolean"},
+                    },
+                },
+            ],
         }
         return schema
 
 
 @dataclasses.dataclass(frozen=True)
 class CosenseConfig:
+    # pylint: disable=too-many-instance-attributes
     project: str
     session_id: str
-    save_directory: CosenseSaveDirectoryConfig
+    backup_archive: BackupArchiveConfig
     domain: Literal["scrapbox.io", "cosen.se"] = "scrapbox.io"
     request_interval: float = 3.0
     request_timeout: float = 10.0
+    user_agent: Optional[UserAgentConfig] = None
     backup_start_date: Optional[datetime.datetime] = None
 
     @classmethod
     def jsonschema(cls) -> dict[str, Any]:
         schema = {
             "type": "object",
-            "required": ["project", "session_id", "save_directory"],
+            "required": ["project", "session_id", "backup_archive"],
             "additionalProperties": False,
             "properties": {
                 "project": {"type": "string"},
                 "session_id": {"type": "string"},
-                "save_directory": {
-                    "oneOf": [
-                        {"type": "string"},
-                        CosenseSaveDirectoryConfig.jsonschema(),
-                    ],
-                },
+                "backup_archive": BackupArchiveConfig.jsonschema(),
                 "domain": {"enum": ["scrapbox.io", "cosen.se"]},
                 "request_interval": {
                     "type": "number",
@@ -77,6 +164,7 @@ class CosenseConfig:
                     "type": "number",
                     "exclusiveMinimum": 0.0,
                 },
+                "user_agent": UserAgentConfig.jsonschema(),
                 "backup_start_date": {"type": ["date", "datetime"]},
             },
         }
@@ -120,7 +208,7 @@ class GitConfig:
     empty_initial_commit: Optional[GitEmptyInitialCommitConfig] = None
     staging_step_size: int = 1
 
-    def git(
+    def create(
         self,
         *,
         logger: Optional[logging.Logger] = None,
@@ -161,89 +249,11 @@ class GitConfig:
         return schema
 
 
-FakeUserAgentOS = Literal[
-    "Windows",
-    "Linux",
-    "Ubuntu",
-    "Chrome OS",
-    "Mac OS X",
-    "Android",
-    "iOS",
-]
-
-
-FakeUserAgentBrowser = Literal[
-    "Google",
-    "Chrome",
-    "Firefox",
-    "Edge",
-    "Opera",
-    "Safari",
-    "Android",
-    "Yandex Browser",
-    "Samsung Internet",
-    "Opera Mobile",
-    "Mobile Safari",
-    "Firefox Mobile",
-    "Firefox iOS",
-    "Chrome Mobile",
-    "Chrome Mobile iOS",
-    "Mobile Safari UI/WKWebView",
-    "Edge Mobile",
-    "DuckDuckGo Mobile",
-    "MiuiBrowser",
-    "Whale",
-    "Twitter",
-    "Facebook",
-    "Amazon Silk",
-]
-
-
-FakeUserAgentPlatform = Literal["desktop", "mobile", "tablet"]
-
-
-@dataclasses.dataclass(frozen=True)
-class FakeUserAgentConfig:
-    os: Optional[FakeUserAgentOS] = None
-    browser: Optional[FakeUserAgentBrowser] = None
-    platform: Optional[FakeUserAgentPlatform] = None
-
-    def user_agent(self) -> str:
-        generator = fake_useragent.UserAgent(
-            os=self.os,
-            browsers=self.browser,
-            platforms=self.platform,
-        )
-        return generator.random
-
-    @classmethod
-    def jsonschema(cls) -> dict[str, Any]:
-        schema = {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "os": {
-                    "type": ["string", "null"],
-                    "enum": [None, *get_args(FakeUserAgentOS)],
-                },
-                "browser": {
-                    "type": ["string", "null"],
-                    "enum": [None, *get_args(FakeUserAgentBrowser)],
-                },
-                "platform": {
-                    "type": ["string", "null"],
-                    "enum": [None, *get_args(FakeUserAgentPlatform)],
-                },
-            },
-        }
-        return schema
-
-
 @dataclasses.dataclass(frozen=True)
 class ExternalLinkSessionConfig:
     timeout: float = 30
     parallel_limit_per_host: int = 0
-    user_agent: Optional[FakeUserAgentConfig] = None
+    user_agent: Optional[UserAgentConfig] = None
     request_headers: dict[str, str] = dataclasses.field(default_factory=dict)
 
     @classmethod
@@ -260,7 +270,7 @@ class ExternalLinkSessionConfig:
                     "type": "integer",
                     "minimum": 0,
                 },
-                "user_agent": FakeUserAgentConfig.jsonschema(),
+                "user_agent": UserAgentConfig.jsonschema(),
                 "request_headers": {
                     "type": "object",
                     "additionalProperties": {
@@ -372,7 +382,8 @@ def load_config(
         config=dacite.Config(
             type_hooks={
                 datetime.datetime: _to_datetime,
-                CosenseSaveDirectoryConfig: _to_save_directory,
+                BackupArchiveConfig: _to_backup_archive,
+                UserAgentConfig: _to_user_agent,
             },
             strict=True,
         ),
@@ -411,10 +422,10 @@ def _is_datetime(
     return isinstance(instance, datetime.datetime)
 
 
-def _to_save_directory(value: str | dict) -> CosenseSaveDirectoryConfig:
+def _to_backup_archive(value: str | dict) -> BackupArchiveConfig:
     if isinstance(value, str):
         value = {"name": value}
-    return CosenseSaveDirectoryConfig(**value)
+    return BackupArchiveConfig(**value)
 
 
 def _to_datetime(value: datetime.date | datetime.datetime) -> datetime.datetime:
@@ -424,3 +435,9 @@ def _to_datetime(value: datetime.date | datetime.datetime) -> datetime.datetime:
         case datetime.date():
             # add time(00:00:00) to date
             return datetime.datetime.combine(value, datetime.time())
+
+
+def _to_user_agent(value: str | dict) -> UserAgentConfig:
+    if isinstance(value, str):
+        value = {"value": value}
+    return UserAgentConfig(**value)

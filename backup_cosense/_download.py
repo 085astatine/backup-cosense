@@ -63,6 +63,7 @@ def _base_url(config: Config) -> str:
 
 def _session(config: Config) -> requests.Session:
     session = requests.Session()
+    # cookie
     domains = ["scrapbox.io", "cosen.se"]
     for domain in domains:
         session.cookies.set(
@@ -70,6 +71,9 @@ def _session(config: Config) -> requests.Session:
             config.cosense.session_id,
             domain=domain,
         )
+    # user agent
+    if config.cosense.user_agent is not None:
+        session.headers.update({"User-Agent": config.cosense.user_agent.create()})
     return session
 
 
@@ -118,15 +122,15 @@ def _backup_filter(
         else None
     )
     # get the latest backup timestamp from the Git repository
-    git = config.git.git(logger=logger)
+    git = config.git.create(logger=logger)
     latest_timestamp = git.latest_commit_timestamp()
     logger.info(f"latest backup: {format_timestamp(latest_timestamp)}")
-    # backup storage
-    storage = config.cosense.save_directory.storage(logger=logger)
+    # backup archive
+    archive = config.cosense.backup_archive.create(logger=logger)
 
     def backup_filter(backup: BackupInfoJSON) -> bool:
         timestamp = backup["backuped"]
-        if storage.file_path(timestamp).backup.exists():
+        if archive.file_path(timestamp).backup.exists():
             logger.debug(f"skip {format_timestamp(timestamp)}: already downloaded")
             return False
         if start_timestamp is not None and start_timestamp > timestamp:
@@ -164,8 +168,8 @@ def _download_backup(
     if backup is None:
         return
     # save
-    storage = config.cosense.save_directory.storage(logger=logger)
-    file_path = storage.file_path(timestamp)
+    archive = config.cosense.backup_archive.create(logger=logger)
+    file_path = archive.file_path(timestamp)
     # save backup
     logger.info(f'save "{file_path.backup}"')
     save_json(file_path.backup, backup)

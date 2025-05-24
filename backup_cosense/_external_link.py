@@ -182,7 +182,7 @@ def _request_headers(config: ExternalLinkSessionConfig) -> multidict.CIMultiDict
     headers: multidict.CIMultiDict = multidict.CIMultiDict()
     # config.user_agent
     if config.user_agent is not None:
-        headers["User-Agent"] = config.user_agent.user_agent()
+        headers["User-Agent"] = config.user_agent.create()
     # config.request_headers
     for key, value in config.request_headers.items():
         headers[key] = value
