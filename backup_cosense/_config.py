@@ -54,7 +54,7 @@ FakeUserAgentPlatform = Literal["desktop", "mobile", "tablet"]
 
 
 @dataclasses.dataclass(frozen=True)
-class FakeUserAgentConfig:
+class UserAgentConfig:
     value: Optional[str] = None
     os: Optional[FakeUserAgentOS] = None
     browser: Optional[FakeUserAgentBrowser] = None
@@ -250,7 +250,7 @@ class GitConfig:
 class ExternalLinkSessionConfig:
     timeout: float = 30
     parallel_limit_per_host: int = 0
-    user_agent: Optional[FakeUserAgentConfig] = None
+    user_agent: Optional[UserAgentConfig] = None
     request_headers: dict[str, str] = dataclasses.field(default_factory=dict)
 
     @classmethod
@@ -267,7 +267,7 @@ class ExternalLinkSessionConfig:
                     "type": "integer",
                     "minimum": 0,
                 },
-                "user_agent": FakeUserAgentConfig.jsonschema(),
+                "user_agent": UserAgentConfig.jsonschema(),
                 "request_headers": {
                     "type": "object",
                     "additionalProperties": {
@@ -380,7 +380,7 @@ def load_config(
             type_hooks={
                 datetime.datetime: _to_datetime,
                 BackupArchiveConfig: _to_backup_archive,
-                FakeUserAgentConfig: _to_user_agent,
+                UserAgentConfig: _to_user_agent,
             },
             strict=True,
         ),
@@ -434,7 +434,7 @@ def _to_datetime(value: datetime.date | datetime.datetime) -> datetime.datetime:
             return datetime.datetime.combine(value, datetime.time())
 
 
-def _to_user_agent(value: str | dict) -> FakeUserAgentConfig:
+def _to_user_agent(value: str | dict) -> UserAgentConfig:
     if isinstance(value, str):
         value = {"value": value}
-    return FakeUserAgentConfig(**value)
+    return UserAgentConfig(**value)
