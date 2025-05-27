@@ -65,7 +65,6 @@ class ExternalLinkLog:
     response: RequestError | ResponseLog | Literal["excluded"]
     is_saved: bool
 
-    @property
     def link(self) -> ExternalLink:
         return ExternalLink(url=self.url, locations=self.locations)
 
@@ -453,8 +452,15 @@ def _request(
     create_session: Callable[[], aiohttp.ClientSession],
     logger: logging.Logger,
 ) -> None:
-    # shuffle links
+    # added links
     links = editor.added_links()
+    # links that have lost their saved files
+    links.extend(
+        log.link()
+        for log in editor.logs()
+        if log.is_saved and not links_directory.file_path(log.url).exists()
+    )
+    # shuffle links
     random.shuffle(links)
     # request
     logs = asyncio.run(
