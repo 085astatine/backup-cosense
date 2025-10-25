@@ -47,7 +47,7 @@ def backup_cosense(
     if option.command == "export":
         logger.info("command: export")
         destination = BackupArchive(
-            pathlib.Path(option.destination),
+            option.destination,
             subdirectory=option.subdirectory,
             logger=logger,
         )
@@ -111,6 +111,7 @@ def _add_export_arguments(parser: argparse.ArgumentParser) -> None:
         dest="destination",
         required=True,
         metavar="DIR",
+        type=pathlib.Path,
         help="directory to export backups",
     )
     # subdirectory
