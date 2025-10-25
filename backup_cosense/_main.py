@@ -36,11 +36,11 @@ def backup_cosense(
     # main
     logger.info("backup-cosense")
     # download backup
-    if option.command in (None, "download"):
+    if option.command == "download":
         logger.info("command: download")
         download_backups(config, logger=logger)
     # commit
-    if option.command in (None, "commit"):
+    if option.command == "commit":
         logger.info("command: commit")
         commit_backups(config, logger=logger)
     # export
@@ -61,10 +61,8 @@ def _argument_parser() -> argparse.ArgumentParser:
     sub_parsers = parser.add_subparsers(
         dest="command",
         title="command",
-        description=(
-            "command to be executed "
-            "(if not specified, download and commit are executed)"
-        ),
+        description="command to be executed",
+        required=True,
     )
     # download
     sub_parsers.add_parser(
