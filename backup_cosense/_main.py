@@ -1,7 +1,8 @@
 import argparse
+import dataclasses
 import logging
 import pathlib
-from typing import Optional
+from typing import Literal, Optional
 
 from ._backup import BackupArchive
 from ._commit import commit_backups
@@ -26,7 +27,7 @@ def backup_cosense(
         )
         logger.addHandler(handler)
     # option
-    option = _argument_parser().parse_args(args=args)
+    option = Option(**vars(_argument_parser().parse_args(args=args)))
     if option.verbose:
         logger.setLevel(logging.DEBUG)
     logger.debug(f"option: {option}")
@@ -52,6 +53,15 @@ def backup_cosense(
             logger=logger,
         )
         export_backups(config, destination, logger=logger)
+
+
+@dataclasses.dataclass(frozen=True)
+class Option:
+    config: pathlib.Path
+    verbose: bool
+    command: Literal["download", "commit", "export"]
+    destination: pathlib.Path
+    subdirectory: bool
 
 
 def _argument_parser() -> argparse.ArgumentParser:
