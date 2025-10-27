@@ -53,7 +53,13 @@ def backup_cosense(
                 subdirectory=option.subdirectory,
                 logger=logger,
             )
-            export_backups(config, destination, logger=logger)
+            export_backups(
+                config,
+                destination,
+                after=option.after,
+                before=option.before,
+                logger=logger,
+            )
 
 
 @dataclasses.dataclass(frozen=True)

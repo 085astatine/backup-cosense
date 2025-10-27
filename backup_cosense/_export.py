@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 import pathlib
 import subprocess
@@ -14,6 +15,9 @@ def export_backups(
     config: Config,
     destination: BackupArchive,
     logger: logging.Logger,
+    *,
+    after: Optional[str] = None,
+    before: Optional[str] = None,
 ) -> None:
     git = config.git.create(logger=logger)
     # check if the destination exists
@@ -21,7 +25,11 @@ def export_backups(
         logger.error(f'export directory "{destination.path}" does not exist')
         return
     # commits
-    commits = git.commits()
+    export_range = _ExportRange(
+        after=after,
+        before=before,
+    )
+    commits = git.commits(option=export_range.to_option())
     if commits:
         logger.info(
             f"{len(commits)} commits:"
@@ -40,6 +48,20 @@ def export_backups(
             destination,
             logger,
         )
+
+
+@dataclasses.dataclass(frozen=True)
+class _ExportRange:
+    after: Optional[str]
+    before: Optional[str]
+
+    def to_option(self) -> list[str]:
+        option: list[str] = []
+        if self.after is not None:
+            option.extend(["--after", self.after])
+        if self.before is not None:
+            option.extend(["--before", self.before])
+        return option
 
 
 def _export(
