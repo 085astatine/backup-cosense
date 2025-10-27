@@ -27,7 +27,7 @@ def backup_cosense(
         )
         logger.addHandler(handler)
     # option
-    option = Option(**vars(_argument_parser().parse_args(args=args)))
+    option = parse_args(args)
     if option.verbose:
         logger.setLevel(logging.DEBUG)
     logger.debug(f"option: {option}")
@@ -62,6 +62,12 @@ class Option:
     command: Literal["download", "commit", "export"]
     destination: pathlib.Path
     subdirectory: bool
+
+
+def parse_args(args: Optional[list[str]] = None) -> Option:
+    parser = _argument_parser()
+    option = parser.parse_args(args)
+    return Option(**vars(option))
 
 
 def _argument_parser() -> argparse.ArgumentParser:
