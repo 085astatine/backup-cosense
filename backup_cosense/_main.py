@@ -63,6 +63,10 @@ class CommonOption:
 
     @classmethod
     def add_arguments(cls, parser: argparse.ArgumentParser) -> None:
+        parser.set_defaults(cls=cls)
+
+    @classmethod
+    def add_common_arguments(cls, parser: argparse.ArgumentParser) -> None:
         # config
         parser.add_argument(
             "--config",
@@ -84,16 +88,12 @@ class CommonOption:
 
 @dataclasses.dataclass(frozen=True)
 class DownloadOption(CommonOption):
-    @classmethod
-    def add_arguments(cls, parser: argparse.ArgumentParser) -> None:
-        parser.set_defaults(cls=cls)
+    pass
 
 
 @dataclasses.dataclass(frozen=True)
 class CommitOption(CommonOption):
-    @classmethod
-    def add_arguments(cls, parser: argparse.ArgumentParser) -> None:
-        parser.set_defaults(cls=cls)
+    pass
 
 
 @dataclasses.dataclass(frozen=True)
@@ -103,7 +103,7 @@ class ExportOption(CommonOption):
 
     @classmethod
     def add_arguments(cls, parser: argparse.ArgumentParser) -> None:
-        parser.set_defaults(cls=cls)
+        super().add_arguments(parser)
         # destination
         parser.add_argument(
             "-d",
@@ -136,7 +136,7 @@ def parse_args(args: Optional[list[str]] = None) -> Option:
 def _argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog=__package__)
     # common
-    CommonOption.add_arguments(parser)
+    CommonOption.add_common_arguments(parser)
     # sub parser
     sub_parsers = parser.add_subparsers(
         title="command",
