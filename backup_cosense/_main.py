@@ -100,6 +100,8 @@ class CommitOption(CommonOption):
 class ExportOption(CommonOption):
     destination: pathlib.Path
     subdirectory: bool
+    after: Optional[str]
+    before: Optional[str]
 
     @classmethod
     def add_arguments(cls, parser: argparse.ArgumentParser) -> None:
@@ -120,6 +122,22 @@ class ExportOption(CommonOption):
             dest="subdirectory",
             action="store_true",
             help="create subdirectories on export",
+        )
+        # after / since
+        parser.add_argument(
+            "--after",
+            "--since",
+            dest="after",
+            metavar="<date>",
+            help="export commits more recent then <date>",
+        )
+        # before / until
+        parser.add_argument(
+            "--before",
+            "--untill",
+            dest="before",
+            metavar="<date>",
+            help="export commits older than <date>",
         )
 
 
