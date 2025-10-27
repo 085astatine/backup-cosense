@@ -64,6 +64,32 @@ class Option:
     subdirectory: bool
 
 
+@dataclasses.dataclass(frozen=True)
+class CommonOption:
+    config: pathlib.Path
+    verbose: bool
+
+    @classmethod
+    def add_arguments(cls, parser: argparse.ArgumentParser) -> None:
+        # config
+        parser.add_argument(
+            "--config",
+            dest="config",
+            default="config.toml",
+            metavar="TOML",
+            type=pathlib.Path,
+            help=".toml file (default %(default)s)",
+        )
+        # verbose
+        parser.add_argument(
+            "-v",
+            "--verbose",
+            dest="verbose",
+            action="store_true",
+            help="set log level to debug",
+        )
+
+
 def parse_args(args: Optional[list[str]] = None) -> Option:
     parser = _argument_parser()
     option = parser.parse_args(args)
@@ -72,7 +98,8 @@ def parse_args(args: Optional[list[str]] = None) -> Option:
 
 def _argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog=__package__)
-    _add_common_arguments(parser)
+    # common
+    CommonOption.add_arguments(parser)
     # sub parser
     sub_parsers = parser.add_subparsers(
         dest="command",
@@ -97,26 +124,6 @@ def _argument_parser() -> argparse.ArgumentParser:
     )
     _add_export_arguments(export_parser)
     return parser
-
-
-def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
-    # config
-    parser.add_argument(
-        "--config",
-        dest="config",
-        default="config.toml",
-        metavar="TOML",
-        type=pathlib.Path,
-        help=".toml file (default %(default)s)",
-    )
-    # verbose
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        dest="verbose",
-        action="store_true",
-        help="set log level to debug",
-    )
 
 
 def _add_export_arguments(parser: argparse.ArgumentParser) -> None:
