@@ -2,7 +2,7 @@ import argparse
 import dataclasses
 import logging
 import pathlib
-from typing import Literal, Optional
+from typing import Optional
 
 from ._backup import BackupArchive
 from ._commit import commit_backups
@@ -34,34 +34,26 @@ def backup_cosense(
     # config TOML
     if config is None:
         config = load_config(option.config, logger=logger)
-    # main
+    # command
     logger.info("backup-cosense")
-    # download backup
-    if option.command == "download":
-        logger.info("command: download")
-        download_backups(config, logger=logger)
-    # commit
-    if option.command == "commit":
-        logger.info("command: commit")
-        commit_backups(config, logger=logger)
-    # export
-    if option.command == "export":
-        logger.info("command: export")
-        destination = BackupArchive(
-            option.destination,
-            subdirectory=option.subdirectory,
-            logger=logger,
-        )
-        export_backups(config, destination, logger=logger)
-
-
-@dataclasses.dataclass(frozen=True)
-class Option:
-    config: pathlib.Path
-    verbose: bool
-    command: Literal["download", "commit", "export"]
-    destination: pathlib.Path
-    subdirectory: bool
+    match option:
+        case DownloadOption():
+            # download backup
+            logger.info("command: download")
+            download_backups(config, logger=logger)
+        case CommitOption():
+            # commit
+            logger.info("command: commit")
+            commit_backups(config, logger=logger)
+        case ExportOption():
+            # export
+            logger.info("command: export")
+            destination = BackupArchive(
+                option.destination,
+                subdirectory=option.subdirectory,
+                logger=logger,
+            )
+            export_backups(config, destination, logger=logger)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -90,10 +82,55 @@ class CommonOption:
         )
 
 
+@dataclasses.dataclass(frozen=True)
+class DownloadOption(CommonOption):
+    @classmethod
+    def add_arguments(cls, parser: argparse.ArgumentParser) -> None:
+        parser.set_defaults(cls=cls)
+
+
+@dataclasses.dataclass(frozen=True)
+class CommitOption(CommonOption):
+    @classmethod
+    def add_arguments(cls, parser: argparse.ArgumentParser) -> None:
+        parser.set_defaults(cls=cls)
+
+
+@dataclasses.dataclass(frozen=True)
+class ExportOption(CommonOption):
+    destination: pathlib.Path
+    subdirectory: bool
+
+    @classmethod
+    def add_arguments(cls, parser: argparse.ArgumentParser) -> None:
+        parser.set_defaults(cls=cls)
+        # destination
+        parser.add_argument(
+            "-d",
+            "--destination",
+            dest="destination",
+            required=True,
+            metavar="DIR",
+            type=pathlib.Path,
+            help="directory to export backups",
+        )
+        # subdirectory
+        parser.add_argument(
+            "--subdirectory",
+            dest="subdirectory",
+            action="store_true",
+            help="create subdirectories on export",
+        )
+
+
+type Option = DownloadOption | CommitOption | ExportOption
+
+
 def parse_args(args: Optional[list[str]] = None) -> Option:
     parser = _argument_parser()
-    option = parser.parse_args(args)
-    return Option(**vars(option))
+    option = vars(parser.parse_args(args))
+    cls = option.pop("cls")
+    return cls(**option)
 
 
 def _argument_parser() -> argparse.ArgumentParser:
@@ -102,45 +139,26 @@ def _argument_parser() -> argparse.ArgumentParser:
     CommonOption.add_arguments(parser)
     # sub parser
     sub_parsers = parser.add_subparsers(
-        dest="command",
         title="command",
         description="command to be executed",
         required=True,
     )
     # download
-    sub_parsers.add_parser(
+    download_parser = sub_parsers.add_parser(
         "download",
         help="download backup from scrapbox.io",
     )
+    DownloadOption.add_arguments(download_parser)
     # commit
-    sub_parsers.add_parser(
+    commit_parser = sub_parsers.add_parser(
         "commit",
         help="commit to Git repository",
     )
+    CommitOption.add_arguments(commit_parser)
     # export
     export_parser = sub_parsers.add_parser(
         "export",
         help="export backups from Git repository",
     )
-    _add_export_arguments(export_parser)
+    ExportOption.add_arguments(export_parser)
     return parser
-
-
-def _add_export_arguments(parser: argparse.ArgumentParser) -> None:
-    # destination
-    parser.add_argument(
-        "-d",
-        "--destination",
-        dest="destination",
-        required=True,
-        metavar="DIR",
-        type=pathlib.Path,
-        help="directory to export backups",
-    )
-    # subdirectory
-    parser.add_argument(
-        "--subdirectory",
-        dest="subdirectory",
-        action="store_true",
-        help="create subdirectories on export",
-    )
