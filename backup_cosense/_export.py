@@ -1,4 +1,5 @@
 import dataclasses
+import datetime
 import logging
 import pathlib
 import subprocess
@@ -16,8 +17,8 @@ def export_backups(
     destination: BackupArchive,
     logger: logging.Logger,
     *,
-    after: Optional[str] = None,
-    before: Optional[str] = None,
+    after: Optional[datetime.datetime] = None,
+    before: Optional[datetime.datetime] = None,
 ) -> None:
     git = config.git.create(logger=logger)
     # check if the destination exists
@@ -52,15 +53,15 @@ def export_backups(
 
 @dataclasses.dataclass(frozen=True)
 class _ExportRange:
-    after: Optional[str]
-    before: Optional[str]
+    after: Optional[datetime.datetime]
+    before: Optional[datetime.datetime]
 
     def to_option(self) -> list[str]:
         option: list[str] = []
         if self.after is not None:
-            option.extend(["--after", self.after])
+            option.extend(["--after", self.after.isoformat()])
         if self.before is not None:
-            option.extend(["--before", self.before])
+            option.extend(["--before", self.before.isoformat()])
         return option
 
 

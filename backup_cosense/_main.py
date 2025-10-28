@@ -1,8 +1,9 @@
 import argparse
 import dataclasses
+import datetime
 import logging
 import pathlib
-from typing import Optional
+from typing import Any, Optional, Sequence
 
 from ._backup import BackupArchive
 from ._commit import commit_backups
@@ -106,8 +107,8 @@ class CommitOption(CommonOption):
 class ExportOption(CommonOption):
     destination: pathlib.Path
     subdirectory: bool
-    after: Optional[str]
-    before: Optional[str]
+    after: Optional[datetime.datetime]
+    before: Optional[datetime.datetime]
 
     @classmethod
     def add_arguments(cls, parser: argparse.ArgumentParser) -> None:
@@ -134,6 +135,7 @@ class ExportOption(CommonOption):
             "--after",
             "--since",
             dest="after",
+            action=_ToDatetimeAction,
             metavar="<date>",
             help="export commits more recent then <date>",
         )
@@ -142,6 +144,7 @@ class ExportOption(CommonOption):
             "--before",
             "--untill",
             dest="before",
+            action=_ToDatetimeAction,
             metavar="<date>",
             help="export commits older than <date>",
         )
@@ -186,3 +189,34 @@ def _argument_parser() -> argparse.ArgumentParser:
     )
     ExportOption.add_arguments(export_parser)
     return parser
+
+
+class _ToDatetimeAction(argparse.Action):
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[Any] | None,
+        option_string: str | None = None,
+    ) -> None:
+        result: Optional[datetime.datetime] = None
+        if isinstance(values, str):
+            result = _to_datetime(values)
+        if result is not None:
+            setattr(namespace, self.dest, result)
+        else:
+            parser.error(f"failed to convert to datetime : {option_string} '{values}'")
+
+
+def _to_datetime(value: str) -> Optional[datetime.datetime]:
+    # ISO8601
+    try:
+        return datetime.datetime.fromisoformat(value)
+    except ValueError:
+        pass
+    # timestamp
+    try:
+        return datetime.datetime.fromtimestamp(int(value))
+    except ValueError:
+        pass
+    return None
