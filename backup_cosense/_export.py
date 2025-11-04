@@ -74,44 +74,98 @@ def _export(
     destination: BackupArchive,
     logger: logging.Logger,
 ) -> None:
+    target = _export_target(project, git, commit)
     file_path = destination.file_path(commit.timestamp)
-    # save backup.json
-    if not _export_json(
-        git,
-        commit.hash,
-        f"{project}.json",
-        file_path.backup,
-        jsonschema_backup(),
-    ):
-        logger.warning(f"skip commit: {commit.hash}")
-        return
-    logger.debug(f'save "{file_path.backup}"')
-    # save backup.info.json
-    if _export_json(
-        git,
-        commit.hash,
-        f"{project}.info.json",
-        file_path.info,
-        jsonschema_backup_info(),
-    ):
-        logger.debug(f'save "{file_path.info}"')
-    else:
-        # from commit message
-        info_json = commit.backup_info()
-        if info_json is not None:
-            save_json(file_path.info, info_json)
+    # save {project}.json
+    backup_object = target.backup_object()
+    if backup_object is not None:
+        if not _export_json(
+            git,
+            backup_object,
+            file_path.backup,
+            jsonschema_backup(),
+        ):
+            logger.warning(f"skip commit: {commit.hash}")
+            return
+        logger.debug(f'save "{file_path.backup}"')
+    # save {project}.info.json
+    info_object = target.info_object()
+    if info_object is not None:
+        if _export_json(
+            git,
+            info_object,
+            file_path.info,
+            jsonschema_backup_info(),
+        ):
             logger.debug(f'save "{file_path.info}"')
+        else:
+            # from commit message
+            info_json = commit.backup_info()
+            if info_json is not None:
+                save_json(file_path.info, info_json)
+                logger.debug(f'save "{file_path.info}"')
+
+
+@dataclasses.dataclass(frozen=True)
+class _ExportTarget:
+    commit: str
+    project: str
+    has_backup: bool
+    has_info: bool
+
+    def backup_object(self) -> Optional[str]:
+        if self.has_backup:
+            return f"{self.commit}:{self.project}.json"
+        return None
+
+    def info_object(self) -> Optional[str]:
+        if self.has_info:
+            return f"{self.commit}:{self.project}.info.json"
+        return None
+
+
+def _export_target(
+    project: str,
+    git: Git,
+    commit: Commit,
+) -> _ExportTarget:
+    # add / modified files in commit
+    command = [
+        "git",
+        "show",
+        "-z",
+        "--name-only",
+        "--diff-filter=MA",
+        '--format=tformat:""',
+        f"{commit.hash}",
+    ]
+    try:
+        process = git.execute(command)
+    except subprocess.CalledProcessError:
+        return _ExportTarget(
+            commit=commit.hash,
+            project=project,
+            has_backup=False,
+            has_info=False,
+        )
+    names = [x for x in process.stdout.removeprefix('""\0\n').split("\0") if x != ""]
+    # {project}.json & {project}.info.json
+    return _ExportTarget(
+        project=project,
+        commit=commit.hash,
+        has_backup=f"{project}.json" in names,
+        has_info=f"{project}.info.json" in names,
+    )
 
 
 def _export_json(
     git: Git,
-    commit_hash: str,
-    file: str,
+    target: str,
     output: pathlib.Path,
     schema: Optional[dict[str, Any]],
 ) -> bool:
     # get from git
-    command = ["git", "show", f"{commit_hash}:{file}"]
+    command = ["git", "show", target]
     try:
         process = git.execute(command)
     except subprocess.CalledProcessError:
