@@ -109,6 +109,7 @@ class CommitOption(CommonOption):
 class ExportOption(CommonOption):
     destination: pathlib.Path
     subdirectory: bool
+    dry_run: bool
     after: Optional[datetime.datetime]
     before: Optional[datetime.datetime]
 
@@ -131,6 +132,12 @@ class ExportOption(CommonOption):
             dest="subdirectory",
             action="store_true",
             help="create subdirectories on export",
+        )
+        parser.add_argument(
+            "--dry-run",
+            dest="dry_run",
+            action="store_true",
+            help="preform a dry run, only printing export targets and save paths",
         )
         # after / since
         parser.add_argument(
