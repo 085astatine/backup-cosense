@@ -32,6 +32,11 @@ disallow_untyped_defs = true
 strict_optional = true
 warn_redundant_casts = true
 
+[tool.pylint.design]
+max-args = 10
+max-positional-arguments = 5
+max-attributes = 15
+
 [tool.pylint.messages_control]
 enable = [
   "useless-suppression", # I0021
