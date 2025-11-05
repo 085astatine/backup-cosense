@@ -137,7 +137,6 @@ class BackupArchiveConfig:
 
 @dataclasses.dataclass(frozen=True)
 class CosenseConfig:
-    # pylint: disable=too-many-instance-attributes
     project: str
     session_id: str
     backup_archive: BackupArchiveConfig
@@ -200,7 +199,6 @@ class GitEmptyInitialCommitConfig:
 
 @dataclasses.dataclass(frozen=True)
 class GitConfig:
-    # pylint: disable=too-many-instance-attributes
     path: str
     executable: Optional[str] = None
     branch: Optional[str] = None
@@ -286,7 +284,6 @@ class ExternalLinkSessionConfig:
 
 @dataclasses.dataclass(frozen=True)
 class ExternalLinkConfig:
-    # pylint: disable=too-many-instance-attributes
     enabled: bool = False
     use_git_lfs: bool = False
     log_directory: str = "log"

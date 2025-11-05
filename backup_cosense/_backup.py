@@ -325,7 +325,6 @@ class BackupData:
 
 class BackupRepository:
     def __init__(
-        # pylint: disable=too-many-arguments
         self,
         project: str,
         directory: pathlib.Path,

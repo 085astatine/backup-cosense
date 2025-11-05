@@ -16,7 +16,6 @@ from ._utility import format_timestamp
 
 
 def export_backups(
-    # pylint: disable=too-many-arguments
     config: Config,
     destination: BackupArchive,
     logger: logging.Logger,

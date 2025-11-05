@@ -101,7 +101,6 @@ class ExternalLinkLog:
 
 
 def save_external_links(
-    # pylint: disable=too-many-arguments
     timestamp: int,
     external_links: list[ExternalLink],
     git_directory: pathlib.Path,

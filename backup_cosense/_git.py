@@ -70,7 +70,6 @@ class Commit:
 
 class Git:
     def __init__(
-        # pylint: disable=too-many-arguments
         self,
         path: pathlib.Path,
         *,
