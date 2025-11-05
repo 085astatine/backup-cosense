@@ -16,15 +16,15 @@ from ._utility import format_timestamp
 
 
 def export_backups(
-    # pylint: disable=too-many-arguments
     config: Config,
     destination: BackupArchive,
-    logger: logging.Logger,
     *,
     dry_run: bool = False,
     after: Optional[datetime.datetime] = None,
     before: Optional[datetime.datetime] = None,
+    logger: Optional[logging.Logger] = None,
 ) -> None:
+    logger = logger or logging.getLogger(__name__)
     git = config.git.create(logger=logger)
     # check if the destination exists
     if not destination.path.exists():
