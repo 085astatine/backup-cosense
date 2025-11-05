@@ -78,32 +78,34 @@ def _export(
     file_path = destination.file_path(commit.timestamp)
     # save {project}.json
     backup_object = target.backup_object()
-    if backup_object is not None:
-        if not _export_json(
-            git,
-            backup_object,
-            file_path.backup,
-            jsonschema_backup(),
-        ):
-            logger.warning(f"skip commit: {commit.hash}")
-            return
-        logger.debug(f'save "{file_path.backup}"')
+    if backup_object is None:
+        logger.warning(f"skip commit: {commit.hash}")
+        return
+    if not _export_json(
+        git,
+        backup_object,
+        file_path.backup,
+        jsonschema_backup(),
+    ):
+        logger.warning(f"skip commit: {commit.hash}")
+        return
+    logger.debug(f'save "{file_path.backup}"')
     # save {project}.info.json
     info_object = target.info_object()
-    if info_object is not None:
-        if _export_json(
-            git,
-            info_object,
-            file_path.info,
-            jsonschema_backup_info(),
-        ):
+    if info_object is None:
+        # from commit message
+        logger.debug("generate info.json from commit message")
+        info_json = commit.backup_info()
+        if info_json is not None:
+            save_json(file_path.info, info_json)
             logger.debug(f'save "{file_path.info}"')
-        else:
-            # from commit message
-            info_json = commit.backup_info()
-            if info_json is not None:
-                save_json(file_path.info, info_json)
-                logger.debug(f'save "{file_path.info}"')
+    elif _export_json(
+        git,
+        info_object,
+        file_path.info,
+        jsonschema_backup_info(),
+    ):
+        logger.debug(f'save "{file_path.info}"')
 
 
 @dataclasses.dataclass(frozen=True)
