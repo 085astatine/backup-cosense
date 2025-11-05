@@ -5,6 +5,7 @@ import datetime
 import logging
 import pathlib
 import subprocess
+import sys
 from typing import Any, Optional
 
 from ._backup import BackupArchive, jsonschema_backup, jsonschema_backup_info
@@ -15,10 +16,12 @@ from ._utility import format_timestamp
 
 
 def export_backups(
+    # pylint: disable=too-many-arguments
     config: Config,
     destination: BackupArchive,
     logger: logging.Logger,
     *,
+    dry_run: bool = False,
     after: Optional[datetime.datetime] = None,
     before: Optional[datetime.datetime] = None,
 ) -> None:
@@ -44,6 +47,14 @@ def export_backups(
     # export
     for commit in commits:
         logger.info(f"export {format_timestamp(commit.timestamp)}")
+        if dry_run:
+            _dry_run_export(
+                config.cosense.project,
+                git,
+                commit,
+                destination,
+            )
+            continue
         _export(
             config.cosense.project,
             git,
@@ -106,6 +117,26 @@ def _export(
         jsonschema_backup_info(),
     ):
         logger.debug(f'save "{file_path.info}"')
+
+
+def _dry_run_export(
+    project: str,
+    git: Git,
+    commit: Commit,
+    destination: BackupArchive,
+) -> None:
+    target = _export_target(project, git, commit)
+    file_path = destination.file_path(commit.timestamp)
+    # {project}.json
+    if target.has_backup is None:
+        return
+    sys.stdout.write(f"(dry-run) export: {file_path.backup}\n")
+    # {project}.info.json
+    if target.has_info is None:
+        info = commit.backup_info()
+        if info is None:
+            return
+    sys.stdout.write(f"(dry-run) export: {file_path.info}\n")
 
 
 @dataclasses.dataclass(frozen=True)

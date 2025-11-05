@@ -59,6 +59,7 @@ def backup_cosense(
             export_backups(
                 config,
                 destination,
+                dry_run=option.dry_run,
                 after=option.after,
                 before=option.before,
                 logger=logger,
