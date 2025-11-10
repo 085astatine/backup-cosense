@@ -262,6 +262,43 @@ class GitConfig:
 
 
 @dataclasses.dataclass(frozen=True)
+class ExternalLinkLogDirectoryConfig:
+    name: str = "log"
+    keep: int | Literal["all"] = "all"
+
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "oneOf": [
+                {"type": "string"},
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "name": {"type": "string"},
+                        "keep": {
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                },
+                                {"const": "all"},
+                            ],
+                        },
+                    },
+                },
+            ],
+        }
+        return schema
+
+    @classmethod
+    def from_toml(cls, value: str | dict) -> Self:
+        if isinstance(value, str):
+            value = {"name": value}
+        return cls(**value)
+
+
+@dataclasses.dataclass(frozen=True)
 class ExternalLinkSessionConfig:
     timeout: float = 30
     parallel_limit_per_host: int = 0
@@ -298,7 +335,7 @@ class ExternalLinkSessionConfig:
 class ExternalLinkConfig:
     enabled: bool = False
     use_git_lfs: bool = False
-    log_directory: str = "log"
+    log_directory: ExternalLinkLogDirectoryConfig = ExternalLinkLogDirectoryConfig()
     save_directory: str = "links"
     session: ExternalLinkSessionConfig = ExternalLinkSessionConfig()
     parallel_limit: int = 5
@@ -306,7 +343,6 @@ class ExternalLinkConfig:
     content_types: list[str] = dataclasses.field(default_factory=list)
     excluded_urls: list[str] = dataclasses.field(default_factory=list)
     allways_request_all_links: bool = False
-    keep_logs: int | Literal["all"] = "all"
     keep_deleted_links: bool = False
 
     @classmethod
@@ -317,7 +353,7 @@ class ExternalLinkConfig:
             "properties": {
                 "enabled": {"type": "boolean"},
                 "use_git_lfs": {"type": "boolean"},
-                "log_directory": {"type": "string"},
+                "log_directory": ExternalLinkLogDirectoryConfig.jsonschema(),
                 "save_directory": {"type": "string"},
                 "session": ExternalLinkSessionConfig.jsonschema(),
                 "parallel_limit": {
@@ -337,15 +373,6 @@ class ExternalLinkConfig:
                     "items": {"type": "string"},
                 },
                 "allways_request_all_links": {"type": "boolean"},
-                "keep_logs": {
-                    "oneOf": [
-                        {
-                            "type": "integer",
-                            "minimum": 0,
-                        },
-                        {"const": "all"},
-                    ],
-                },
                 "keep_deleted_links": {"type": "boolean"},
             },
         }
@@ -394,6 +421,7 @@ def load_config(
             type_hooks={
                 datetime.datetime: _to_datetime,
                 BackupArchiveConfig: BackupArchiveConfig.from_toml,
+                ExternalLinkLogDirectoryConfig: ExternalLinkLogDirectoryConfig.from_toml,
                 UserAgentConfig: UserAgentConfig.from_toml,
             },
             strict=True,

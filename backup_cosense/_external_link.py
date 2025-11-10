@@ -119,7 +119,7 @@ def save_external_links(
     if create_session is None:
         create_session = default_create_session
     # log directory
-    log_directory = _LogDirectory(pathlib.Path(config.log_directory), logger)
+    log_directory = _LogDirectory(pathlib.Path(config.log_directory.name), logger)
     # links directory
     links_directory = _LinksDirectory(
         git_directory.joinpath(config.save_directory),
@@ -147,8 +147,8 @@ def save_external_links(
     log = log_editor.output()
     log_directory.save(log)
     # clean logs
-    if config.keep_logs != "all":
-        log_directory.clean(config.keep_logs)
+    if config.log_directory.keep != "all":
+        log_directory.clean(config.log_directory.keep)
     # commit target
     return _commit_target(
         config,
