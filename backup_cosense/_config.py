@@ -4,7 +4,7 @@ import dataclasses
 import datetime
 import logging
 import pathlib
-from typing import Any, Literal, Optional, get_args
+from typing import Any, Literal, Optional, Self, get_args
 
 import dacite
 import fake_useragent
@@ -99,6 +99,12 @@ class UserAgentConfig:
         }
         return schema
 
+    @classmethod
+    def from_toml(cls, value: str | dict) -> Self:
+        if isinstance(value, str):
+            value = {"value": value}
+        return cls(**value)
+
 
 @dataclasses.dataclass(frozen=True)
 class BackupArchiveConfig:
@@ -133,6 +139,12 @@ class BackupArchiveConfig:
             ],
         }
         return schema
+
+    @classmethod
+    def from_toml(cls, value: str | dict) -> Self:
+        if isinstance(value, str):
+            value = {"name": value}
+        return cls(**value)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -381,8 +393,8 @@ def load_config(
         config=dacite.Config(
             type_hooks={
                 datetime.datetime: _to_datetime,
-                BackupArchiveConfig: _to_backup_archive,
-                UserAgentConfig: _to_user_agent,
+                BackupArchiveConfig: BackupArchiveConfig.from_toml,
+                UserAgentConfig: UserAgentConfig.from_toml,
             },
             strict=True,
         ),
@@ -421,12 +433,6 @@ def _is_datetime(
     return isinstance(instance, datetime.datetime)
 
 
-def _to_backup_archive(value: str | dict) -> BackupArchiveConfig:
-    if isinstance(value, str):
-        value = {"name": value}
-    return BackupArchiveConfig(**value)
-
-
 def _to_datetime(value: datetime.date | datetime.datetime) -> datetime.datetime:
     match value:
         case datetime.datetime():
@@ -434,9 +440,3 @@ def _to_datetime(value: datetime.date | datetime.datetime) -> datetime.datetime:
         case datetime.date():
             # add time(00:00:00) to date
             return datetime.datetime.combine(value, datetime.time())
-
-
-def _to_user_agent(value: str | dict) -> UserAgentConfig:
-    if isinstance(value, str):
-        value = {"value": value}
-    return UserAgentConfig(**value)
