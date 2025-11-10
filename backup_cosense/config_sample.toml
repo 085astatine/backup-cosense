@@ -1,0 +1,250 @@
+[cosense]
+# Your cosense project name (required)
+# type: <str>
+project = "<cosense_project>"
+
+
+# The connect.sid of the cookie. (required)
+# The session ID of the Cosense project administrator is requred to download backup data.
+# How to get connect.sid
+# - Chrome
+#     1. Open DevTools.
+#     2. Expand Application tab.
+#     3. Open "https://scrapbox.io" in Cookies and get the value of connect.sid.
+# - Firefox
+#     1. Open devtools.
+#     2. Expand Storage tab.
+#     3. Open "https://scrapbox.io" in Cookies and get the value of connect.sid.
+# type: <str>
+session_id = "<connect.sid>"
+
+
+# Destination for downloaded backup data. (required)
+# type: <str> | {name=<str>, subdirectory=<bool>}
+# - name: Path to the directory.
+# - subdirectory:
+#     Create subdirectories based on timestamp.
+#     for example: 1234567890.json → 123/1234567890.json
+#     default: false
+backup_archive = "<directory>"
+# backup_archive = {name = "<directory>", subdirectory = true}
+
+
+# Switch the domain for API requests. (optional)
+# type: "scrapbox.io" | "cosen.se"
+# default: "scrapbox.io"
+# domain = "scrapbox.io"
+
+
+# Number of seconds between API requests (optional)
+# type: <float>
+# default: 3.0
+# request_interval = 3.0
+
+
+# Nunber of seconds until request timeout (optional)
+# type: <float>
+# default: 10.0
+# request_timeout = 10.0
+
+
+# User-Agent used to download backups from cosense. (optional)
+# type: <str> | {os=<str>, browser=<str>, platform=<str>}
+# default: None
+#   In this case, requests's default User-Agent "python-requests/X.Y.Z" is used.
+# - <string>: Set the value to User-Agent
+# - {os=<str>, browser=<str>, platform=<str>}: Parameters for fake-useragent
+#    - os: "Windows", "Linux", "Ubuntu", "Chrome OS", "Mac OS X", "Android", "iOS"
+#    - browser: "Google", "Chrome", "Firefox", "Edge", "Opera", "Safari", "Android", ...
+#    - platform: "desktop", "mobile", "tablet"
+# user_agent = "<User-Agent>"
+# user_agent = {os="Windows", browser="Firefox", platform="desktop"}
+
+
+# Backup data before the specifired time is not be targeted. (optional)
+# type: datetime
+# default: None
+# backup_start_date = 2024-05-21
+
+
+[git]
+# Path to git repository (required)
+# type: <str>
+path = "<path>"
+
+
+# Path to the git executable. (optional)
+# type: <str>
+# default: None
+#   Then find git with `shutil.witch("git")`
+#
+# executable = "/usr/bin/git"
+
+
+# Branch to be committed (optional)
+# type: <str>
+# default: None
+#
+# branch = "<branch>"
+
+# Sort pages on commit.
+# Sorting pages is expected to reduce commit diffs.
+# type: "as-is", "created-asc", "created-desc"
+# default: "as-is"
+# - as-is        : Do not sort pages.
+# - created-asc  : Sort pages in ascending order by created time.
+# - created-desc : Sort pages in descending order by created time.
+# page_order = "as-is"
+
+# user.name used for commits. (optional)
+# type: <str>
+# default: None
+#
+# user_name = "<user.name>"
+
+
+# user.email used aaaafor commits. (optional)
+# typ: <str>
+# default: None
+#
+# user_email = "<user.email>"
+
+
+# Whether to insert an empty commit at the beginning of the repository. (optional)
+# type: <str>
+#       | {message=<str>, timestamp=<dateime> | "oldest_backup" | "oldest_created_page"}
+# default: None
+# - message: Commit message
+# - timestamp:
+#     Committer date and author date of the initial commit
+#     type: <datetime> | "oldest_backup" | "oldest_created_page"
+#     default: "oldest_created_page"
+#     - <datetime>: Use the selected time.
+#     - "oldest_backup": Use the time when the oldest backup data was exported.
+#     - "oldest_created_page": Use the time of the oldest created page in the oldest backup data.
+#
+# empty_initial_commit = "Initial commit"
+# empty_initial_commit = {message="Initial commit", timestamp="oldest_created_page"}
+
+
+# Number of files added per "git add" command.
+# type: <int>
+# default: 1
+#
+# staging_step_size = 1
+
+
+[external_link]
+# Enable saving extarnal links. (optional)
+# type: <bool>
+# default: false
+#
+# enabled = false
+
+# Use Git LFS to save external links
+# type: <bool>
+# default: false
+#
+# use_git_lfs = false
+
+
+# Reqular expressions for target Content-Type. (optional)
+# External links with the selected Content-Type specifired will be saved.
+# type: <list[str]>
+# default: []
+#
+# content_types = [
+#   "application/pdf",
+#   "image/.+",
+# ]
+
+# Regular expressions for excluding URLs. (optional)
+# type: <list[str]>
+# default: []
+#
+# excluded_urls = [
+#   "https?://192\.168\..+",
+#   "https?://localhost.+",
+# ]
+
+
+# Directory in the Git repository that stores external links. (optional)
+# type: <str>
+# default: "links"
+#
+# save_directory = "links"
+
+# Directory name to record the access result of external links. (optional)
+# By using saved logs, only newly added external links are targeted.
+# type: <str>
+# default: log
+#
+# log_directory = "log"
+
+
+# The number of access logs to keep. (optional)
+# type: <int> | "all".
+# - <int>: Keep the most recent <integer> logs.
+# - "all": Keep all logs.
+# default: "all"
+#
+# keep_logs = "all"
+
+
+# Maximum number of requests that can be executed simultaneously. (optional)
+# type: <int>
+# default: 5
+#
+# parallel_limit = 5
+
+
+# Number of seconds to wait between requests (optional)
+# type: <float>
+# default: 1.0
+#
+# request_interval = 1.0
+
+
+# Keep files in the Git repository even if the links is removed from Cosense. (optional)
+# type: <bool>
+# default: false
+#
+# keep_deleted_links = false
+
+[external_link.session]
+# Total number of seconds for the whole request. (optional)
+# Used as an argument to aiohttp.ClientTimeout(total=...)
+# type: <float>
+# default: 30.0
+#
+# timeout = 30.0
+
+# Total number of seconds for the whole request. (optional)
+# Used as an argument to aiohttp.TCPConnector(parallel_limit_per_host=...)
+# limit simultaneous connections to the same endpoint.
+# If limit is 0, the connector has no limit.
+# type: <int>
+# default: 0
+#
+# parallel_limit_per_host = 1
+
+
+# User-Agent used to aiohttp.ClientSession. (optional)
+# type: <str> | {os=<str>, browser=<str>, platform=<str>}
+# default: None
+#   In this case, aiohttp's default User-Agent "Python/X.Y aiohttp/X.Y.Z" is used.
+# - <string>: Set the value to User-Agent
+# - {os=<str>, browser=<str>, platform=<str>}: Parameters for fake-useragent
+#    - os: "Windows", "Linux", "Ubuntu", "Chrome OS", "Mac OS X", "Android", "iOS"
+#    - browser: "Google", "Chrome", "Firefox", "Edge", "Opera", "Safari", "Android", ...
+#    - platform: "desktop", "mobile", "tablet"
+#
+# user_agent = "<User-Agent>"
+# user_agent = {os="Windows", browser="Firefox", platform="desktop"}
+
+
+# Add paramters to HTTP request headers. (optional)
+# type: <dict[str, str]>
+# default: []
+#
+# request_headers = {"Accept": "text/html"}
