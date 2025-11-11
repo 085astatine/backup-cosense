@@ -4,6 +4,7 @@ import dataclasses
 import datetime
 import logging
 import pathlib
+import re
 from typing import Any, Literal, Optional, Self, get_args
 
 import dacite
@@ -53,6 +54,26 @@ FakeUserAgentBrowser = Literal[
 
 
 FakeUserAgentPlatform = Literal["desktop", "mobile", "tablet"]
+
+
+@dataclasses.dataclass(frozen=True)
+class RegexPatterns:
+    patterns: list[re.Pattern[str]] = dataclasses.field(default_factory=list)
+
+    def any_match(self, value: str) -> bool:
+        return any(pattern.match(value) for pattern in self.patterns)
+
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "array",
+            "items": {"type": "string"},
+        }
+        return schema
+
+    @classmethod
+    def from_toml(cls, value: list[str]) -> Self:
+        return cls([re.compile(x) for x in value])
 
 
 @dataclasses.dataclass(frozen=True)
@@ -340,8 +361,8 @@ class ExternalLinkConfig:
     session: ExternalLinkSessionConfig = ExternalLinkSessionConfig()
     parallel_limit: int = 5
     request_interval: float = 1.0
-    content_types: list[str] = dataclasses.field(default_factory=list)
-    excluded_urls: list[str] = dataclasses.field(default_factory=list)
+    content_types: RegexPatterns = RegexPatterns()
+    excluded_urls: RegexPatterns = RegexPatterns()
     allways_request_all_links: bool = False
     keep_deleted_links: bool = False
 
@@ -364,14 +385,8 @@ class ExternalLinkConfig:
                     "type": "number",
                     "exclusiveMinimum": 0.0,
                 },
-                "content_types": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "excluded_urls": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
+                "content_types": RegexPatterns.jsonschema(),
+                "excluded_urls": RegexPatterns.jsonschema(),
                 "allways_request_all_links": {"type": "boolean"},
                 "keep_deleted_links": {"type": "boolean"},
             },
@@ -422,6 +437,7 @@ def load_config(
                 datetime.datetime: _to_datetime,
                 BackupArchiveConfig: BackupArchiveConfig.from_toml,
                 ExternalLinkLogDirectoryConfig: ExternalLinkLogDirectoryConfig.from_toml,
+                RegexPatterns: RegexPatterns.from_toml,
                 UserAgentConfig: UserAgentConfig.from_toml,
             },
             strict=True,

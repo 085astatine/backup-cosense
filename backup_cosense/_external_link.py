@@ -14,7 +14,7 @@ import dacite
 import multidict
 
 from ._backup import ExternalLink, Location
-from ._config import ExternalLinkConfig, ExternalLinkSessionConfig
+from ._config import ExternalLinkConfig, ExternalLinkSessionConfig, RegexPatterns
 from ._git import CommitTarget
 from ._json import load_json, save_json
 
@@ -488,8 +488,8 @@ async def _request_external_links(
     # request arguments
     request_args = _RequestArguments(
         links_directory=links_directory,
-        content_types=[re.compile(pattern) for pattern in config.content_types],
-        excluded_urls=[re.compile(pattern) for pattern in config.excluded_urls],
+        content_types=config.content_types,
+        excluded_urls=config.excluded_urls,
     )
 
     # parallel requests
@@ -518,16 +518,16 @@ async def _request_external_links(
 @dataclasses.dataclass(frozen=True)
 class _RequestArguments:
     links_directory: _LinksDirectory
-    content_types: list[re.Pattern[str]]
-    excluded_urls: list[re.Pattern[str]]
+    content_types: RegexPatterns
+    excluded_urls: RegexPatterns
 
     def is_target_content_type(self, content_type: Optional[str]) -> bool:
         if content_type is None:
             return False
-        return any(pattern.match(content_type) for pattern in self.content_types)
+        return self.content_types.any_match(content_type)
 
     def is_excluded_url(self, url: str) -> bool:
-        return any(pattern.match(url) for pattern in self.excluded_urls)
+        return self.excluded_urls.any_match(url)
 
 
 class _RequestLogger(logging.LoggerAdapter):
