@@ -176,33 +176,17 @@ path = "<path>"
 
 # Directory name to record the access result of external links. (optional)
 # By using saved logs, only newly added external links are targeted.
-# type: <str>
-# default: log
+# type: <str> | {name=<str>, keep=<int> | "all"}
+# default: {name="log", keep="all"}
+# - name: Directory name
+# - keep:
+#     The number of access logs to keep
+#     - <int>: Keep the most recent <integer> logs.
+#     - "all": Keep all logs.
+#
 #
 # log_directory = "log"
-
-
-# The number of access logs to keep. (optional)
-# type: <int> | "all".
-# - <int>: Keep the most recent <integer> logs.
-# - "all": Keep all logs.
-# default: "all"
-#
-# keep_logs = "all"
-
-
-# Maximum number of requests that can be executed simultaneously. (optional)
-# type: <int>
-# default: 5
-#
-# parallel_limit = 5
-
-
-# Number of seconds to wait between requests (optional)
-# type: <float>
-# default: 1.0
-#
-# request_interval = 1.0
+# log_directory = {name="log", keep="all"}
 
 
 # Keep files in the Git repository even if the links is removed from Cosense. (optional)
@@ -219,6 +203,14 @@ path = "<path>"
 #
 # timeout = 30.0
 
+
+# Maximum number of requests that can be executed simultaneously. (optional)
+# type: <int>
+# default: 5
+#
+# parallel_limit = 5
+
+
 # Total number of seconds for the whole request. (optional)
 # Used as an argument to aiohttp.TCPConnector(parallel_limit_per_host=...)
 # limit simultaneous connections to the same endpoint.
@@ -227,6 +219,13 @@ path = "<path>"
 # default: 0
 #
 # parallel_limit_per_host = 1
+
+
+# Number of seconds to wait between requests (optional)
+# type: <float>
+# default: 1.0
+#
+# request_interval = 1.0
 
 
 # User-Agent used to aiohttp.ClientSession. (optional)
