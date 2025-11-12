@@ -484,7 +484,7 @@ async def _request_external_links(
     logger: logging.Logger,
 ) -> list[ExternalLinkLog]:
     # semaphore
-    semaphore = asyncio.Semaphore(config.parallel_limit)
+    semaphore = asyncio.Semaphore(config.session.parallel_limit)
     # request arguments
     request_args = _RequestArguments(
         links_directory=links_directory,
@@ -505,7 +505,7 @@ async def _request_external_links(
                 link,
                 _RequestLogger(logger, index),
             )
-            await asyncio.sleep(config.request_interval)
+            await asyncio.sleep(config.session.request_interval)
             return response
 
     logger.info(f"request {len(links)} links")

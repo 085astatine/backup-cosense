@@ -322,7 +322,9 @@ class ExternalLinkLogDirectoryConfig:
 @dataclasses.dataclass(frozen=True)
 class ExternalLinkSessionConfig:
     timeout: float = 30
+    parallel_limit: int = 5
     parallel_limit_per_host: int = 0
+    request_interval: float = 1.0
     user_agent: Optional[UserAgentConfig] = None
     request_headers: dict[str, str] = dataclasses.field(default_factory=dict)
 
@@ -336,9 +338,17 @@ class ExternalLinkSessionConfig:
                     "type": "number",
                     "exclusiveMinimum": 0.0,
                 },
+                "parallel_limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                },
                 "parallel_limit_per_host": {
                     "type": "integer",
                     "minimum": 0,
+                },
+                "request_interval": {
+                    "type": "number",
+                    "exclusiveMinimum": 0.0,
                 },
                 "user_agent": UserAgentConfig.jsonschema(),
                 "request_headers": {
@@ -359,8 +369,6 @@ class ExternalLinkConfig:
     log_directory: ExternalLinkLogDirectoryConfig = ExternalLinkLogDirectoryConfig()
     save_directory: str = "links"
     session: ExternalLinkSessionConfig = ExternalLinkSessionConfig()
-    parallel_limit: int = 5
-    request_interval: float = 1.0
     content_types: RegexPatterns = RegexPatterns()
     excluded_urls: RegexPatterns = RegexPatterns()
     allways_request_all_links: bool = False
@@ -377,14 +385,6 @@ class ExternalLinkConfig:
                 "log_directory": ExternalLinkLogDirectoryConfig.jsonschema(),
                 "save_directory": {"type": "string"},
                 "session": ExternalLinkSessionConfig.jsonschema(),
-                "parallel_limit": {
-                    "type": "integer",
-                    "minimum": 1,
-                },
-                "request_interval": {
-                    "type": "number",
-                    "exclusiveMinimum": 0.0,
-                },
                 "content_types": RegexPatterns.jsonschema(),
                 "excluded_urls": RegexPatterns.jsonschema(),
                 "allways_request_all_links": {"type": "boolean"},
