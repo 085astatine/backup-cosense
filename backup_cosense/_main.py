@@ -98,6 +98,7 @@ class CommonOption:
         # config sample
         parser.add_argument(
             "--config-sample",
+            default=argparse.SUPPRESS,
             nargs=0,
             action=_ConfigSampleAction,
             help="print a sample config.toml",
