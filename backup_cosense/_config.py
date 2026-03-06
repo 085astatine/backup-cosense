@@ -4,7 +4,8 @@ import dataclasses
 import datetime
 import logging
 import pathlib
-from typing import Any, Literal, Optional, get_args
+import re
+from typing import Any, Literal, Optional, Self, get_args
 
 import dacite
 import fake_useragent
@@ -56,6 +57,26 @@ FakeUserAgentPlatform = Literal["desktop", "mobile", "tablet"]
 
 
 @dataclasses.dataclass(frozen=True)
+class RegexPatterns:
+    patterns: list[re.Pattern[str]] = dataclasses.field(default_factory=list)
+
+    def any_match(self, value: str) -> bool:
+        return any(pattern.match(value) for pattern in self.patterns)
+
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "type": "array",
+            "items": {"type": "string"},
+        }
+        return schema
+
+    @classmethod
+    def from_toml(cls, value: list[str]) -> Self:
+        return cls([re.compile(x) for x in value])
+
+
+@dataclasses.dataclass(frozen=True)
 class UserAgentConfig:
     value: Optional[str] = None
     os: Optional[FakeUserAgentOS] = None
@@ -99,6 +120,12 @@ class UserAgentConfig:
         }
         return schema
 
+    @classmethod
+    def from_toml(cls, value: str | dict) -> Self:
+        if isinstance(value, str):
+            value = {"value": value}
+        return cls(**value)
+
 
 @dataclasses.dataclass(frozen=True)
 class BackupArchiveConfig:
@@ -133,6 +160,12 @@ class BackupArchiveConfig:
             ],
         }
         return schema
+
+    @classmethod
+    def from_toml(cls, value: str | dict) -> Self:
+        if isinstance(value, str):
+            value = {"name": value}
+        return cls(**value)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -250,9 +283,48 @@ class GitConfig:
 
 
 @dataclasses.dataclass(frozen=True)
+class ExternalLinkLogDirectoryConfig:
+    name: str = "log"
+    keep: int | Literal["all"] = "all"
+
+    @classmethod
+    def jsonschema(cls) -> dict[str, Any]:
+        schema = {
+            "oneOf": [
+                {"type": "string"},
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "name": {"type": "string"},
+                        "keep": {
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                },
+                                {"const": "all"},
+                            ],
+                        },
+                    },
+                },
+            ],
+        }
+        return schema
+
+    @classmethod
+    def from_toml(cls, value: str | dict) -> Self:
+        if isinstance(value, str):
+            value = {"name": value}
+        return cls(**value)
+
+
+@dataclasses.dataclass(frozen=True)
 class ExternalLinkSessionConfig:
     timeout: float = 30
+    parallel_limit: int = 5
     parallel_limit_per_host: int = 0
+    request_interval: float = 1.0
     user_agent: Optional[UserAgentConfig] = None
     request_headers: dict[str, str] = dataclasses.field(default_factory=dict)
 
@@ -266,9 +338,17 @@ class ExternalLinkSessionConfig:
                     "type": "number",
                     "exclusiveMinimum": 0.0,
                 },
+                "parallel_limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                },
                 "parallel_limit_per_host": {
                     "type": "integer",
                     "minimum": 0,
+                },
+                "request_interval": {
+                    "type": "number",
+                    "exclusiveMinimum": 0.0,
                 },
                 "user_agent": UserAgentConfig.jsonschema(),
                 "request_headers": {
@@ -286,15 +366,12 @@ class ExternalLinkSessionConfig:
 class ExternalLinkConfig:
     enabled: bool = False
     use_git_lfs: bool = False
-    log_directory: str = "log"
+    log_directory: ExternalLinkLogDirectoryConfig = ExternalLinkLogDirectoryConfig()
     save_directory: str = "links"
     session: ExternalLinkSessionConfig = ExternalLinkSessionConfig()
-    parallel_limit: int = 5
-    request_interval: float = 1.0
-    content_types: list[str] = dataclasses.field(default_factory=list)
-    excluded_urls: list[str] = dataclasses.field(default_factory=list)
+    content_types: RegexPatterns = RegexPatterns()
+    excluded_urls: RegexPatterns = RegexPatterns()
     allways_request_all_links: bool = False
-    keep_logs: int | Literal["all"] = "all"
     keep_deleted_links: bool = False
 
     @classmethod
@@ -305,35 +382,12 @@ class ExternalLinkConfig:
             "properties": {
                 "enabled": {"type": "boolean"},
                 "use_git_lfs": {"type": "boolean"},
-                "log_directory": {"type": "string"},
+                "log_directory": ExternalLinkLogDirectoryConfig.jsonschema(),
                 "save_directory": {"type": "string"},
                 "session": ExternalLinkSessionConfig.jsonschema(),
-                "parallel_limit": {
-                    "type": "integer",
-                    "minimum": 1,
-                },
-                "request_interval": {
-                    "type": "number",
-                    "exclusiveMinimum": 0.0,
-                },
-                "content_types": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "excluded_urls": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
+                "content_types": RegexPatterns.jsonschema(),
+                "excluded_urls": RegexPatterns.jsonschema(),
                 "allways_request_all_links": {"type": "boolean"},
-                "keep_logs": {
-                    "oneOf": [
-                        {
-                            "type": "integer",
-                            "minimum": 0,
-                        },
-                        {"const": "all"},
-                    ],
-                },
                 "keep_deleted_links": {"type": "boolean"},
             },
         }
@@ -381,8 +435,10 @@ def load_config(
         config=dacite.Config(
             type_hooks={
                 datetime.datetime: _to_datetime,
-                BackupArchiveConfig: _to_backup_archive,
-                UserAgentConfig: _to_user_agent,
+                BackupArchiveConfig: BackupArchiveConfig.from_toml,
+                ExternalLinkLogDirectoryConfig: ExternalLinkLogDirectoryConfig.from_toml,
+                RegexPatterns: RegexPatterns.from_toml,
+                UserAgentConfig: UserAgentConfig.from_toml,
             },
             strict=True,
         ),
@@ -421,12 +477,6 @@ def _is_datetime(
     return isinstance(instance, datetime.datetime)
 
 
-def _to_backup_archive(value: str | dict) -> BackupArchiveConfig:
-    if isinstance(value, str):
-        value = {"name": value}
-    return BackupArchiveConfig(**value)
-
-
 def _to_datetime(value: datetime.date | datetime.datetime) -> datetime.datetime:
     match value:
         case datetime.datetime():
@@ -434,9 +484,3 @@ def _to_datetime(value: datetime.date | datetime.datetime) -> datetime.datetime:
         case datetime.date():
             # add time(00:00:00) to date
             return datetime.datetime.combine(value, datetime.time())
-
-
-def _to_user_agent(value: str | dict) -> UserAgentConfig:
-    if isinstance(value, str):
-        value = {"value": value}
-    return UserAgentConfig(**value)

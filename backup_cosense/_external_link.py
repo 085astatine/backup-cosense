@@ -14,7 +14,7 @@ import dacite
 import multidict
 
 from ._backup import ExternalLink, Location
-from ._config import ExternalLinkConfig, ExternalLinkSessionConfig
+from ._config import ExternalLinkConfig, ExternalLinkSessionConfig, RegexPatterns
 from ._git import CommitTarget
 from ._json import load_json, save_json
 
@@ -119,7 +119,7 @@ def save_external_links(
     if create_session is None:
         create_session = default_create_session
     # log directory
-    log_directory = _LogDirectory(pathlib.Path(config.log_directory), logger)
+    log_directory = _LogDirectory(pathlib.Path(config.log_directory.name), logger)
     # links directory
     links_directory = _LinksDirectory(
         git_directory.joinpath(config.save_directory),
@@ -147,8 +147,8 @@ def save_external_links(
     log = log_editor.output()
     log_directory.save(log)
     # clean logs
-    if config.keep_logs != "all":
-        log_directory.clean(config.keep_logs)
+    if config.log_directory.keep != "all":
+        log_directory.clean(config.log_directory.keep)
     # commit target
     return _commit_target(
         config,
@@ -484,12 +484,12 @@ async def _request_external_links(
     logger: logging.Logger,
 ) -> list[ExternalLinkLog]:
     # semaphore
-    semaphore = asyncio.Semaphore(config.parallel_limit)
+    semaphore = asyncio.Semaphore(config.session.parallel_limit)
     # request arguments
     request_args = _RequestArguments(
         links_directory=links_directory,
-        content_types=[re.compile(pattern) for pattern in config.content_types],
-        excluded_urls=[re.compile(pattern) for pattern in config.excluded_urls],
+        content_types=config.content_types,
+        excluded_urls=config.excluded_urls,
     )
 
     # parallel requests
@@ -505,7 +505,7 @@ async def _request_external_links(
                 link,
                 _RequestLogger(logger, index),
             )
-            await asyncio.sleep(config.request_interval)
+            await asyncio.sleep(config.session.request_interval)
             return response
 
     logger.info(f"request {len(links)} links")
@@ -518,16 +518,16 @@ async def _request_external_links(
 @dataclasses.dataclass(frozen=True)
 class _RequestArguments:
     links_directory: _LinksDirectory
-    content_types: list[re.Pattern[str]]
-    excluded_urls: list[re.Pattern[str]]
+    content_types: RegexPatterns
+    excluded_urls: RegexPatterns
 
     def is_target_content_type(self, content_type: Optional[str]) -> bool:
         if content_type is None:
             return False
-        return any(pattern.match(content_type) for pattern in self.content_types)
+        return self.content_types.any_match(content_type)
 
     def is_excluded_url(self, url: str) -> bool:
-        return any(pattern.match(url) for pattern in self.excluded_urls)
+        return self.excluded_urls.any_match(url)
 
 
 class _RequestLogger(logging.LoggerAdapter):

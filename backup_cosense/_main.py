@@ -5,6 +5,7 @@ import dataclasses
 import datetime
 import logging
 import pathlib
+import sys
 from typing import Any, Optional, Sequence
 
 from ._backup import BackupArchive
@@ -93,6 +94,14 @@ class CommonOption:
             dest="verbose",
             action="store_true",
             help="set log level to debug",
+        )
+        # config sample
+        parser.add_argument(
+            "--config-sample",
+            default=argparse.SUPPRESS,
+            nargs=0,
+            action=_ConfigSampleAction,
+            help="print a sample config.toml",
         )
 
 
@@ -199,6 +208,20 @@ def _argument_parser() -> argparse.ArgumentParser:
     )
     ExportOption.add_arguments(export_parser)
     return parser
+
+
+class _ConfigSampleAction(argparse.Action):
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[Any] | None,
+        option_string: str | None = None,
+    ) -> None:
+        path = pathlib.Path(__file__).with_name("config_sample.toml")
+        text = path.read_text(encoding="utf-8")
+        sys.stdout.write(text)
+        parser.exit()
 
 
 class _ToDatetimeAction(argparse.Action):
